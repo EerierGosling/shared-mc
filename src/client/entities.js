@@ -149,34 +149,82 @@ function setItemMeshTexture (mesh, itemName) {
   })
 }
 
+// Vanilla draws a nametag with its 8px font at 1/40 block per pixel: white
+// text on a black box at 25% alpha with one pixel of padding around the glyphs.
+const TAG_FONT_PX = 8
+const TAG_BLOCKS_PER_PX = 1 / 40
+const TAG_HEIGHT = TAG_FONT_PX + 2
+// Monocraft is a vector font, so the canvas antialiases it at every size. Draw
+// it 4x oversampled and threshold the alpha back to hard pixels; at 8px the
+// smeared 1px strokes would not survive the threshold.
+const TAG_OVERSAMPLE = 4
+const TAG_FONT = `${TAG_FONT_PX * TAG_OVERSAMPLE}px Monocraft`
+
+// Until the face is in, the canvas would silently fall back to a system font.
+// Wait once; if the load fails draw anyway — a wrong font beats no tag.
+const tagFontReady = document.fonts
+  ? document.fonts.load(TAG_FONT).catch(() => {})
+  : Promise.resolve()
+
+// Returns the tag width in font pixels.
+function drawNametag (canvas, text) {
+  const ctx = canvas.getContext('2d')
+  ctx.font = TAG_FONT
+  const width = Math.ceil(ctx.measureText(text).width / TAG_OVERSAMPLE) + 2
+  canvas.width = width * TAG_OVERSAMPLE
+  canvas.height = TAG_HEIGHT * TAG_OVERSAMPLE
+  // resizing the canvas reset the context
+  ctx.font = TAG_FONT
+  ctx.fillStyle = '#ffffff'
+  ctx.textAlign = 'left'
+  ctx.textBaseline = 'alphabetic'
+  // Monocraft sits 7px above the baseline and 1px below at 8px, so a baseline
+  // on row 8 keeps the glyphs inside the one-pixel padding on both sides.
+  ctx.fillText(text, TAG_OVERSAMPLE, TAG_FONT_PX * TAG_OVERSAMPLE)
+
+  const img = ctx.getImageData(0, 0, canvas.width, canvas.height)
+  const d = img.data
+  for (let i = 0; i < d.length; i += 4) {
+    const glyph = d[i + 3] >= 128
+    d[i] = d[i + 1] = d[i + 2] = glyph ? 255 : 0
+    d[i + 3] = glyph ? 255 : 64
+  }
+  ctx.putImageData(img, 0, 0)
+  return width
+}
+
 function attachNametag (mesh, entity) {
   if (entity.username === undefined) return
 
   const canvas = document.createElement('canvas')
-  canvas.width = 500
-  canvas.height = 100
-  const ctx = canvas.getContext('2d')
-  ctx.font = '50pt Arial'
-  ctx.fillStyle = '#000000'
-  ctx.textAlign = 'left'
-  ctx.textBaseline = 'top'
-  ctx.fillText(entity.username, 100, 0)
-
   const tex = new THREE.Texture(canvas)
-  tex.needsUpdate = true
+  // Sampled well above its native 1/40 block per pixel, so keep the pixels
+  // square rather than letting mipmaps and linear magnification smear them.
+  tex.magFilter = THREE.NearestFilter
+  tex.minFilter = THREE.LinearFilter
+  tex.generateMipmaps = false
   // The chunk material is transparent too (alphaTest), so terrain and this
   // sprite share three's back-to-front transparent pass, sorted by object
   // origin — for a 16-block section that is its corner, so the wall right
   // behind a tag routinely sorts in front of it. In that order a depth-writing
-  // sprite stamps its whole, mostly empty quad into the depth buffer and the
-  // wall fails the depth test behind it: an x-ray hole. Without the depth
-  // write the wall just paints over the tag instead. So draw tags after the
-  // world, testing depth against it but never writing, and discard the clear
-  // pixels so they cannot tint the mob underneath.
+  // sprite stamps its whole quad into the depth buffer and the wall fails the
+  // depth test behind it: an x-ray hole. Without the depth write the wall just
+  // paints over the tag instead. So draw tags after the world, testing depth
+  // against it but never writing.
   const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthWrite: false, alphaTest: 0.1 }))
   sprite.renderOrder = 1
-  sprite.position.y += (entity.height || 1.8) + 0.6
+  // Nothing to show until the font has been drawn; a blank 1x1 quad would
+  // flash over the head in the meantime.
+  sprite.visible = false
+  sprite.position.y += (entity.height || 1.8) + 0.5
   mesh.add(sprite)
+
+  tagFontReady.then(() => {
+    const width = drawNametag(canvas, entity.username)
+    tex.needsUpdate = true
+    sprite.scale.set(width * TAG_BLOCKS_PER_PX, TAG_HEIGHT * TAG_BLOCKS_PER_PX, 1)
+    sprite.visible = true
+  })
 }
 
 function buildPlaceholderMesh (entity) {
