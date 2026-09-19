@@ -117,6 +117,8 @@ socket.on('version', version => {
   if (!listening) {
     // Wires loadChunk / unloadChunk / entity / blockUpdate straight off the socket.
     viewer.listen(socket)
+    // Entity moves arrive merged per tick as one array (worldStream.js).
+    socket.on('entities', list => { for (const e of list) viewer.updateEntity(e) })
     listening = true
   }
 })
