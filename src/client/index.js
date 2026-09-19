@@ -35,6 +35,7 @@ window.__viewer = viewer
 // upgrade probe starves, leaving the whole stream on long-polling (seconds
 // of queueing). Polling stays as the fallback for proxies that block ws.
 const socket = io({ transports: ['websocket', 'polling'] })
+window.__socket = socket
 const hud = new Hud()
 const inventoryUI = new InventoryUI(socket)
 const minimap = new Minimap(viewer.entities)
