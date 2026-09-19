@@ -43,6 +43,7 @@ class Controller {
     this.effective = {}
     this.lastLookAt = new Map() // socket.id -> timestamp
     this.lastChatAt = new Map()
+    this.diggers = new Set() // socket.ids currently holding the mouse button
     this.digHeld = false
     this.digging = false
     for (const key of CONTROL_KEYS) this.effective[key] = false
@@ -50,6 +51,7 @@ class Controller {
 
   setBot (bot) {
     this.bot = bot
+    this.diggers.clear()
     this.digHeld = false
     this.digging = false
     this._applyEffective(true)
@@ -57,6 +59,7 @@ class Controller {
 
   clearBot () {
     this.bot = null
+    this.diggers.clear()
     this.digHeld = false
     this.digging = false
   }
@@ -64,7 +67,7 @@ class Controller {
   register (socket) {
     socket.on('input:state', state => this.setInput(socket.id, state))
     socket.on('input:look', look => this.look(socket.id, look))
-    socket.on('action:dig', payload => this.setDig(Boolean(payload && payload.active)))
+    socket.on('action:dig', payload => this.setDig(socket.id, Boolean(payload && payload.active)))
     socket.on('action:use', () => this.use())
     socket.on('action:attack', () => this.attack())
     socket.on('hotbar', payload => this.setHotbar(payload && payload.slot))
@@ -79,6 +82,8 @@ class Controller {
     this.lastLookAt.delete(socketId)
     this.lastChatAt.delete(socketId)
     this._applyEffective()
+    // A tab that vanishes mid-click must not leave the bot mining forever.
+    this._setDigHeld(socketId, false)
   }
 
   // --- movement ------------------------------------------------------------
@@ -129,13 +134,22 @@ class Controller {
     return blockAtCursor(this.bot, this.config.reach)
   }
 
-  setDig (active) {
+  setDig (socketId, active) {
     if (active && this._entityAtCursor()) {
       this.attack()
       return
     }
-    this.digHeld = active
-    if (active) this._digLoop()
+    this._setDigHeld(socketId, active)
+  }
+
+  // Same OR merge as movement: the bot digs while anyone holds the button.
+  _setDigHeld (socketId, active) {
+    if (active) this.diggers.add(socketId)
+    else this.diggers.delete(socketId)
+    const held = this.diggers.size > 0
+    if (held === this.digHeld) return
+    this.digHeld = held
+    if (held) this._digLoop()
     else this._stopDigging()
   }
 
@@ -171,11 +185,19 @@ class Controller {
           await sleep(100)
           continue
         }
+        // Tell every viewer how long this dig will take so they can animate
+        // crack stages locally — without it a block silently pops seconds
+        // after the click, which reads as lag.
+        let digMs = 1000
+        try { digMs = this.bot.digTime(block) } catch (err) {}
+        if (this.io) this.io.emit('dig:start', { position: block.position, ms: digMs })
         try {
           // 'ignore' keeps the bot's head where the browser pointed it.
           await this.bot.dig(block, 'ignore')
         } catch (err) {
           await sleep(100)
+        } finally {
+          if (this.io) this.io.emit('dig:stop')
         }
       }
     } finally {
@@ -184,6 +206,7 @@ class Controller {
   }
 
   _stopDigging () {
+    if (this.io) this.io.emit('dig:stop')
     if (!this.bot) return
     try {
       this.bot.stopDigging()
@@ -307,6 +330,7 @@ class Controller {
   }
 
   stopEverything () {
+    this.diggers.clear()
     this.digHeld = false
     this._stopDigging()
     this.desired.clear()

@@ -8,7 +8,9 @@ const { Viewer } = require('prismarine-viewer/viewer')
 const { supportedVersions } = require('prismarine-viewer/viewer/lib/version')
 const { Hud } = require('./hud')
 const InventoryUI = require('./inventory')
+const BlockLights = require('./lights')
 const Minimap = require('./minimap')
+const BreakingAnimation = require('./breaking')
 const setupInput = require('./input')
 const { createSky, applySkyForTime } = require('./sky')
 const { Entities } = require('./entities')
@@ -32,6 +34,7 @@ const socket = io({ transports: ['websocket', 'polling'] })
 const hud = new Hud()
 const inventoryUI = new InventoryUI(socket)
 const minimap = new Minimap()
+const breaking = new BreakingAnimation(viewer.scene)
 
 // First-person hand viewmodel, parented to the camera so it rides along with
 // look direction for free. Swung from input.js while a dig/attack is held.
@@ -52,6 +55,7 @@ highlight.visible = false
 viewer.scene.add(highlight)
 
 const sky = createSky(viewer)
+const blockLights = new BlockLights(viewer.scene)
 
 let listening = false
 
@@ -76,6 +80,7 @@ socket.on('version', version => {
     hud.setStatus('error', `this build cannot render Minecraft ${version}`)
     return
   }
+  breaking.setVersion(version)
   if (!listening) {
     // Wires loadChunk / unloadChunk / entity / blockUpdate straight off the socket.
     viewer.listen(socket)
@@ -91,7 +96,11 @@ socket.on('position', ({ pos, yaw, pitch }) => {
     camera.pitch = pitch
   }
   viewer.setFirstPersonCamera(pos, camera.yaw, camera.pitch)
+  minimap.setCenter(pos)
 })
+
+socket.on('dig:start', payload => breaking.start(payload))
+socket.on('dig:stop', () => breaking.stop())
 
 socket.on('state', state => {
   hud.setState(state)
@@ -109,7 +118,7 @@ socket.on('chat', message => {
   hud.addChat(message.text, message.position === 'system' ? 'system' : null)
 })
 
-socket.on('minimap', frame => minimap.setFrame(frame))
+socket.on('lights', lights => blockLights.set(lights))
 
 // --- latency readout --------------------------------------------------------
 socket.on('latency:pong', sentAt => hud.setPing(Date.now() - sentAt))
@@ -119,7 +128,9 @@ setInterval(() => socket.emit('latency:ping', Date.now()), 2000)
 function animate () {
   window.requestAnimationFrame(animate)
   viewer.update()
+  breaking.update()
   minimap.setYaw(camera.yaw)
+  minimap.render(renderer, viewer.scene)
   renderer.render(viewer.scene, viewer.camera)
 }
 animate()

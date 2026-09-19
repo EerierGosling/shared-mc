@@ -30,7 +30,14 @@ function attachWorldView (bot, socket, viewDistance, onBlockClicked) {
   // model and would otherwise throw "Unknown entity item").
   const sendDroppedItem = (entity) => {
     if (entity.name !== 'item') return
-    const item = entity.getDroppedItem && entity.getDroppedItem()
+    // fromNotch inside getDroppedItem throws on metadata shapes it doesn't
+    // know; a weird stack must not take the whole server down.
+    let item = null
+    try {
+      item = entity.getDroppedItem && entity.getDroppedItem()
+    } catch (err) {
+      return
+    }
     if (!item) return
     socket.emit('entity', { id: entity.id, itemName: item.name })
   }
