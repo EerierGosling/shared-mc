@@ -2,6 +2,13 @@
 
 const MAX_CHAT_LINES = 40
 
+// Vanilla HUD sprites, served out of minecraft-assets. Health and hunger are
+// both ten icons covering twenty points, so each icon is worth two.
+const HUD = '/assets/gui/sprites/hud/'
+const ICON_COUNT = 10
+const HEART = { empty: HUD + 'heart/container.png', half: HUD + 'heart/half.png', full: HUD + 'heart/full.png' }
+const FOOD = { empty: HUD + 'food_empty.png', half: HUD + 'food_half.png', full: HUD + 'food_full.png' }
+
 const el = id => document.getElementById(id)
 
 /** Everything drawn in DOM on top of the canvas. */
@@ -24,6 +31,9 @@ class Hud {
       this.hotbar.appendChild(slot)
       this.slots.push(slot)
     }
+
+    this.hearts = iconRow(this.health)
+    this.drumsticks = iconRow(this.food)
   }
 
   setStatus (state, message) {
@@ -57,8 +67,8 @@ class Hud {
   }
 
   renderVitals (state) {
-    this.health.textContent = `HP ${bar(state.health, 20)}`
-    this.food.textContent = `FD ${bar(state.food, 20)}`
+    paintIcons(this.hearts, state.health, HEART)
+    paintIcons(this.drumsticks, state.food, FOOD)
   }
 
   renderHotbar (state) {
@@ -126,9 +136,30 @@ function appendCount (slot, count) {
   slot.appendChild(badge)
 }
 
-function bar (value, max) {
-  const filled = Math.max(0, Math.min(max, Math.round(value || 0)))
-  return `${'|'.repeat(filled)}${'.'.repeat(max - filled)}`
+function iconRow (parent) {
+  const cells = []
+  for (let i = 0; i < ICON_COUNT; i++) {
+    const cell = document.createElement('i')
+    parent.appendChild(cell)
+    cells.push(cell)
+  }
+  return cells
+}
+
+/**
+ * Paints one row of hearts or drumsticks. Vanilla always draws the empty
+ * container first and layers the full or half icon over it, which is what the
+ * two stacked background images are doing.
+ */
+function paintIcons (cells, value, sprites) {
+  const points = Math.max(0, Math.round(value || 0))
+  cells.forEach((cell, i) => {
+    const remaining = points - i * 2
+    const top = remaining >= 2 ? sprites.full : remaining === 1 ? sprites.half : null
+    cell.style.backgroundImage = top
+      ? `url(${top}), url(${sprites.empty})`
+      : `url(${sprites.empty})`
+  })
 }
 
 function escapeHtml (text) {

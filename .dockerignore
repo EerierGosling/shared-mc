@@ -1,0 +1,10 @@
+# The image runs its own npm install and npm run build; copying the host's
+# node_modules over that would clobber correctly-built native deps, and it is 1.3G.
+node_modules/
+dist/
+
+# Compose passes config through environment:, so the host .env must not be baked in.
+.env
+
+.git/
+*.log

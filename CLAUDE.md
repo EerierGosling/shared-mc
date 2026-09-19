@@ -30,6 +30,36 @@ full socket protocol — read that first.
 - **Server-side decisions stay server-side.** Dig/use/attack use
   `bot.blockAtCursor()` / `bot.entityAtCursor()` rather than a raycast supplied by
   the browser, so the bot stays authoritative.
+- **`canvas` is shimmed on the client and avoided on the server.**
+  prismarine-viewer requires node-canvas from `entities.js` (nametag textures,
+  which really do run in the browser) and `atlas.js` (server-only, reads PNGs off
+  disk). The browser gets `src/client/shims/canvas.js` via a webpack fallback. The
+  server dodges it by importing `prismarine-viewer/viewer/lib/worldView` directly
+  instead of the `prismarine-viewer/viewer` barrel — the barrel pulls in `Viewer`
+  → `entities` → node-canvas and all of three.js, none of which the server needs.
+  Do not "tidy" that deep import back into the barrel; it crashes startup with
+  `Cannot find module 'canvas'`.
+- **`MC_VERSION` is not the asset version.** prismarine-viewer only ships assets
+  for the last release of each major, so `1.20.4` resolves to `1.20.1` via
+  `getVersion()`. Looking for `/textures/1.20.4.png` will 404 and mean nothing.
+- **Never raycast from an unchecked bot position.** If `bot.entity.position`
+  goes NaN, prismarine-world's RaycastIterator never terminates — it stops on
+  `Math.min(tMax…) > maxDistance`, and every NaN comparison is false — so
+  `world.raycast` spins forever and one `state.js` tick wedges the whole server
+  at 100% CPU, serving nothing further. mineflayer's guard only checks that
+  `entity.position` exists, not that its components are numbers. Go through
+  `src/server/raycast.js`, never `bot.blockAtCursor()` / `bot.entityAtCursor()`
+  directly.
+- **A protocol mismatch shows up as NaN, not as an error.** Forcing `MC_VERSION`
+  at a server running something newer (ViaVersion will happily let you in) can
+  decode position packets into NaN. The symptom is a wedged server or a camera
+  that renders nothing, never a clean "wrong version" message.
+- **Keep mineflayer current, and suspect packet field renames first.** 1.20.3
+  repacked `entity_velocity` from flat `velocityX/Y/Z` into one `vec3i16`
+  `velocity`. mineflayer 4.25 still read the old names, so every knockback
+  produced `undefined / 8000` -> NaN velocity -> NaN position, and the vanilla
+  server kicked the bot with `invalid_player_movement` the moment anything hit
+  it. A stale field name does not throw; it quietly yields undefined.
 - The bot object is **replaced** on reconnect. Anything holding a reference gets
   it through `setBot()` / `clearBot()` from the `BotHolder` events. Don't cache
   `bot` at module scope.
@@ -42,7 +72,16 @@ full socket protocol — read that first.
 
 ## Status
 
-The code is written but has **not been run yet** — it was authored on a machine
-with no Node.js installed. Expect the first `npm run dev` to shake out typos,
-and expect the webpack bundle to be the fiddliest part. Please update this note
-once it has actually booted.
+It boots. `npm run dev` builds the bundle and the server comes up: our page is
+served at `/`, the bundle at `/dist/bundle.js`, and the viewer's `/worker.js`,
+`/textures/*` and `/blocksStates/*` all resolve. Verified against a dead
+Minecraft port, so the HTTP surface and the reconnect backoff are what was
+exercised — the bot half has not yet been driven against a live server.
+
+Node is installed via nvm (v22, matching the Dockerfile), so it is only on
+`PATH` in an interactive shell. Scripts that shell out non-interactively need
+`. "$NVM_DIR/nvm.sh"` first. v22 is a floor, not a preference: minecraft-protocol
+1.68 declares `node >=22`.
+
+Getting there took two fixes, both recorded above: the `canvas` shim and the
+`worldView` deep import.
