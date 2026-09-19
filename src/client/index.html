@@ -319,6 +319,46 @@
   #join-error { margin-top: calc(3 * var(--u)); font-size: calc(var(--px) * 7px); color: #555; }
   #join-error.bad { color: #a83232; }
 
+  /* --- death screen -------------------------------------------------------- */
+  /* Vanilla fills the screen with a 0x60500000 -> 0xA0803030 gradient, draws
+     the title at 2x, the cause and score under it, and a 200x20 button. */
+  #death {
+    inset: 0; display: none; pointer-events: auto;
+    background: linear-gradient(rgba(80, 0, 0, 0.38), rgba(128, 48, 48, 0.63));
+    flex-direction: column; align-items: center; text-align: center;
+  }
+  #death.open { display: flex; }
+  body.dead #crosshair { display: none; }
+  /* The tint covers the world, not the map: keep it readable while dead. */
+  body.dead #minimap { z-index: 1; }
+  #death-title {
+    margin: calc(60 * var(--u)) 0 0;
+    font-size: calc(var(--px) * 16px); font-weight: normal; line-height: 1;
+    text-shadow: calc(2 * var(--u)) calc(2 * var(--u)) 0 var(--shadow);
+  }
+  #death-cause { margin-top: calc(17 * var(--u)); min-height: calc(9 * var(--u)); }
+  #death-score { margin-top: calc(6 * var(--u)); }
+  #death-score b { color: var(--mc-yellow); font-weight: normal; }
+  #death-countdown { margin-top: calc(6 * var(--u)); color: var(--mc-gray); }
+  /* The vanilla widget: 200x20 texture, highlighted variant on hover. */
+  .mc-button {
+    width: calc(200 * var(--u)); height: calc(20 * var(--u));
+    margin-top: calc(24 * var(--u));
+    padding: 0; border: 0; cursor: pointer;
+    background: url('/assets/gui/sprites/widget/button.png') 0 0 / 100% 100%;
+    image-rendering: pixelated;
+    color: var(--mc-white); font: inherit;
+    text-shadow: var(--u) var(--u) 0 var(--shadow);
+  }
+  .mc-button:hover, .mc-button:focus-visible {
+    background-image: url('/assets/gui/sprites/widget/button_highlighted.png');
+    color: var(--mc-yellow); outline: none;
+  }
+  .mc-button:disabled {
+    background-image: url('/assets/gui/sprites/widget/button_disabled.png');
+    color: var(--mc-gray); cursor: default;
+  }
+
   /* --- inventory ----------------------------------------------------------- */
   #inventory {
     inset: 0; display: none; align-items: center; justify-content: center;
@@ -443,6 +483,13 @@
   </div>
   <input id="chat-input" maxlength="256" placeholder="say something&hellip; (/nick name)" autocomplete="off">
 
+  <div id="death" class="overlay">
+    <h1 id="death-title" class="shadowed">You died!</h1>
+    <div id="death-cause" class="shadowed"></div>
+    <div id="death-score" class="shadowed"></div>
+    <button id="respawn" class="mc-button">Respawn</button>
+    <div id="death-countdown" class="shadowed"></div>
+  </div>
 
   <div id="hint" class="overlay tooltip shadowed">
     <b>click</b> to play &nbsp; <b>WASD</b> move &nbsp; <b>space</b> jump<br>

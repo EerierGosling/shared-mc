@@ -88,6 +88,7 @@ class StatePusher {
 
     return {
       username: bot.username,
+      isAlive: bot.isAlive !== false,
       health: round(bot.health || 0, 1),
       food: bot.food,
       oxygen: bot.oxygenLevel,

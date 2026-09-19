@@ -98,6 +98,8 @@ socket.on('connect', () => hud.setStatus('connecting', 'connected to the stream'
 socket.on('disconnect', () => {
   hud.setStatus('error', 'lost the stream — retrying…')
   input.releaseAll()
+  // Reconnecting re-sends bot:death if the bot is still dead.
+  hud.hideDeath()
 })
 
 socket.on('bot:status', status => {
@@ -159,6 +161,20 @@ socket.on('state', state => {
 
 socket.on('chat', entry => hud.addChat(entry))
 socket.on('chat:history', entries => hud.setChatHistory(entries))
+
+// bot:death { diedAt, respawnAt, cause, score } arrives on death, again once
+// the combat packet supplies the cause, and on connect while the bot is dead.
+// The bot does not auto-respawn: 'respawn' from any browser, or respawnAt
+// passing, puts it back and bot:respawn follows.
+socket.on('bot:death', info => {
+  // The button needs a real cursor, and held keys must not carry over into
+  // the respawned bot.
+  input.releaseAll()
+  if (document.pointerLockElement) document.exitPointerLock()
+  inventoryUI.close()
+  hud.showDeath(info, () => socket.emit('respawn'))
+})
+socket.on('bot:respawn', () => hud.hideDeath())
 
 socket.on('lights', lights => blockLights.set(lights))
 

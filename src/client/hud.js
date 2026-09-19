@@ -32,10 +32,17 @@ class Hud {
     this.chatLog = el('chat-log')
     this.chatInput = el('chat-input')
     this.players = el('players')
+    this.death = el('death')
+    this.deathCause = el('death-cause')
+    this.deathScore = el('death-score')
+    this.deathCountdown = el('death-countdown')
+    this.respawnButton = el('respawn')
+    this.respawnAt = 0
     this.ping = null
     this.lastState = null
 
     setInterval(() => this._expireChat(), 500)
+    setInterval(() => this._tickDeath(), 250)
 
     this.slots = []
     for (let i = 0; i < 9; i++) {
@@ -166,6 +173,42 @@ class Hud {
 
   get chatOpen () {
     return this.chatInput.classList.contains('open')
+  }
+
+  // --- death screen ---------------------------------------------------------
+
+  /**
+   * info: { cause, score, respawnAt }. Arrives twice per death, the second
+   * time with the cause once the combat packet has landed, so this must be
+   * safe to call on an already-shown screen.
+   */
+  showDeath (info, onRespawn) {
+    this.deathCause.textContent = info.cause || ''
+    this.deathScore.innerHTML = `Score: <b>${Number(info.score) || 0}</b>`
+    this.respawnAt = info.respawnAt || 0
+    this.respawnButton.onclick = () => {
+      this.respawnButton.disabled = true
+      onRespawn()
+    }
+    this.respawnButton.disabled = false
+    this.death.classList.add('open')
+    document.body.classList.add('dead')
+    this._tickDeath()
+  }
+
+  hideDeath () {
+    this.death.classList.remove('open')
+    document.body.classList.remove('dead')
+  }
+
+  get dead () {
+    return this.death.classList.contains('open')
+  }
+
+  _tickDeath () {
+    if (!this.dead) return
+    const left = Math.max(0, Math.ceil((this.respawnAt - Date.now()) / 1000))
+    this.deathCountdown.textContent = `Respawning automatically in ${left}s`
   }
 }
 
