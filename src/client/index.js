@@ -117,8 +117,15 @@ socket.on('version', version => {
   if (!listening) {
     // Wires loadChunk / unloadChunk / entity / blockUpdate straight off the socket.
     viewer.listen(socket)
-    // Entity moves arrive merged per tick as one array (worldStream.js).
-    socket.on('entities', list => { for (const e of list) viewer.updateEntity(e) })
+    // Entity moves arrive merged per tick as one array (worldStream.js), so
+    // the skin painter has to be fed from here as well as from 'entity'.
+    socket.on('entities', list => {
+      for (const e of list) {
+        viewer.updateEntity(e)
+        skins.noteEntity(e)
+      }
+      skins.apply()
+    })
     listening = true
   }
 })
