@@ -54,6 +54,12 @@ full socket protocol — read that first.
   at a server running something newer (ViaVersion will happily let you in) can
   decode position packets into NaN. The symptom is a wedged server or a camera
   that renders nothing, never a clean "wrong version" message.
+- **Keep mineflayer current, and suspect packet field renames first.** 1.20.3
+  repacked `entity_velocity` from flat `velocityX/Y/Z` into one `vec3i16`
+  `velocity`. mineflayer 4.25 still read the old names, so every knockback
+  produced `undefined / 8000` -> NaN velocity -> NaN position, and the vanilla
+  server kicked the bot with `invalid_player_movement` the moment anything hit
+  it. A stale field name does not throw; it quietly yields undefined.
 - The bot object is **replaced** on reconnect. Anything holding a reference gets
   it through `setBot()` / `clearBot()` from the `BotHolder` events. Don't cache
   `bot` at module scope.
@@ -72,9 +78,10 @@ served at `/`, the bundle at `/dist/bundle.js`, and the viewer's `/worker.js`,
 Minecraft port, so the HTTP surface and the reconnect backoff are what was
 exercised — the bot half has not yet been driven against a live server.
 
-Node is installed via nvm (v20, matching the Dockerfile), so it is only on
+Node is installed via nvm (v22, matching the Dockerfile), so it is only on
 `PATH` in an interactive shell. Scripts that shell out non-interactively need
-`. "$NVM_DIR/nvm.sh"` first.
+`. "$NVM_DIR/nvm.sh"` first. v22 is a floor, not a preference: minecraft-protocol
+1.68 declares `node >=22`.
 
 Getting there took two fixes, both recorded above: the `canvas` shim and the
 `worldView` deep import.
