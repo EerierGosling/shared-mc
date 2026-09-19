@@ -3,6 +3,57 @@
 // THREE renderer and node-canvas, which only exist in the browser bundle.
 // worldView.js itself is pure data streaming — safe on the server.
 const { WorldView } = require('prismarine-viewer/viewer/lib/worldView')
+const { EventEmitter } = require('events')
+
+// One physics tick; entity moves are merged per entity within it.
+const ENTITY_FLUSH_MS = 50
+
+/**
+ * The emitter WorldView writes to. Everything passes straight through to the
+ * socket except 'entity', which WorldView fires once per entityMoved: on a
+ * busy server that measured ~250 messages a second per viewer, a third of them
+ * yaw/pitch only. Moves are merged per entity and flushed as one 'entities'
+ * array per tick; the client fans them back out to viewer.updateEntity.
+ */
+function createStreamEmitter (socket) {
+  const emitter = new EventEmitter()
+  const emitLocal = emitter.emit.bind(emitter)
+  let batch = []
+  const pending = new Map()
+
+  emitter.emit = (event, payload) => {
+    if (event !== 'entity') return socket.emit(event, payload)
+    const current = pending.get(payload.id)
+    // A spawn or a removal starts a fresh record, so a delete followed by a
+    // respawn of the same id keeps its order; plain moves fold into it.
+    if (current && !payload.delete && payload.name === undefined) {
+      Object.assign(current, payload)
+    } else {
+      pending.set(payload.id, payload)
+      batch.push(payload)
+    }
+    return true
+  }
+
+  // WorldView listens on its emitter for the click raycast the browser sends.
+  const onClick = click => emitLocal('mouseClick', click)
+  socket.on('mouseClick', onClick)
+
+  const timer = setInterval(() => {
+    if (batch.length === 0) return
+    socket.emit('entities', batch)
+    batch = []
+    pending.clear()
+  }, ENTITY_FLUSH_MS)
+
+  return {
+    emitter,
+    stop () {
+      clearInterval(timer)
+      socket.removeListener('mouseClick', onClick)
+    }
+  }
+}
 
 /**
  * Streams the world around the bot to one browser socket.
@@ -17,7 +68,8 @@ const { WorldView } = require('prismarine-viewer/viewer/lib/worldView')
 function attachWorldView (bot, socket, viewDistance, onBlockClicked) {
   socket.emit('version', bot.version)
 
-  const worldView = new WorldView(bot.world, viewDistance, bot.entity.position, socket)
+  const stream = createStreamEmitter(socket)
+  const worldView = new WorldView(bot.world, viewDistance, bot.entity.position, stream.emitter)
   worldView.init(bot.entity.position)
   worldView.listenToBot(bot)
 
@@ -27,7 +79,9 @@ function attachWorldView (bot, socket, viewDistance, onBlockClicked) {
   // entity.getDroppedItem(). Send it as a second, merged 'entity' update; the
   // client keys off itemName to draw that item's real texture instead of
   // falling back to prismarine-viewer's mob-model path (which has no "item"
-  // model and would otherwise throw "Unknown entity item").
+  // model and would otherwise throw "Unknown entity item"). It goes through
+  // the stream emitter so it folds into the spawn record it belongs to rather
+  // than overtaking it on the socket.
   //
   // Must listen on 'itemDrop', not 'entitySpawn': on modern protocol versions
   // item entities spawn via spawn_entity, which carries no metadata at all —
@@ -46,7 +100,7 @@ function attachWorldView (bot, socket, viewDistance, onBlockClicked) {
       return
     }
     if (!item) return
-    socket.emit('entity', { id: entity.id, itemName: item.name })
+    stream.emitter.emit('entity', { id: entity.id, itemName: item.name })
   }
   bot.on('itemDrop', sendDroppedItem)
 
@@ -81,6 +135,7 @@ function attachWorldView (bot, socket, viewDistance, onBlockClicked) {
     if (detached) return
     detached = true
     clearInterval(positionTimer)
+    stream.stop()
     bot.removeListener('move', onMove)
     bot.removeListener('itemDrop', sendDroppedItem)
     worldView.removeListenersFromBot(bot)

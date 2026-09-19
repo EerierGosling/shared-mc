@@ -35,6 +35,7 @@ window.__viewer = viewer
 // upgrade probe starves, leaving the whole stream on long-polling (seconds
 // of queueing). Polling stays as the fallback for proxies that block ws.
 const socket = io({ transports: ['websocket', 'polling'] })
+window.__socket = socket
 const hud = new Hud()
 const inventoryUI = new InventoryUI(socket)
 const minimap = new Minimap(viewer.entities)
@@ -117,6 +118,15 @@ socket.on('version', version => {
   if (!listening) {
     // Wires loadChunk / unloadChunk / entity / blockUpdate straight off the socket.
     viewer.listen(socket)
+    // Entity moves arrive merged per tick as one array (worldStream.js), so
+    // the skin painter has to be fed from here as well as from 'entity'.
+    socket.on('entities', list => {
+      for (const e of list) {
+        viewer.updateEntity(e)
+        skins.noteEntity(e)
+      }
+      skins.apply()
+    })
     listening = true
   }
 })
