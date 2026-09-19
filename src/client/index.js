@@ -28,11 +28,15 @@ const viewer = new Viewer(renderer)
 // same real mob models but falls back to a body+head shape instead of a flat
 // box for the mobs prismarine-viewer never got geometry for (see entities.js).
 viewer.entities = new Entities(viewer.scene)
+// Debug hook: lets a headless browser or the devtools console inspect the
+// renderer and the socket, which are otherwise module locals.
+window.__viewer = viewer
 // Websocket first: the default polling-then-upgrade dance never completes
 // here — the initial chunk dump saturates the polling transport so the
 // upgrade probe starves, leaving the whole stream on long-polling (seconds
 // of queueing). Polling stays as the fallback for proxies that block ws.
 const socket = io({ transports: ['websocket', 'polling'] })
+window.__socket = socket
 const hud = new Hud()
 const inventoryUI = new InventoryUI(socket)
 const minimap = new Minimap(viewer.entities)

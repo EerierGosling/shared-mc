@@ -3,7 +3,7 @@ const webpack = require('webpack')
 
 // prismarine-viewer's Viewer pulls in prismarine-chunk/-block/-entity, which expect
 // Node globals. These fallbacks mirror the upstream examples/web_client config.
-module.exports = {
+const clientConfig = {
   entry: './src/client/index.js',
   output: {
     path: path.resolve(__dirname, 'dist'),
@@ -48,8 +48,62 @@ module.exports = {
       // eslint-disable-next-line
       /viewer[\/|\\]lib[\/|\\]utils/,
       './utils.web.js'
+    ),
+    // Our WorldRenderer: same class, but it spawns our worker bundle below
+    // and meshes the full 1.18+ height. See src/client/viewer/.
+    new webpack.NormalModuleReplacementPlugin(
+      // eslint-disable-next-line
+      /prismarine-viewer[\/|\\]viewer[\/|\\]lib[\/|\\]worldrenderer\.js$/,
+      path.resolve(__dirname, 'src/client/viewer/worldrenderer.js')
     )
   ],
   performance: { hints: false },
   devtool: 'source-map'
 }
+
+// The mesher worker, replacing prismarine-viewer/public/worker.js (63 MB: it
+// bundles minecraft-data for every edition and version, and the Viewer starts
+// several copies). Same recipe as upstream's own webpack.config.js, minus
+// Bedrock's per-version data, which a mineflayer bot can never need. Bedrock's
+// common/ files stay: minecraft-data's index walks both editions' version
+// tables at load and throws on a missing one.
+const allowedWorkerFiles = ['blocks', 'blockCollisionShapes', 'tints', 'blockStates',
+  'biomes', 'features', 'version', 'legacy', 'versions', 'protocolVersions']
+
+const workerConfig = {
+  entry: './src/client/viewer/worker.js',
+  output: {
+    path: path.resolve(__dirname, 'dist'),
+    filename: 'worker.js'
+  },
+  resolve: { fallback: clientConfig.resolve.fallback },
+  module: {
+    rules: [{
+      test: /prismarine-viewer[\/|\\]viewer[\/|\\]lib[\/|\\]models\.js$/,
+      use: path.resolve(__dirname, 'src/client/viewer/models-loader.js')
+    }]
+  },
+  plugins: [
+    new webpack.ProvidePlugin({
+      Buffer: ['buffer', 'Buffer'],
+      process: 'process/browser'
+    })
+  ],
+  externals: [
+    function ({ context, request }, cb) {
+      if (context.includes('minecraft-data') && request.endsWith('.json')) {
+        const fileName = request.split('/').pop().replace('.json', '')
+        const bedrockData = request.includes('/bedrock/') && !request.includes('/bedrock/common/')
+        if (bedrockData || !allowedWorkerFiles.includes(fileName)) {
+          cb(null, [])
+          return
+        }
+      }
+      cb()
+    }
+  ],
+  performance: { hints: false },
+  devtool: 'source-map'
+}
+
+module.exports = [clientConfig, workerConfig]
