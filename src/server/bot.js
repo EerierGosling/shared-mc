@@ -32,7 +32,20 @@ class BotHolder extends EventEmitter {
   stop () {
     this.stopped = true
     clearTimeout(this.reconnectTimer)
-    if (this.bot) this.bot.quit()
+    const bot = this.bot
+    this.bot = null
+    this.ready = false
+    if (!bot) return
+    // A visitor closing the tab mid-connect lands here before mineflayer has
+    // finished attaching quit(), and this now runs on every disconnect rather
+    // than only at shutdown — so an unguarded call takes the server down with
+    // everyone else's bots on it. Fall back to cutting the socket.
+    try {
+      if (typeof bot.quit === 'function') bot.quit()
+      else if (bot._client && typeof bot._client.end === 'function') bot._client.end('session closed')
+    } catch (err) {
+      this.emit('log', `while stopping: ${err.message}`)
+    }
   }
 
   _connect () {

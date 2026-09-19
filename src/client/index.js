@@ -15,6 +15,8 @@ const setupInput = require('./input')
 const { createSky, applySkyForTime } = require('./sky')
 const { Entities } = require('./entities')
 const { Hand } = require('./hand')
+const { JoinScreen } = require('./join')
+const SkinPainter = require('./skins')
 
 const canvas = document.getElementById('viewport')
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: false })
@@ -50,7 +52,7 @@ hand.attachTo(viewer.camera)
 // so mouse movement shows up on screen before the network round trip lands.
 const camera = { yaw: 0, pitch: 0 }
 
-const input = setupInput({ socket, viewer, camera, hud, inventoryUI, canvas, hand })
+const input = setupInput({ socket, viewer, camera, hud, inventoryUI, canvas, hand, join })
 
 const highlight = new THREE.LineSegments(
   new THREE.EdgesGeometry(new THREE.BoxGeometry(1.002, 1.002, 1.002)),
@@ -64,7 +66,30 @@ const blockLights = new BlockLights(viewer.scene)
 
 let listening = false
 
-socket.on('connect', () => hud.setStatus('connecting', 'connected to the stream, waiting for the bot…'))
+// Nothing is driveable until this visitor has a bot of their own, so input is
+// wired only once the join is accepted. Until then the browser is just a page.
+const skins = new SkinPainter(viewer)
+const join = new JoinScreen(socket, identity => {
+  hud.setStatus('connecting', `joining as ${identity.username}…`)
+})
+
+socket.on('roster', roster => {
+  skins.setRoster(roster)
+  hud.setRoster(roster)
+})
+
+// The viewer consumes 'entity' itself; we watch the same stream to learn which
+// entity id belongs to which player so their skin can be painted on.
+socket.on('entity', entity => {
+  skins.noteEntity(entity)
+  skins.apply()
+})
+
+socket.on('action:refused', ({ kind, retryIn }) => {
+  hud.addChat(`* too much ${kind} — wait ${retryIn}s`, 'system')
+})
+
+socket.on('connect', () => hud.setStatus('connecting', 'connected to the stream'))
 
 socket.on('disconnect', () => {
   hud.setStatus('error', 'lost the stream — retrying…')

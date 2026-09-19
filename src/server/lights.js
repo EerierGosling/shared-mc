@@ -30,8 +30,8 @@ const MOVE_EPSILON = 2
  * current from blockUpdate events.
  */
 class LightTracker {
-  constructor (io) {
-    this.io = io
+  constructor (emitter) {
+    this.emitter = emitter
     this.bot = null
     this.timer = null
     this.listeners = []
@@ -190,7 +190,7 @@ class LightTracker {
     if (serialized === this.lastSerialized) return
     this.lastSerialized = serialized
     this.lastPayload = payload
-    this.io.emit('lights', payload)
+    this.emitter.emit('lights', payload)
   }
 }
 

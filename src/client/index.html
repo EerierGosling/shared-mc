@@ -208,6 +208,103 @@
   #chat-input.open { display: block; }
   #chat-input::placeholder { color: #7f7f7f; }
 
+  /* --- player list --------------------------------------------------------- */
+  #players {
+    top: calc(2 * var(--u)); right: calc(2 * var(--u));
+    min-width: calc(60 * var(--u));
+    padding: calc(1 * var(--u)) calc(2 * var(--u));
+    background: rgba(0, 0, 0, 0.5);
+    text-shadow: var(--u) var(--u) 0 var(--shadow);
+  }
+  .player { display: flex; align-items: center; gap: calc(2 * var(--u)); }
+  /* The face is the 8x8 head region of a 64x64 skin sheet, cropped by CSS. */
+  .player i {
+    width: calc(8 * var(--u)); height: calc(8 * var(--u));
+    background-size: calc(64 * var(--u)) calc(64 * var(--u));
+    background-position: calc(-8 * var(--u)) calc(-8 * var(--u));
+  }
+
+  /* --- join screen ---------------------------------------------------------- */
+  #join {
+    inset: 0; display: none; align-items: center; justify-content: center;
+    background: rgba(0, 0, 0, 0.82); pointer-events: auto;
+  }
+  #join.open { display: flex; }
+  #join-panel {
+    background: var(--gui);
+    border-style: solid; border-width: calc(2 * var(--u));
+    border-color: var(--gui-lit) var(--gui-dim) var(--gui-dim) var(--gui-lit);
+    padding: calc(5 * var(--u));
+    width: calc(150 * var(--u)); max-width: 92vw;
+    color: var(--ink); text-align: center;
+  }
+  #join-panel h1 {
+    margin: 0 0 calc(4 * var(--u));
+    font-size: calc(var(--px) * 12px); font-weight: normal;
+  }
+  #join-name {
+    width: 100%; font: inherit;
+    font-size: calc(var(--px) * 10px);
+    padding: calc(2 * var(--u));
+    color: var(--mc-white); background: #000;
+    border-style: solid; border-width: var(--u);
+    border-color: var(--slot-dark) var(--gui-lit) var(--gui-lit) var(--slot-dark);
+    outline: none; text-align: center;
+  }
+  /* Minecraft's world-select list: stacked rows, selection is a white outline. */
+  #join-modes { display: flex; flex-direction: column; gap: var(--u); margin-bottom: calc(4 * var(--u)); }
+  .mode-row {
+    display: flex; align-items: center; gap: calc(3 * var(--u));
+    width: 100%; text-align: left; cursor: pointer; font: inherit;
+    padding: calc(2 * var(--u));
+    color: var(--mc-white); background: #2e2e2e;
+    border: calc(1 * var(--u)) solid #101010;
+  }
+  .mode-row:hover:not(:disabled) { background: #43434f; }
+  .mode-row.selected { border-color: var(--mc-white); background: #43434f; }
+  .mode-row.full { color: #7f7f7f; cursor: default; }
+  .mode-row i {
+    flex: none;
+    width: calc(16 * var(--u)); height: calc(16 * var(--u));
+    background-size: contain; background-repeat: no-repeat; background-position: center;
+  }
+  .mode-row span { display: flex; flex-direction: column; gap: calc(0.5 * var(--u)); }
+  .mode-row b { font-weight: normal; font-size: calc(var(--px) * 9px); }
+  .mode-row small { font-size: calc(var(--px) * 6px); color: #a0a0a0; line-height: 1.4; }
+  .mode-row.selected small { color: #c6c6c6; }
+
+  /* Name and skin only matter for your own bot, so they stay hidden until then. */
+  #join-identity { display: none; }
+  #join-identity.open { display: block; }
+
+  #join-skins {
+    display: flex; flex-wrap: wrap; justify-content: center;
+    gap: calc(2 * var(--u)); margin: calc(4 * var(--u)) 0;
+  }
+  .skin {
+    width: calc(16 * var(--u)); height: calc(16 * var(--u));
+    padding: 0; cursor: pointer;
+    background-size: calc(128 * var(--u)) calc(128 * var(--u));
+    background-position: calc(-16 * var(--u)) calc(-16 * var(--u));
+    background-color: var(--slot);
+    border-style: solid; border-width: var(--u);
+    border-color: var(--slot-dark) var(--gui-lit) var(--gui-lit) var(--slot-dark);
+  }
+  .skin.selected { border-color: var(--mc-white); background-color: #fff; }
+  /* Vanilla's button: grey slab, light top-left, dark bottom-right. */
+  #join-button {
+    width: 100%; font: inherit; font-size: calc(var(--px) * 10px);
+    padding: calc(2 * var(--u)); cursor: pointer;
+    color: var(--mc-white); background: #6b6b6b;
+    border-style: solid; border-width: calc(2 * var(--u));
+    border-color: #a0a0a0 #2b2b2b #2b2b2b #a0a0a0;
+    text-shadow: var(--u) var(--u) 0 var(--shadow);
+  }
+  #join-button:hover:not(:disabled) { background: #7f8caa; }
+  #join-button:disabled { color: #a0a0a0; cursor: default; }
+  #join-error { margin-top: calc(3 * var(--u)); font-size: calc(var(--px) * 7px); color: #555; }
+  #join-error.bad { color: #a83232; }
+
   /* --- inventory ----------------------------------------------------------- */
   #inventory {
     inset: 0; display: none; align-items: center; justify-content: center;
@@ -336,6 +433,21 @@
     <b>click</b> to play &nbsp; <b>WASD</b> move &nbsp; <b>space</b> jump<br>
     <b>LMB</b> mine &nbsp; <b>RMB</b> use/place &nbsp; <b>1-9</b> hotbar<br>
     <b>E</b> inventory &nbsp; <b>T</b> chat &nbsp; <b>Q</b> drop &nbsp; <b>G</b> walk to cursor
+  </div>
+
+  <div id="players" class="overlay"></div>
+
+  <div id="join" class="overlay">
+    <form id="join-panel" action="#">
+      <h1>Shared Minecraft</h1>
+      <div id="join-modes"></div>
+      <div id="join-identity">
+        <input id="join-name" maxlength="16" placeholder="your name" autocomplete="off" spellcheck="false">
+        <div id="join-skins"></div>
+      </div>
+      <button id="join-button" type="submit" disabled>Play</button>
+      <p id="join-error"></p>
+    </form>
   </div>
 
   <div id="inventory" class="overlay">

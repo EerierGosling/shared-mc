@@ -21,6 +21,7 @@ class Hud {
     this.hotbar = el('hotbar')
     this.chatLog = el('chat-log')
     this.chatInput = el('chat-input')
+    this.players = el('players')
     this.ping = null
     this.lastState = null
 
@@ -39,6 +40,21 @@ class Hud {
   setStatus (state, message) {
     this.status.dataset.state = state
     this.status.textContent = message
+  }
+
+  /** Who else is here. Vanilla shows this on Tab; we keep it always visible. */
+  setRoster (roster) {
+    if (!this.players) return
+    this.players.innerHTML = ''
+    for (const { username, skin } of roster) {
+      const row = document.createElement('div')
+      row.className = 'player'
+      const face = document.createElement('i')
+      face.style.backgroundImage = `url(/assets/entity/player/wide/${skin}.png)`
+      row.appendChild(face)
+      row.appendChild(document.createTextNode(username))
+      this.players.appendChild(row)
+    }
   }
 
   setPing (ms) {

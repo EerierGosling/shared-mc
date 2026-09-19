@@ -11,8 +11,8 @@ const UPDATE_THROTTLE_MS = 150
  * 45 offhand).
  */
 class InventoryBridge {
-  constructor (io) {
-    this.io = io
+  constructor (socket) {
+    this.socket = socket
     this.bot = null
     this.listeners = []
     this.pending = null
@@ -23,9 +23,9 @@ class InventoryBridge {
     this.bot = bot
 
     this._listen(bot, 'windowOpen', window => {
-      this.io.emit('window:open', this.serializeWindow(window))
+      this.socket.emit('window:open', this.serializeWindow(window))
     })
-    this._listen(bot, 'windowClose', () => this.io.emit('window:close'))
+    this._listen(bot, 'windowClose', () => this.socket.emit('window:close'))
     if (bot.inventory) {
       this._listen(bot.inventory, 'updateSlot', () => this._scheduleUpdate())
     }
@@ -60,7 +60,7 @@ class InventoryBridge {
     this.pending = setTimeout(() => {
       this.pending = null
       const payload = this.snapshot()
-      if (payload) this.io.emit('inventory', payload)
+      if (payload) this.socket.emit('inventory', payload)
     }, UPDATE_THROTTLE_MS)
     this.pending.unref?.()
   }

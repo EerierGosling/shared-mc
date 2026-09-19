@@ -20,30 +20,41 @@ const INTERACTABLE = /chest|furnace|crafting_table|barrel|shulker_box|hopper|dis
 
 const MAX_CHAT_LENGTH = 256
 
-/**
- * Translates browser input into bot actions.
- *
- * Control is free-for-all: every connected browser drives the same bot. Held
- * keys are merged with OR across clients, so one person releasing W does not
- * stop the bot while someone else is still holding it. A client's contribution
- * is dropped when it disconnects. Look is last-write-wins.
- */
 // A dig that cannot proceed says so at most this often, so a held mouse button
 // cannot flood the chat log.
 const DIG_NOTICE_MS = 4000
 
+/**
+ * Translates browser input into one bot's actions.
+ *
+ * A session owns one bot and one or more member browsers. Held keys are merged
+ * across members with an OR rather than last-write-wins: in roadtrip mode one
+ * person releasing W must not stop the bot while someone else is still holding
+ * it. A solo session is that same merge over a single member, so one code path
+ * serves both modes — do not "simplify" it back to a single held-key object.
+ * A member's contribution is dropped when they disconnect. Look is
+ * last-write-wins, rate limited per member.
+ *
+ * `emitter` is whatever the session speaks through: one socket for a solo
+ * session, the room for a shared one.
+ *
+ * Destructive actions go through a Budget first. Visitors share one world, so
+ * a refusal is reported rather than dropped — a silent cap is indistinguishable
+ * from lag and gets reported as a bug.
+ */
 class Controller {
-  constructor (config, primitives, io) {
+  constructor (emitter, config, primitives, budget) {
+    this.emitter = emitter
     this.config = config
     this.primitives = primitives
-    this.io = io
-    this.lastDigNoticeAt = 0
+    this.budget = budget
     this.bot = null
-    this.desired = new Map() // socket.id -> control state
+    this.desired = new Map() // socket.id -> that member's held keys
     this.effective = {}
     this.lastLookAt = new Map() // socket.id -> timestamp
     this.lastChatAt = new Map()
     this.diggers = new Set() // socket.ids currently holding the mouse button
+    this.lastDigNoticeAt = 0
     this.digHeld = false
     this.digging = false
     for (const key of CONTROL_KEYS) this.effective[key] = false
@@ -77,6 +88,7 @@ class Controller {
     socket.on('stop', () => this.stopEverything())
   }
 
+  /** Forget a member who left, and recompute the merge without their keys. */
   dropSocket (socketId) {
     this.desired.delete(socketId)
     this.lastLookAt.delete(socketId)
@@ -162,11 +174,17 @@ class Controller {
    * is indistinguishable from the server ignoring the click.
    */
   _digNotice (text) {
-    if (!this.io) return
     const now = Date.now()
     if (now - this.lastDigNoticeAt < DIG_NOTICE_MS) return
     this.lastDigNoticeAt = now
-    this.io.emit('chat', { text, position: 'system', ts: now })
+    this.emitter.emit('chat', { text, position: 'system', ts: now })
+  }
+
+  /** Spends anti-grief budget, reporting rather than swallowing a refusal. */
+  _afford (kind) {
+    if (this.budget.take(kind)) return true
+    this.emitter.emit('action:refused', { kind, retryIn: this.budget.retryInSeconds() })
+    return false
   }
 
   async _digLoop () {
@@ -185,19 +203,25 @@ class Controller {
           await sleep(100)
           continue
         }
-        // Tell every viewer how long this dig will take so they can animate
+        // Charged per block actually broken rather than per click, so holding
+        // the button down is what the cap measures.
+        if (!this._afford('dig')) {
+          this.digHeld = false
+          break
+        }
+        // Tell the viewers how long this dig will take so they can animate
         // crack stages locally — without it a block silently pops seconds
         // after the click, which reads as lag.
         let digMs = 1000
         try { digMs = this.bot.digTime(block) } catch (err) {}
-        if (this.io) this.io.emit('dig:start', { position: block.position, ms: digMs })
+        this.emitter.emit('dig:start', { position: block.position, ms: digMs })
         try {
           // 'ignore' keeps the bot's head where the browser pointed it.
           await this.bot.dig(block, 'ignore')
         } catch (err) {
           await sleep(100)
         } finally {
-          if (this.io) this.io.emit('dig:stop')
+          this.emitter.emit('dig:stop')
         }
       }
     } finally {
@@ -206,7 +230,7 @@ class Controller {
   }
 
   _stopDigging () {
-    if (this.io) this.io.emit('dig:stop')
+    this.emitter.emit('dig:stop')
     if (!this.bot) return
     try {
       this.bot.stopDigging()
@@ -225,6 +249,7 @@ class Controller {
       const sneaking = this.effective.sneak
       if (!sneaking && INTERACTABLE.test(block.name)) {
         try {
+          // Opening a chest changes nothing, so it costs no budget.
           await bot.activateBlock(block)
           return
         } catch (err) {
@@ -232,6 +257,7 @@ class Controller {
         }
       }
       if (held && this._isPlaceable(bot, held)) {
+        if (!this._afford('place')) return
         const face = FACE_VECTORS[block.face] || new Vec3(0, 1, 0)
         try {
           await bot.placeBlock(block, face)
@@ -273,6 +299,7 @@ class Controller {
       } catch (err) {}
       return
     }
+    if (!this._afford('attack')) return
     try {
       bot.attack(entity)
     } catch (err) {}
@@ -289,6 +316,7 @@ class Controller {
   drop () {
     const bot = this.bot
     if (!bot || !bot.heldItem) return
+    if (!this._afford('drop')) return
     Promise.resolve(bot.tossStack(bot.heldItem)).catch(() => {})
   }
 

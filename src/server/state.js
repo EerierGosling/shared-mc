@@ -10,12 +10,13 @@ const round = (n, places = 2) => {
 }
 
 /**
- * Pushes a HUD snapshot to every browser, at most every TICK_MS and only when
- * something actually changed.
+ * Pushes a HUD snapshot to one browser, at most every TICK_MS and only when
+ * something actually changed. One per visitor: this used to broadcast over the
+ * server-wide emitter because every browser watched the same bot.
  */
 class StatePusher {
-  constructor (io, config) {
-    this.io = io
+  constructor (socket, config) {
+    this.socket = socket
     this.config = config
     this.bot = null
     this.timer = null
@@ -27,13 +28,13 @@ class StatePusher {
     this.clearBot()
     this.bot = bot
     this._listen(bot, 'messagestr', (message, position) => {
-      this.io.emit('chat', { text: message, position, ts: Date.now() })
+      this.socket.emit('chat', { text: message, position, ts: Date.now() })
     })
     this._listen(bot, 'death', () => {
-      this.io.emit('chat', { text: '* the bot died', position: 'system', ts: Date.now() })
+      this.socket.emit('chat', { text: '* the bot died', position: 'system', ts: Date.now() })
     })
     this._listen(bot, 'spawn', () => {
-      this.io.emit('chat', { text: '* the bot spawned', position: 'system', ts: Date.now() })
+      this.socket.emit('chat', { text: '* the bot spawned', position: 'system', ts: Date.now() })
     })
   }
 
@@ -66,7 +67,7 @@ class StatePusher {
     const serialized = JSON.stringify(snapshot)
     if (serialized === this.lastSerialized) return
     this.lastSerialized = serialized
-    this.io.emit('state', snapshot)
+    this.socket.emit('state', snapshot)
   }
 
   snapshot () {
