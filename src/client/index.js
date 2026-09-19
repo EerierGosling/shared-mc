@@ -8,6 +8,7 @@ const { Viewer } = require('prismarine-viewer/viewer')
 const { Hud } = require('./hud')
 const InventoryUI = require('./inventory')
 const setupInput = require('./input')
+const { applySkyForTime } = require('./sky')
 
 const canvas = document.getElementById('viewport')
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: false })
@@ -69,6 +70,7 @@ socket.on('position', ({ pos, yaw, pitch }) => {
 
 socket.on('state', state => {
   hud.setState(state)
+  applySkyForTime(viewer, state.timeOfDay)
   if (state.targetBlock) {
     const { x, y, z } = state.targetBlock.position
     highlight.position.set(x + 0.5, y + 0.5, z + 0.5)
