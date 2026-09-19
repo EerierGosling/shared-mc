@@ -33,7 +33,7 @@ viewer.entities = new Entities(viewer.scene)
 const socket = io({ transports: ['websocket', 'polling'] })
 const hud = new Hud()
 const inventoryUI = new InventoryUI(socket)
-const minimap = new Minimap()
+const minimap = new Minimap(viewer.entities)
 const breaking = new BreakingAnimation(viewer.scene)
 
 // First-person hand viewmodel, parented to the camera so it rides along with

@@ -19,7 +19,8 @@ const DOWN = 44
  * redraws geometry it already has, and the map gets real textures for free.
  */
 class Minimap {
-  constructor () {
+  constructor (entities) {
+    this.entities = entities
     this.root = document.getElementById('minimap')
     this.canvas = document.getElementById('minimap-canvas')
     this.canvas.width = SIZE
@@ -69,7 +70,30 @@ class Minimap {
       this.flipped.set(this.pixels.subarray((SIZE - 1 - y) * row, (SIZE - y) * row), y * row)
     }
     this.ctx.putImageData(new ImageData(this.flipped, SIZE, SIZE), 0, 0)
+    this.drawPlayers()
     this.root.classList.add('live')
+  }
+
+  // Other players, as dots over the terrain. Their meshes sit in the scene the
+  // ortho pass just rendered, but at 2px per block a player is sub-pixel noise;
+  // a drawn marker stays readable. Off-map players pin to the frame edge so
+  // the dot still points the way, like vanilla map markers.
+  drawPlayers () {
+    if (!this.entities) return
+    const scale = SIZE / VIEW
+    const max = SIZE / 2 - 3
+    for (const mesh of Object.values(this.entities.players)) {
+      const dx = Math.max(-max, Math.min(max, (mesh.position.x - this.center.x) * scale))
+      const dz = Math.max(-max, Math.min(max, (mesh.position.z - this.center.z) * scale))
+      const x = Math.round(SIZE / 2 + dx)
+      const y = Math.round(SIZE / 2 + dz)
+      // Rects, not arcs: the canvas is upscaled with image-rendering: pixelated,
+      // so hard square edges match the rest of the HUD.
+      this.ctx.fillStyle = '#000'
+      this.ctx.fillRect(x - 3, y - 3, 6, 6)
+      this.ctx.fillStyle = '#fff'
+      this.ctx.fillRect(x - 2, y - 2, 4, 4)
+    }
   }
 
   setYaw (yaw) {

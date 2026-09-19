@@ -162,6 +162,10 @@ class Entities {
   constructor (scene) {
     this.scene = scene
     this.entities = {}
+    // Player meshes by id, for the minimap. Move events don't repeat the
+    // entity name, so membership is decided once here at spawn; the tweened
+    // mesh position doubles as a smoothed map position for free.
+    this.players = {}
   }
 
   clear () {
@@ -170,6 +174,7 @@ class Entities {
       disposeDeep(mesh)
     }
     this.entities = {}
+    this.players = {}
   }
 
   update (entity) {
@@ -178,6 +183,7 @@ class Entities {
       if (!mesh) return
       this.entities[entity.id] = mesh
       this.scene.add(mesh)
+      if (entity.name === 'player') this.players[entity.id] = mesh
     }
 
     const e = this.entities[entity.id]
@@ -190,6 +196,7 @@ class Entities {
       this.scene.remove(e)
       disposeDeep(e)
       delete this.entities[entity.id]
+      delete this.players[entity.id]
     }
 
     if (entity.pos) {
