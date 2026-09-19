@@ -5,6 +5,7 @@ global.THREE = require('three')
 const THREE = global.THREE
 const io = require('socket.io-client')
 const { Viewer } = require('prismarine-viewer/viewer')
+const { supportedVersions } = require('prismarine-viewer/viewer/lib/version')
 const { Hud } = require('./hud')
 const InventoryUI = require('./inventory')
 const setupInput = require('./input')
@@ -51,6 +52,11 @@ socket.on('bot:status', status => {
 })
 
 socket.on('version', version => {
+  // The server serves /textures/<version>* and /blocksStates/<version>.json
+  // for whatever it runs (aliasing a shipped atlas when needed), so take the
+  // version as-is — letting the viewer round down to the previous atlas
+  // strips every block added after it.
+  if (!supportedVersions.includes(version)) supportedVersions.push(version)
   if (!viewer.setVersion(version)) {
     hud.setStatus('error', `this build cannot render Minecraft ${version}`)
     return

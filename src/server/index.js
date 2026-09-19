@@ -33,7 +33,39 @@ const viewerPublic = path.join(path.dirname(require.resolve('prismarine-viewer/p
 app.get(['/', '/index.html'], (req, res) => res.sendFile(path.join(clientDir, 'index.html')))
 app.use('/dist', express.static(distDir))
 app.use('/fonts', express.static(path.join(clientDir, 'fonts')))
+
+// prismarine-viewer only ships atlases for some versions (…, 1.20.1, 1.21.1,
+// …). Rounding DOWN to the previous atlas loses every block added since —
+// 1.20.4 (pack format 22) rendered with 1.20.1 (format 15) has no
+// short_grass and friends. The next atlas UP is a name superset (verified:
+// all 1058 blocks of 1.20.4 exist in the 1.21.1 states), so serve that one
+// under our version's URLs. The browser worker still decodes chunks with the
+// real version, so block state ids stay correct.
+const { getVersion, supportedVersions } = require('prismarine-viewer/viewer/lib/version')
+const assetVersion = pickAssetVersion(config.mc.version)
+if (!assetVersion) {
+  console.warn(`no viewer atlas at or above ${config.mc.version}; the browser render will be broken until prismarine-viewer ships one`)
+}
+if (assetVersion && assetVersion !== config.mc.version) {
+  console.log(`viewer assets: serving ${assetVersion} atlas as ${config.mc.version}`)
+  app.get(`/textures/${config.mc.version}.png`, (req, res) =>
+    res.sendFile(path.join(viewerPublic, 'textures', `${assetVersion}.png`)))
+  app.get(`/blocksStates/${config.mc.version}.json`, (req, res) =>
+    res.sendFile(path.join(viewerPublic, 'blocksStates', `${assetVersion}.json`)))
+  app.use(`/textures/${config.mc.version}`, express.static(path.join(viewerPublic, 'textures', assetVersion)))
+}
+
 app.use(express.static(viewerPublic))
+
+function pickAssetVersion (version) {
+  if (supportedVersions.includes(version)) return version
+  const parse = v => v.split('.').map(n => parseInt(n, 10) || 0)
+  const cmp = (a, b) => a[0] - b[0] || (a[1] || 0) - (b[1] || 0) || (a[2] || 0) - (b[2] || 0)
+  const above = supportedVersions
+    .filter(v => cmp(parse(v), parse(version)) > 0)
+    .sort((a, b) => cmp(parse(a), parse(b)))
+  return above[0] || getVersion(version)
+}
 
 // Item icons for the inventory overlay. Optional: if this version has no asset
 // pack the UI falls back to text labels.
