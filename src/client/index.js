@@ -54,6 +54,13 @@ hand.attachTo(viewer.camera)
 // so mouse movement shows up on screen before the network round trip lands.
 const camera = { yaw: 0, pitch: 0 }
 
+// Nothing is driveable until this visitor has a bot of their own, so input is
+// wired only once the join is accepted. Until then the browser is just a page.
+const skins = new SkinPainter(viewer)
+const join = new JoinScreen(socket, identity => {
+  hud.setStatus('connecting', `joining as ${identity.username}…`)
+})
+
 const input = setupInput({ socket, viewer, camera, hud, inventoryUI, canvas, hand, join })
 
 const highlight = new THREE.LineSegments(
@@ -68,12 +75,6 @@ const blockLights = new BlockLights(viewer.scene)
 
 let listening = false
 
-// Nothing is driveable until this visitor has a bot of their own, so input is
-// wired only once the join is accepted. Until then the browser is just a page.
-const skins = new SkinPainter(viewer)
-const join = new JoinScreen(socket, identity => {
-  hud.setStatus('connecting', `joining as ${identity.username}…`)
-})
 
 socket.on('roster', roster => {
   skins.setRoster(roster)
