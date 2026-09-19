@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Shared Minecraft</title>
+<style>
+  :root {
+    --panel: rgba(12, 14, 18, 0.78);
+    --border: rgba(255, 255, 255, 0.14);
+    --text: #e8ecf1;
+    --dim: #97a2b0;
+    --good: #5fd08a;
+    --warn: #e2b34a;
+    --bad: #e2685a;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; height: 100%; overflow: hidden;
+    background: #0b0d11; color: var(--text);
+    font: 13px/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  #viewport { display: block; width: 100%; height: 100%; }
+
+  .overlay { position: fixed; pointer-events: none; }
+
+  #crosshair {
+    left: 50%; top: 50%; width: 18px; height: 18px;
+    transform: translate(-50%, -50%);
+    opacity: 0.85;
+  }
+  #crosshair::before, #crosshair::after {
+    content: ''; position: absolute; background: #fff;
+    box-shadow: 0 0 2px rgba(0,0,0,0.9);
+  }
+  #crosshair::before { left: 50%; top: 0; width: 2px; height: 100%; margin-left: -1px; }
+  #crosshair::after { top: 50%; left: 0; height: 2px; width: 100%; margin-top: -1px; }
+
+  #status {
+    top: 12px; left: 50%; transform: translateX(-50%);
+    padding: 6px 14px; border-radius: 999px;
+    background: var(--panel); border: 1px solid var(--border);
+    backdrop-filter: blur(8px);
+  }
+  #status[data-state="connected"] { color: var(--good); }
+  #status[data-state="reconnecting"], #status[data-state="connecting"] { color: var(--warn); }
+  #status[data-state="error"] { color: var(--bad); }
+
+  #stats {
+    top: 12px; left: 12px; padding: 8px 12px; border-radius: 8px;
+    background: var(--panel); border: 1px solid var(--border);
+    color: var(--dim); white-space: pre; backdrop-filter: blur(8px);
+  }
+  #stats b { color: var(--text); font-weight: 600; }
+
+  #vitals {
+    bottom: 86px; left: 50%; transform: translateX(-50%);
+    display: flex; gap: 18px; text-shadow: 0 1px 3px #000;
+  }
+  #vitals span { letter-spacing: 1px; }
+  #health { color: #ff6b6b; }
+  #food { color: #d9a441; }
+
+  #hotbar {
+    bottom: 16px; left: 50%; transform: translateX(-50%);
+    display: flex; gap: 4px; padding: 4px; border-radius: 8px;
+    background: var(--panel); border: 1px solid var(--border);
+  }
+  .slot {
+    width: 52px; height: 52px; border-radius: 6px; position: relative;
+    background: rgba(255,255,255,0.05); border: 2px solid transparent;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 9px; color: var(--dim); text-align: center; overflow: hidden;
+    word-break: break-all; padding: 2px;
+  }
+  .slot.selected { border-color: #fff; background: rgba(255,255,255,0.14); }
+  .slot img { width: 36px; height: 36px; image-rendering: pixelated; }
+  .slot .count {
+    position: absolute; right: 3px; bottom: 1px;
+    font-size: 12px; color: #fff; text-shadow: 1px 1px 2px #000;
+  }
+
+  #chat {
+    bottom: 86px; left: 12px; width: 420px; max-width: 42vw;
+    display: flex; flex-direction: column; gap: 4px;
+  }
+  #chat-log {
+    max-height: 30vh; overflow: hidden; display: flex;
+    flex-direction: column; justify-content: flex-end; gap: 2px;
+  }
+  #chat-log div {
+    background: rgba(12,14,18,0.6); padding: 2px 8px; border-radius: 4px;
+    text-shadow: 0 1px 2px #000; word-break: break-word;
+  }
+  #chat-log div.system { color: var(--dim); font-style: italic; }
+  #chat-input {
+    display: none; pointer-events: auto; width: 100%;
+    padding: 8px 10px; border-radius: 6px; color: var(--text);
+    background: var(--panel); border: 1px solid var(--border);
+    font: inherit; outline: none;
+  }
+  #chat-input.open { display: block; }
+
+  #hint {
+    bottom: 16px; right: 16px; padding: 10px 14px; border-radius: 8px;
+    background: var(--panel); border: 1px solid var(--border);
+    color: var(--dim); backdrop-filter: blur(8px);
+  }
+  #hint b { color: var(--text); }
+
+  #inventory {
+    inset: 0; display: none; align-items: center; justify-content: center;
+    background: rgba(6, 8, 11, 0.72); pointer-events: auto;
+  }
+  #inventory.open { display: flex; }
+  #inventory-panel {
+    background: #14181f; border: 1px solid var(--border); border-radius: 12px;
+    padding: 18px; min-width: 460px; box-shadow: 0 24px 60px rgba(0,0,0,0.6);
+  }
+  #inventory-panel h2 {
+    margin: 0 0 14px; font-size: 14px; font-weight: 600;
+    display: flex; justify-content: space-between; align-items: baseline;
+  }
+  #inventory-panel h2 small { color: var(--dim); font-weight: 400; }
+  .grid { display: grid; grid-template-columns: repeat(9, 52px); gap: 4px; margin-bottom: 14px; }
+  .grid .slot { cursor: pointer; }
+  .grid .slot:hover { background: rgba(255,255,255,0.16); }
+  .section-label { color: var(--dim); margin: 0 0 6px; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; }
+</style>
+</head>
+<body>
+  <canvas id="viewport"></canvas>
+
+  <div id="crosshair" class="overlay"></div>
+  <div id="status" class="overlay" data-state="connecting">connecting…</div>
+  <div id="stats" class="overlay"></div>
+
+  <div id="vitals" class="overlay">
+    <span id="health"></span>
+    <span id="food"></span>
+  </div>
+
+  <div id="hotbar" class="overlay"></div>
+
+  <div id="chat" class="overlay">
+    <div id="chat-log"></div>
+    <input id="chat-input" maxlength="256" placeholder="say something…" autocomplete="off">
+  </div>
+
+  <div id="hint" class="overlay">
+    <b>click</b> to play &nbsp; <b>WASD</b> move &nbsp; <b>space</b> jump<br>
+    <b>LMB</b> mine &nbsp; <b>RMB</b> use/place &nbsp; <b>1-9</b> hotbar<br>
+    <b>E</b> inventory &nbsp; <b>T</b> chat &nbsp; <b>Q</b> drop &nbsp; <b>G</b> walk to cursor
+  </div>
+
+  <div id="inventory" class="overlay">
+    <div id="inventory-panel">
+      <h2><span id="inventory-title">Inventory</span> <small>E or Esc to close</small></h2>
+      <div id="inventory-body"></div>
+    </div>
+  </div>
+
+  <script src="/dist/bundle.js"></script>
+</body>
+</html>

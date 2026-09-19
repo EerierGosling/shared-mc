@@ -1,0 +1,120 @@
+'use strict'
+const { describeItem } = require('./items')
+
+const TICK_MS = 100
+
+const round = (n, places = 2) => {
+  const factor = Math.pow(10, places)
+  return Math.round(n * factor) / factor
+}
+
+/**
+ * Pushes a HUD snapshot to every browser, at most every TICK_MS and only when
+ * something actually changed.
+ */
+class StatePusher {
+  constructor (io, config) {
+    this.io = io
+    this.config = config
+    this.bot = null
+    this.timer = null
+    this.lastSerialized = null
+    this.listeners = []
+  }
+
+  setBot (bot) {
+    this.clearBot()
+    this.bot = bot
+    this._listen(bot, 'messagestr', (message, position) => {
+      this.io.emit('chat', { text: message, position, ts: Date.now() })
+    })
+    this._listen(bot, 'death', () => {
+      this.io.emit('chat', { text: '* the bot died', position: 'system', ts: Date.now() })
+    })
+    this._listen(bot, 'spawn', () => {
+      this.io.emit('chat', { text: '* the bot spawned', position: 'system', ts: Date.now() })
+    })
+  }
+
+  clearBot () {
+    for (const [emitter, event, fn] of this.listeners) emitter.removeListener(event, fn)
+    this.listeners = []
+    this.bot = null
+    this.lastSerialized = null
+  }
+
+  _listen (emitter, event, fn) {
+    emitter.on(event, fn)
+    this.listeners.push([emitter, event, fn])
+  }
+
+  start () {
+    if (this.timer) return
+    this.timer = setInterval(() => this._tick(), TICK_MS)
+    this.timer.unref?.()
+  }
+
+  stop () {
+    clearInterval(this.timer)
+    this.timer = null
+  }
+
+  _tick () {
+    const snapshot = this.snapshot()
+    if (!snapshot) return
+    const serialized = JSON.stringify(snapshot)
+    if (serialized === this.lastSerialized) return
+    this.lastSerialized = serialized
+    this.io.emit('state', snapshot)
+  }
+
+  snapshot () {
+    const bot = this.bot
+    if (!bot || !bot.entity) return null
+
+    const hotbar = []
+    const slots = (bot.inventory && bot.inventory.slots) || []
+    for (let i = 0; i < 9; i++) hotbar.push(describeItem(slots[36 + i]))
+
+    let targetBlock = null
+    try {
+      const block = bot.blockAtCursor(this.config.reach)
+      if (block) {
+        targetBlock = {
+          position: { x: block.position.x, y: block.position.y, z: block.position.z },
+          name: block.name,
+          displayName: block.displayName,
+          diggable: bot.canDigBlock(block)
+        }
+      }
+    } catch (err) {
+      targetBlock = null
+    }
+
+    return {
+      username: bot.username,
+      health: round(bot.health || 0, 1),
+      food: bot.food,
+      oxygen: bot.oxygenLevel,
+      xpLevel: bot.experience ? bot.experience.level : 0,
+      position: {
+        x: round(bot.entity.position.x),
+        y: round(bot.entity.position.y),
+        z: round(bot.entity.position.z)
+      },
+      yaw: round(bot.entity.yaw, 3),
+      pitch: round(bot.entity.pitch, 3),
+      quickBarSlot: bot.quickBarSlot,
+      hotbar,
+      heldItem: describeItem(bot.heldItem),
+      targetBlock,
+      timeOfDay: bot.time ? bot.time.timeOfDay : 0,
+      isRaining: Boolean(bot.isRaining),
+      gameMode: bot.game ? bot.game.gameMode : null,
+      dimension: bot.game ? bot.game.dimension : null,
+      playerCount: Object.keys(bot.players || {}).length
+    }
+  }
+}
+
+module.exports = StatePusher
