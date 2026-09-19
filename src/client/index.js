@@ -16,7 +16,11 @@ renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
 renderer.setSize(window.innerWidth, window.innerHeight)
 
 const viewer = new Viewer(renderer)
-const socket = io()
+// Websocket first: the default polling-then-upgrade dance never completes
+// here — the initial chunk dump saturates the polling transport so the
+// upgrade probe starves, leaving the whole stream on long-polling (seconds
+// of queueing). Polling stays as the fallback for proxies that block ws.
+const socket = io({ transports: ['websocket', 'polling'] })
 const hud = new Hud()
 const inventoryUI = new InventoryUI(socket)
 

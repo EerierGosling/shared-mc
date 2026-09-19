@@ -35,14 +35,24 @@ function attachWorldView (bot, socket, viewDistance, onBlockClicked) {
     worldView.updatePosition(bot.entity.position)
   }
 
-  bot.on('move', sendPosition)
+  // 'move' fires for every physics correction — on a busy server that's a
+  // burst of events per tick, per viewer. Coalesce to one packet per tick.
+  let moved = false
+  const onMove = () => { moved = true }
+  const positionTimer = setInterval(() => {
+    if (!moved) return
+    moved = false
+    sendPosition()
+  }, 50)
+  bot.on('move', onMove)
   sendPosition()
 
   let detached = false
   return () => {
     if (detached) return
     detached = true
-    bot.removeListener('move', sendPosition)
+    clearInterval(positionTimer)
+    bot.removeListener('move', onMove)
     worldView.removeListenersFromBot(bot)
     worldView.removeAllListeners()
   }

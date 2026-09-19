@@ -14,7 +14,13 @@ const { attachWorldView } = require('./worldStream')
 
 const app = express()
 const server = http.createServer(app)
-const io = new Server(server, { maxHttpBufferSize: 1e8 })
+const io = new Server(server, {
+  maxHttpBufferSize: 1e8,
+  // Chunk JSON compresses ~10x and each viewer downloads the whole view
+  // distance on connect. The threshold keeps the 20Hz position/state
+  // stream out of zlib.
+  perMessageDeflate: { threshold: 16384 }
+})
 
 // --- static assets ---------------------------------------------------------
 // Order matters. prismarine-viewer ships its own index.html in the same public
