@@ -16,6 +16,7 @@ const CONTROL_KEYS = ['forward', 'back', 'left', 'right', 'jump', 'sneak', 'spri
 const LOOK_SEND_MS = 50
 const SENSITIVITY = 0.004
 const HALF_PI = Math.PI / 2
+const DOUBLE_TAP_MS = 300
 
 /**
  * Keyboard + mouse capture.
@@ -24,15 +25,18 @@ const HALF_PI = Math.PI / 2
  * the server, so aiming never waits for a round trip. Everything else is a
  * plain message; the bot stays authoritative over what actually happens.
  */
-function setupInput ({ socket, viewer, camera, hud, inventoryUI, canvas }) {
+function setupInput ({ socket, viewer, camera, hud, inventoryUI, canvas, hand }) {
   const held = Object.create(null)
   let locked = false
   let lastLookSent = 0
   let lookPending = false
+  let lastForwardTap = 0
 
   const sendControls = () => {
     const payload = {}
-    for (const key of CONTROL_KEYS) payload[key] = Boolean(held[key])
+    for (const key of CONTROL_KEYS) {
+      payload[key] = key === 'sprint' ? Boolean(held.sprint || held.autoSprint) : Boolean(held[key])
+    }
     socket.emit('input:state', payload)
   }
 
@@ -41,9 +45,11 @@ function setupInput ({ socket, viewer, camera, hud, inventoryUI, canvas }) {
     for (const key of CONTROL_KEYS) {
       if (held[key]) { held[key] = false; changed = true }
     }
+    if (held.autoSprint) { held.autoSprint = false; changed = true }
     if (held.digging) {
       held.digging = false
       socket.emit('action:dig', { active: false })
+      hand.stopSwinging()
     }
     if (changed) sendControls()
   }
@@ -72,6 +78,7 @@ function setupInput ({ socket, viewer, camera, hud, inventoryUI, canvas }) {
     if (event.button === 0) {
       held.digging = true
       socket.emit('action:dig', { active: true })
+      hand.startSwinging()
     } else if (event.button === 2) {
       socket.emit('action:use')
     }
@@ -81,6 +88,7 @@ function setupInput ({ socket, viewer, camera, hud, inventoryUI, canvas }) {
     if (event.button === 0 && held.digging) {
       held.digging = false
       socket.emit('action:dig', { active: false })
+      hand.stopSwinging()
     }
   })
 
@@ -136,6 +144,11 @@ function setupInput ({ socket, viewer, camera, hud, inventoryUI, canvas }) {
     const control = KEY_TO_CONTROL[event.code]
     if (!control || held[control]) return
     if (event.code === 'Space') event.preventDefault()
+    if (control === 'forward') {
+      const now = Date.now()
+      if (now - lastForwardTap < DOUBLE_TAP_MS) held.autoSprint = true
+      lastForwardTap = now
+    }
     held[control] = true
     sendControls()
   })
@@ -144,6 +157,7 @@ function setupInput ({ socket, viewer, camera, hud, inventoryUI, canvas }) {
     const control = KEY_TO_CONTROL[event.code]
     if (!control || !held[control]) return
     held[control] = false
+    if (control === 'forward') held.autoSprint = false
     sendControls()
   })
 

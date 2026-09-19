@@ -245,13 +245,48 @@
   .grid .slot {
     width: calc(18 * var(--u)); height: calc(18 * var(--u));
     background: var(--slot);
+    background-size: calc(16 * var(--u)) calc(16 * var(--u));
+    background-position: center; background-repeat: no-repeat;
     border-style: solid; border-width: var(--u);
     border-color: var(--slot-dark) var(--gui-lit) var(--gui-lit) var(--slot-dark);
     cursor: pointer; color: var(--ink);
   }
-  .grid .slot:hover { background: #c5c5c5; }
+  .grid .slot:hover { background-color: #c5c5c5; }
   .grid .slot img { width: calc(16 * var(--u)); height: calc(16 * var(--u)); }
   .grid .slot .count { color: var(--mc-white); }
+
+  /* --- crafting row: armor, player bust, offhand, 2x2 crafting ------------- */
+  .crafting-row { display: flex; align-items: flex-start; gap: calc(4 * var(--u)); margin-bottom: calc(3 * var(--u)); }
+  .grid.grid-1 { grid-template-columns: repeat(1, calc(18 * var(--u))); margin-bottom: 0; }
+  .grid.grid-2 { grid-template-columns: repeat(2, calc(18 * var(--u))); margin-bottom: 0; }
+
+  .player-frame {
+    position: relative;
+    width: calc(40 * var(--u)); height: calc(52 * var(--u));
+    background: var(--slot);
+    border-style: solid; border-width: var(--u);
+    border-color: var(--slot-dark) var(--gui-lit) var(--gui-lit) var(--slot-dark);
+  }
+  .player-figure {
+    position: absolute; left: 50%; top: calc(4 * var(--u));
+    transform: translateX(-50%);
+    width: calc(18 * var(--u)); height: calc(44 * var(--u));
+  }
+  .player-figure i { position: absolute; display: block; }
+  .p-hair { top: 0; left: calc(3 * var(--u)); width: calc(12 * var(--u)); height: calc(4 * var(--u)); background: #4a3728; }
+  .p-head { top: calc(4 * var(--u)); left: calc(3 * var(--u)); width: calc(12 * var(--u)); height: calc(12 * var(--u)); background: #f0b48c; }
+  .p-body { top: calc(16 * var(--u)); left: calc(3 * var(--u)); width: calc(12 * var(--u)); height: calc(16 * var(--u)); background: #17a5a0; }
+  .p-arm { top: calc(16 * var(--u)); width: calc(3 * var(--u)); height: calc(16 * var(--u)); background: #f0b48c; }
+  .p-arm-l { left: 0; }
+  .p-arm-r { right: 0; }
+  .p-leg { top: calc(32 * var(--u)); width: calc(6 * var(--u)); height: calc(12 * var(--u)); background: #3b5bdb; }
+  .p-leg-l { left: calc(3 * var(--u)); }
+  .p-leg-r { left: calc(9 * var(--u)); }
+  .offhand-wrap { position: absolute; right: 0; bottom: calc(-19 * var(--u)); }
+
+  .crafting-col { display: flex; flex-direction: column; }
+  .crafting-main { display: flex; align-items: center; gap: calc(3 * var(--u)); }
+  .crafting-arrow { font-size: calc(var(--px) * 10px); color: var(--ink); padding: 0 var(--u); }
 </style>
 </head>
 <body>

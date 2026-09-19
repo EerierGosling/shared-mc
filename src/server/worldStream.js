@@ -21,6 +21,21 @@ function attachWorldView (bot, socket, viewDistance, onBlockClicked) {
   worldView.init(bot.entity.position)
   worldView.listenToBot(bot)
 
+  // WorldView's own entitySpawn handler forwards only id/name/pos/width/height/
+  // username, so a dropped-item entity ("item") carries no clue which item it
+  // is — that only lives in raw metadata, which mineflayer decodes for us via
+  // entity.getDroppedItem(). Send it as a second, merged 'entity' update; the
+  // client keys off itemName to draw that item's real texture instead of
+  // falling back to prismarine-viewer's mob-model path (which has no "item"
+  // model and would otherwise throw "Unknown entity item").
+  const sendDroppedItem = (entity) => {
+    if (entity.name !== 'item') return
+    const item = entity.getDroppedItem && entity.getDroppedItem()
+    if (!item) return
+    socket.emit('entity', { id: entity.id, itemName: item.name })
+  }
+  bot.on('entitySpawn', sendDroppedItem)
+
   if (onBlockClicked) {
     worldView.on('blockClicked', (block, face, button) => onBlockClicked(block, face, button))
   }
@@ -53,6 +68,7 @@ function attachWorldView (bot, socket, viewDistance, onBlockClicked) {
     detached = true
     clearInterval(positionTimer)
     bot.removeListener('move', onMove)
+    bot.removeListener('entitySpawn', sendDroppedItem)
     worldView.removeListenersFromBot(bot)
     worldView.removeAllListeners()
   }

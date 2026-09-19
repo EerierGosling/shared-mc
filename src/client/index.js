@@ -10,7 +10,9 @@ const { Hud } = require('./hud')
 const InventoryUI = require('./inventory')
 const Minimap = require('./minimap')
 const setupInput = require('./input')
-const { applySkyForTime } = require('./sky')
+const { createSky, applySkyForTime } = require('./sky')
+const { Entities } = require('./entities')
+const { Hand } = require('./hand')
 
 const canvas = document.getElementById('viewport')
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: false })
@@ -18,6 +20,10 @@ renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
 renderer.setSize(window.innerWidth, window.innerHeight)
 
 const viewer = new Viewer(renderer)
+// Swap in our own entity manager before listen() wires it up — it renders the
+// same real mob models but falls back to a body+head shape instead of a flat
+// box for the mobs prismarine-viewer never got geometry for (see entities.js).
+viewer.entities = new Entities(viewer.scene)
 // Websocket first: the default polling-then-upgrade dance never completes
 // here — the initial chunk dump saturates the polling transport so the
 // upgrade probe starves, leaving the whole stream on long-polling (seconds
@@ -27,11 +33,16 @@ const hud = new Hud()
 const inventoryUI = new InventoryUI(socket)
 const minimap = new Minimap()
 
+// First-person hand viewmodel, parented to the camera so it rides along with
+// look direction for free. Swung from input.js while a dig/attack is held.
+const hand = new Hand()
+hand.attachTo(viewer.camera)
+
 // Local camera angles. The server owns position; we own where we are looking,
 // so mouse movement shows up on screen before the network round trip lands.
 const camera = { yaw: 0, pitch: 0 }
 
-const input = setupInput({ socket, viewer, camera, hud, inventoryUI, canvas })
+const input = setupInput({ socket, viewer, camera, hud, inventoryUI, canvas, hand })
 
 const highlight = new THREE.LineSegments(
   new THREE.EdgesGeometry(new THREE.BoxGeometry(1.002, 1.002, 1.002)),
@@ -39,6 +50,8 @@ const highlight = new THREE.LineSegments(
 )
 highlight.visible = false
 viewer.scene.add(highlight)
+
+const sky = createSky(viewer)
 
 let listening = false
 
@@ -82,7 +95,7 @@ socket.on('position', ({ pos, yaw, pitch }) => {
 
 socket.on('state', state => {
   hud.setState(state)
-  applySkyForTime(viewer, state.timeOfDay)
+  applySkyForTime(viewer, state.timeOfDay, sky)
   if (state.targetBlock) {
     const { x, y, z } = state.targetBlock.position
     highlight.position.set(x + 0.5, y + 0.5, z + 0.5)
