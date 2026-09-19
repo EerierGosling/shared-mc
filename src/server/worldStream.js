@@ -1,5 +1,8 @@
 'use strict'
-const { WorldView } = require('prismarine-viewer/viewer')
+// Deep require: the viewer barrel (prismarine-viewer/viewer) pulls in the
+// THREE renderer and node-canvas, which only exist in the browser bundle.
+// worldView.js itself is pure data streaming — safe on the server.
+const { WorldView } = require('prismarine-viewer/viewer/lib/worldView')
 
 /**
  * Streams the world around the bot to one browser socket.
