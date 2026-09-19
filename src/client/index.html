@@ -252,13 +252,23 @@
     cursor: pointer; color: var(--ink);
   }
   .grid .slot:hover { background-color: #c5c5c5; }
+  .grid .slot.drag-target { background-color: #d8d8a0; }
   .grid .slot img { width: calc(16 * var(--u)); height: calc(16 * var(--u)); }
   .grid .slot .count { color: var(--mc-white); }
+
+  /* The item currently picked up, following the mouse while the inventory is open. */
+  #cursor-item {
+    position: fixed; left: 0; top: 0; z-index: 20;
+    pointer-events: none; display: none;
+    transform: translate(calc(-10 * var(--u)), calc(-10 * var(--u)));
+  }
+  #cursor-item.visible { display: flex; }
 
   /* --- crafting row: armor, player bust, offhand, 2x2 crafting ------------- */
   .crafting-row { display: flex; align-items: flex-start; gap: calc(4 * var(--u)); margin-bottom: calc(3 * var(--u)); }
   .grid.grid-1 { grid-template-columns: repeat(1, calc(18 * var(--u))); margin-bottom: 0; }
   .grid.grid-2 { grid-template-columns: repeat(2, calc(18 * var(--u))); margin-bottom: 0; }
+  .grid.grid-3 { grid-template-columns: repeat(3, calc(18 * var(--u))); margin-bottom: 0; }
 
   .player-frame {
     position: relative;
@@ -282,11 +292,20 @@
   .p-leg { top: calc(32 * var(--u)); width: calc(6 * var(--u)); height: calc(12 * var(--u)); background: #3b5bdb; }
   .p-leg-l { left: calc(3 * var(--u)); }
   .p-leg-r { left: calc(9 * var(--u)); }
-  .offhand-wrap { position: absolute; right: 0; bottom: calc(-19 * var(--u)); }
+  .offhand-wrap { position: absolute; right: calc(-1 * var(--u)); bottom: calc(-1 * var(--u)); }
 
   .crafting-col { display: flex; flex-direction: column; }
-  .crafting-main { display: flex; align-items: center; gap: calc(3 * var(--u)); }
+  .crafting-main { display: flex; align-items: center; gap: calc(3 * var(--u)); margin-bottom: calc(3 * var(--u)); }
   .crafting-arrow { font-size: calc(var(--px) * 10px); color: var(--ink); padding: 0 var(--u); }
+
+  /* --- crafting table: recipe-book stand-in, 3x3 grid, output --------------- */
+  .workbench-icon {
+    width: calc(18 * var(--u)); height: calc(18 * var(--u));
+    flex: none;
+    background: #4a9c46;
+    border-style: solid; border-width: var(--u);
+    border-color: #6fc768 #1f4a1c #1f4a1c #6fc768;
+  }
 </style>
 </head>
 <body>
@@ -324,6 +343,7 @@
       <h2><span id="inventory-title">Inventory</span> <small>E or Esc to close</small></h2>
       <div id="inventory-body"></div>
     </div>
+    <div id="cursor-item" class="slot"></div>
   </div>
 
   <script src="/dist/bundle.js"></script>

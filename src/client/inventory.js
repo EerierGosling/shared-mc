@@ -11,6 +11,12 @@ const HOTBAR_START = 36
 const HOTBAR_END = 45
 const OFFHAND = 45
 
+// prismarine-windows names the crafting table window differently depending on
+// protocol era - handle both rather than betting on one.
+const WORKBENCH_TYPES = new Set(['minecraft:crafting', 'minecraft:crafting_table'])
+const WORKBENCH_OUTPUT = 0
+const WORKBENCH_GRID = [1, 2, 3, 4, 5, 6, 7, 8, 9]
+
 // Vanilla draws a faint placeholder icon in these slots when they're empty.
 const EMPTY_ICON = {
   5: 'empty_armor_slot_helmet',
@@ -30,8 +36,12 @@ class InventoryUI {
     this.root = document.getElementById('inventory')
     this.body = document.getElementById('inventory-body')
     this.title = document.getElementById('inventory-title')
+    this.cursorItemEl = document.getElementById('cursor-item')
     this.payload = null
     this.containerOpen = false
+    // A held-mouse-button path across slots. Released over one slot it's an
+    // ordinary click; released over several it's a stack split (see _endDrag).
+    this.drag = null
 
     socket.on('inventory', payload => {
       this.payload = payload
@@ -50,6 +60,11 @@ class InventoryUI {
     this.root.addEventListener('click', event => {
       if (event.target === this.root) this.close()
     })
+    this.root.addEventListener('mousemove', event => {
+      this.cursorItemEl.style.left = `${event.clientX}px`
+      this.cursorItemEl.style.top = `${event.clientY}px`
+    })
+    document.addEventListener('mouseup', () => this._endDrag())
   }
 
   get isOpen () {
@@ -78,6 +93,8 @@ class InventoryUI {
   render () {
     const payload = this.payload
     this.body.innerHTML = ''
+    renderSlot(this.cursorItemEl, payload && payload.cursorItem)
+    this.cursorItemEl.classList.toggle('visible', Boolean(payload && payload.cursorItem))
     if (!payload || !payload.window) {
       this.body.textContent = 'waiting for the bot…'
       return
@@ -88,7 +105,11 @@ class InventoryUI {
 
     if (isContainer) {
       const end = win.inventoryStart !== null ? win.inventoryStart : win.slotCount
-      this.section('container', range(0, end), win.slots)
+      if (WORKBENCH_TYPES.has(win.type)) {
+        this.workbenchRow(win.slots)
+      } else {
+        this.section('container', range(0, end), win.slots)
+      }
       this.section('inventory', range(end, win.slotCount), win.slots)
       return
     }
@@ -149,6 +170,38 @@ class InventoryUI {
     this.body.appendChild(row)
   }
 
+  /** Recipe-book icon, 3x3 crafting grid and output slot for a crafting table. */
+  workbenchRow (slots) {
+    const heading = document.createElement('p')
+    heading.className = 'section-label'
+    heading.textContent = 'Crafting'
+    this.body.appendChild(heading)
+
+    const main = document.createElement('div')
+    main.className = 'crafting-main'
+
+    const icon = document.createElement('div')
+    icon.className = 'workbench-icon'
+    main.appendChild(icon)
+
+    const grid = document.createElement('div')
+    grid.className = 'grid grid-3'
+    for (const slotNumber of WORKBENCH_GRID) grid.appendChild(this.slotCell(slotNumber, slots))
+    main.appendChild(grid)
+
+    const arrow = document.createElement('span')
+    arrow.className = 'crafting-arrow'
+    arrow.textContent = '→'
+    main.appendChild(arrow)
+
+    const outputWrap = document.createElement('div')
+    outputWrap.className = 'grid grid-1'
+    outputWrap.appendChild(this.slotCell(WORKBENCH_OUTPUT, slots))
+    main.appendChild(outputWrap)
+
+    this.body.appendChild(main)
+  }
+
   section (label, slotNumbers, slots) {
     const heading = document.createElement('p')
     heading.className = 'section-label'
@@ -170,19 +223,42 @@ class InventoryUI {
     const emptyIcon = EMPTY_ICON[slotNumber]
     if (emptyIcon) cell.style.backgroundImage = item ? '' : `url(/assets/items/${emptyIcon}.png)`
 
-    cell.addEventListener('click', event => {
+    // Left/right button down starts a drag path; released over just the one
+    // slot it's replayed as a normal click, released over several it's a
+    // stack split (see _endDrag). Shift-click (quick move) fires immediately
+    // instead, same as vanilla - it was never a drag gesture.
+    cell.addEventListener('mousedown', event => {
+      if (event.button !== 0 && event.button !== 2) return
       event.preventDefault()
-      this.socket.emit('window:click', {
-        slot: slotNumber,
-        mouseButton: 0,
-        mode: event.shiftKey ? 1 : 0 // shift-click = quick move
-      })
+      if (event.shiftKey) {
+        this.socket.emit('window:click', { slot: slotNumber, mouseButton: 0, mode: 1 })
+        return
+      }
+      this.drag = { mouseButton: event.button === 2 ? 1 : 0, path: [slotNumber] }
+      cell.classList.add('drag-target')
     })
-    cell.addEventListener('contextmenu', event => {
-      event.preventDefault()
-      this.socket.emit('window:click', { slot: slotNumber, mouseButton: 1, mode: 0 })
+    cell.addEventListener('mouseenter', () => {
+      if (!this.drag || this.drag.path.includes(slotNumber)) return
+      this.drag.path.push(slotNumber)
+      cell.classList.add('drag-target')
     })
+    // The actual click/drag is sent from mousedown/mouseenter above; this
+    // only stops the browser's own right-click menu from popping up and
+    // swallowing the mouseup _endDrag needs to finish the drag.
+    cell.addEventListener('contextmenu', event => event.preventDefault())
     return cell
+  }
+
+  _endDrag () {
+    const drag = this.drag
+    this.drag = null
+    if (!drag) return
+    for (const cell of this.body.querySelectorAll('.slot.drag-target')) cell.classList.remove('drag-target')
+    if (drag.path.length === 1) {
+      this.socket.emit('window:click', { slot: drag.path[0], mouseButton: drag.mouseButton, mode: 0 })
+    } else {
+      this.socket.emit('window:drag', { slots: drag.path, mouseButton: drag.mouseButton })
+    }
   }
 }
 

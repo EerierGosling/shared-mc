@@ -17,15 +17,15 @@ const DOME_RADIUS = CELESTIAL_RADIUS * 1.2
 const STAR_COUNT = 1500
 
 const KEYFRAMES = [
-  { t: 0, horizon: 0xfcb46b, zenith: 0x6a89c9, ambient: 0.55, sun: 0.55, sunColor: 0xffd9a0 },
-  { t: 2000, horizon: 0xbfe3f5, zenith: 0x4a90d9, ambient: 0.85, sun: 0.85, sunColor: 0xffffff },
-  { t: 6000, horizon: 0x9fd8f0, zenith: 0x2f6fb0, ambient: 0.9, sun: 0.9, sunColor: 0xffffff },
-  { t: 10000, horizon: 0xbfe3f5, zenith: 0x4a90d9, ambient: 0.85, sun: 0.85, sunColor: 0xffffff },
-  { t: 12000, horizon: 0xfb8b5b, zenith: 0x4a3f6b, ambient: 0.5, sun: 0.5, sunColor: 0xffab66 },
-  { t: 13000, horizon: 0x2b2f5b, zenith: 0x05060f, ambient: 0.2, sun: 0.08, sunColor: 0x4a5a8a },
-  { t: 18000, horizon: 0x0a0e1c, zenith: 0x000000, ambient: 0.12, sun: 0.02, sunColor: 0x223355 },
-  { t: 22000, horizon: 0x2b2f5b, zenith: 0x05060f, ambient: 0.2, sun: 0.08, sunColor: 0x4a5a8a },
-  { t: DAY_LENGTH, horizon: 0xfcb46b, zenith: 0x6a89c9, ambient: 0.55, sun: 0.55, sunColor: 0xffd9a0 }
+  { t: 0, horizon: 0xfcb46b, zenith: 0x6a89c9, ambient: 0.41, sun: 0.41, sunColor: 0xffd9a0 },
+  { t: 2000, horizon: 0xbfe3f5, zenith: 0x4a90d9, ambient: 0.64, sun: 0.64, sunColor: 0xffffff },
+  { t: 6000, horizon: 0x9fd8f0, zenith: 0x2f6fb0, ambient: 0.68, sun: 0.68, sunColor: 0xffffff },
+  { t: 10000, horizon: 0xbfe3f5, zenith: 0x4a90d9, ambient: 0.64, sun: 0.64, sunColor: 0xffffff },
+  { t: 12000, horizon: 0xfb8b5b, zenith: 0x4a3f6b, ambient: 0.38, sun: 0.38, sunColor: 0xffab66 },
+  { t: 13000, horizon: 0x2b2f5b, zenith: 0x05060f, ambient: 0.15, sun: 0.06, sunColor: 0x4a5a8a },
+  { t: 18000, horizon: 0x0a0e1c, zenith: 0x000000, ambient: 0.09, sun: 0.015, sunColor: 0x223355 },
+  { t: 22000, horizon: 0x2b2f5b, zenith: 0x05060f, ambient: 0.15, sun: 0.06, sunColor: 0x4a5a8a },
+  { t: DAY_LENGTH, horizon: 0xfcb46b, zenith: 0x6a89c9, ambient: 0.41, sun: 0.41, sunColor: 0xffd9a0 }
 ]
 
 function findSegment (t) {

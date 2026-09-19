@@ -38,6 +38,11 @@ const breaking = new BreakingAnimation(viewer.scene)
 
 // First-person hand viewmodel, parented to the camera so it rides along with
 // look direction for free. Swung from input.js while a dig/attack is held.
+// renderer.render(scene, camera) only walks the scene graph — the camera
+// itself is never one of its own children by default — so anything parented
+// to the camera (like the hand) needs the camera added to the scene too, or
+// it sits in an orphan subtree and never draws.
+viewer.scene.add(viewer.camera)
 const hand = new Hand()
 hand.attachTo(viewer.camera)
 
@@ -125,10 +130,15 @@ socket.on('latency:pong', sentAt => hud.setPing(Date.now() - sentAt))
 setInterval(() => socket.emit('latency:ping', Date.now()), 2000)
 
 // --- render loop ------------------------------------------------------------
+let lastFrameTime = performance.now()
 function animate () {
   window.requestAnimationFrame(animate)
+  const now = performance.now()
+  const dt = (now - lastFrameTime) / 1000
+  lastFrameTime = now
   viewer.update()
   breaking.update()
+  viewer.entities.animate(dt)
   minimap.setYaw(camera.yaw)
   minimap.render(renderer, viewer.scene)
   renderer.render(viewer.scene, viewer.camera)

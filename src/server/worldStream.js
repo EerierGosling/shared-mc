@@ -28,6 +28,13 @@ function attachWorldView (bot, socket, viewDistance, onBlockClicked) {
   // client keys off itemName to draw that item's real texture instead of
   // falling back to prismarine-viewer's mob-model path (which has no "item"
   // model and would otherwise throw "Unknown entity item").
+  //
+  // Must listen on 'itemDrop', not 'entitySpawn': on modern protocol versions
+  // item entities spawn via spawn_entity, which carries no metadata at all —
+  // the item stack only arrives later on a separate entity_metadata packet.
+  // getDroppedItem() reads entity.metadata directly, so calling it during
+  // entitySpawn hits Item.fromNotch(undefined) and throws. mineflayer emits
+  // 'itemDrop' precisely once that metadata packet has landed.
   const sendDroppedItem = (entity) => {
     if (entity.name !== 'item') return
     // fromNotch inside getDroppedItem throws on metadata shapes it doesn't
@@ -41,7 +48,7 @@ function attachWorldView (bot, socket, viewDistance, onBlockClicked) {
     if (!item) return
     socket.emit('entity', { id: entity.id, itemName: item.name })
   }
-  bot.on('entitySpawn', sendDroppedItem)
+  bot.on('itemDrop', sendDroppedItem)
 
   if (onBlockClicked) {
     worldView.on('blockClicked', (block, face, button) => onBlockClicked(block, face, button))
@@ -75,7 +82,7 @@ function attachWorldView (bot, socket, viewDistance, onBlockClicked) {
     detached = true
     clearInterval(positionTimer)
     bot.removeListener('move', onMove)
-    bot.removeListener('entitySpawn', sendDroppedItem)
+    bot.removeListener('itemDrop', sendDroppedItem)
     worldView.removeListenersFromBot(bot)
     worldView.removeAllListeners()
   }

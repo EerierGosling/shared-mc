@@ -112,6 +112,9 @@ function renderSlot (slot, item) {
 
   const img = document.createElement('img')
   img.alt = ''
+  // Native HTML drag-and-drop on this <img> would hijack our own mouse-based
+  // slot dragging (stack splitting) before it ever sees a mouseenter.
+  img.draggable = false
   // minecraft-assets splits textures between items/ and blocks/; try both
   // before giving up and showing the item name as text.
   img.src = `/assets/items/${item.name}.png`
