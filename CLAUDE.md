@@ -2,10 +2,22 @@
 
 ## Shape of the thing
 
-One mineflayer bot, many browsers, all driving it at once. The browser is a real
-client surface, not a video player: it receives world state and renders it, and
-its input is replayed by the bot. `README.md` has the file-by-file map and the
-full socket protocol — read that first.
+Two ways to play the same Minecraft server, chosen on the way in:
+
+- **road trip** — everyone who picks it shares one bot, one character and one
+  inventory, the way the project started.
+- **solo** — that visitor gets a bot of their own.
+
+The browser is a real client surface, not a video player: it receives world
+state and renders it, and its input is replayed by whichever bot it drives.
+`README.md` has the file-by-file map and the full socket protocol.
+
+A browser gets nothing until it joins. `src/server/sessions.js` vets the mode
+(and, for solo, a name and skin), then `src/server/session.js` builds the bot,
+controller, state pusher, inventory bridge and world views. **Both modes are
+the same Session class** — the only differences are how many member sockets it
+has and what it speaks through: one socket for solo, a socket.io room for the
+road trip.
 
 ## Things that will bite you
 
@@ -20,10 +32,26 @@ full socket protocol — read that first.
   because `Viewer` pulls in the prismarine chunk/block/entity stack. They live in
   `webpack.config.js` and `src/client/shims/`. Adding a prismarine dep to the
   client usually means adding another fallback.
-- **Free-for-all input is an OR merge, not last-write-wins** (`control.js`,
-  `_applyEffective`). Per-socket desired state, merged across clients, recomputed
-  on disconnect. Do not "simplify" it into a single shared control object — one
-  person releasing a key would stop everyone.
+- **Held keys are OR-merged across a session's members, not last-write-wins**
+  (`control.js`, `_applyEffective`). In road trip mode one person releasing W
+  must not stop the bot while someone else still holds it. A solo session is
+  the same merge over exactly one member, which is why one code path serves
+  both modes — do not "simplify" it into a single held-key object.
+- **Only solo visitors cost a login.** Road trip riders share one bot, so they
+  are uncapped; solo bots are capped by the Minecraft server's own player
+  limit. `sessions.js` pings the server at startup and lowers its cap to
+  `max-players` minus `playerSlotsReserved`, never raising it. Skipping that
+  would let the page lock real players out.
+- **A session's emitter is not always a socket.** Solo sessions speak through
+  the member's socket; road trip sessions speak through `io.to(room)`. Anything
+  taking that emitter must only ever call `.emit()` on it — `state.js`,
+  `inventory.js` and `primitives.js` all rely on that. World views are the
+  exception and stay per-member, since prismarine's WorldView tracks which
+  chunks that particular client has been sent.
+- **Destructive actions are budgeted per visitor** (`limits.js`). Dig, place,
+  attack and drop each get an allowance per rolling window, and exceeding it
+  emits `action:refused` rather than dropping the action. Keep it that way: a
+  silent cap is indistinguishable from lag and gets reported as a bug.
 - **Mouse look is applied locally first, then sent.** Never make the camera wait
   for the server round trip. `src/client/index.js` ignores the server's yaw/pitch
   while this client holds pointer lock, otherwise it rides along.

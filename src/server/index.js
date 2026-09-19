@@ -3,15 +3,10 @@ const path = require('path')
 const http = require('http')
 const express = require('express')
 const { Server } = require('socket.io')
+const mc = require('minecraft-protocol')
 
 const config = require('./config')
-const BotHolder = require('./bot')
-const Controller = require('./control')
-const Primitives = require('./primitives')
-const StatePusher = require('./state')
-const LightTracker = require('./lights')
-const InventoryBridge = require('./inventory')
-const { attachWorldView } = require('./worldStream')
+const Sessions = require('./sessions')
 
 const app = express()
 const server = http.createServer(app)
@@ -68,8 +63,9 @@ function pickAssetVersion (version) {
   return above[0] || getVersion(version)
 }
 
-// Item icons for the inventory overlay. Optional: if this version has no asset
-// pack the UI falls back to text labels.
+// Item icons for the inventory overlay, and the player skins the join screen
+// offers. Optional: if this version has no asset pack the UI falls back to
+// text labels.
 try {
   const assets = require('minecraft-assets')(config.mc.version)
   if (assets && assets.directory) app.use('/assets', express.static(assets.directory))
@@ -78,79 +74,57 @@ try {
 }
 
 // --- wiring ----------------------------------------------------------------
-const primitives = new Primitives(io)
-const controller = new Controller(config, primitives, io)
-const statePusher = new StatePusher(io, config)
-const lightTracker = new LightTracker(io)
-const inventory = new InventoryBridge(io)
-const holder = new BotHolder(config.mc)
+// Two ways to play: ride the shared bot with everyone else, or drive one of
+// your own. Sessions owns both; nothing crosses between them but the roster.
+const sessions = new Sessions(config, io)
 
-const clients = new Map() // socket.id -> { socket, detach }
-let status = { state: 'connecting', message: 'connecting to the Minecraft server' }
-
-function setStatus (state, message) {
-  status = { state, message }
-  io.emit('bot:status', status)
-}
-
-function attach (socket) {
-  const client = clients.get(socket.id)
-  if (!client || client.detach || !holder.ready) return
-  client.detach = attachWorldView(holder.bot, socket, config.viewDistance)
-}
-
-function detach (client) {
-  if (!client || !client.detach) return
-  client.detach()
-  client.detach = null
+function broadcastRoster () {
+  io.emit('roster', sessions.roster())
+  // The join screen shows live occupancy, so anyone still choosing sees the
+  // solo slots fill up as they go.
+  io.emit('join:options', sessions.options())
 }
 
 io.on('connection', socket => {
-  clients.set(socket.id, { socket, detach: null })
-  console.log(`browser connected (${clients.size} viewing)`)
+  // No bot yet: the visitor picks a mode first, and only a vetted join creates
+  // a login on the Minecraft server.
+  socket.emit('join:options', sessions.options())
 
-  socket.emit('bot:status', status)
-  socket.emit('config', { reach: config.reach, viewDistance: config.viewDistance })
-  controller.register(socket)
-  inventory.register(socket)
-  primitives.sendAll(socket)
-  lightTracker.sendTo(socket)
-  attach(socket)
+  socket.on('join', payload => {
+    if (sessions.modeBySocket.has(socket.id)) return // already playing
+    const vetted = sessions.vet(payload)
+    if (!vetted.ok) {
+      socket.emit('join:rejected', { reason: vetted.reason })
+      return
+    }
+    sessions.join(socket, vetted.mode, vetted.identity)
+    socket.emit('join:accepted', { mode: vetted.mode, ...vetted.identity })
+    console.log(`${vetted.identity.username} joined ${vetted.mode} (${sessions.botCount}/${sessions.capacity} bots, ${sessions.roadtripRiders} riding)`)
+    broadcastRoster()
+  })
 
   socket.on('latency:ping', sentAt => socket.emit('latency:pong', sentAt))
 
   socket.on('disconnect', () => {
-    detach(clients.get(socket.id))
-    clients.delete(socket.id)
-    controller.dropSocket(socket.id)
-    console.log(`browser disconnected (${clients.size} viewing)`)
+    const left = sessions.leave(socket)
+    if (left) {
+      console.log(`a ${left.mode} visitor left (${sessions.botCount}/${sessions.capacity} bots, ${sessions.roadtripRiders} riding)`)
+      broadcastRoster()
+    }
   })
 })
 
-holder.on('log', message => console.log(`[bot] ${message}`))
-
-holder.on('ready', bot => {
-  controller.setBot(bot)
-  controller.attachPathfinderEvents(bot)
-  statePusher.setBot(bot)
-  lightTracker.setBot(bot)
-  inventory.setBot(bot)
-  for (const client of clients.values()) attach(client.socket)
-  setStatus('connected', `playing as ${bot.username}`)
+// Solo visitors each cost a real login, so the Minecraft server's own player
+// cap is the ceiling. Ask it rather than guessing; on failure keep the
+// configured cap.
+mc.ping({ host: config.mc.host, port: config.mc.port }, (err, result) => {
+  if (err || !result || !result.players) {
+    console.warn(`could not read max-players (${err ? err.message : 'no response'}); capacity stays ${sessions.capacity}`)
+    return
+  }
+  sessions.applyServerCapacity(result.players.max)
+  console.log(`server allows ${result.players.max} players; capacity ${sessions.capacity}`)
 })
-
-holder.on('down', reason => {
-  controller.clearBot()
-  statePusher.clearBot()
-  lightTracker.clearBot()
-  inventory.clearBot()
-  for (const client of clients.values()) detach(client)
-  setStatus('reconnecting', reason)
-})
-
-statePusher.start()
-lightTracker.start()
-holder.start()
 
 server.listen(config.web.port, () => {
   console.log(`open http://localhost:${config.web.port}`)
@@ -158,9 +132,7 @@ server.listen(config.web.port, () => {
 
 const shutdown = () => {
   console.log('shutting down')
-  holder.stop()
-  statePusher.stop()
-  lightTracker.stop()
+  sessions.destroyAll()
   server.close(() => process.exit(0))
   setTimeout(() => process.exit(0), 2000).unref()
 }

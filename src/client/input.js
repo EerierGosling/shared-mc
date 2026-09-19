@@ -25,7 +25,7 @@ const DOUBLE_TAP_MS = 300
  * the server, so aiming never waits for a round trip. Everything else is a
  * plain message; the bot stays authoritative over what actually happens.
  */
-function setupInput ({ socket, viewer, camera, hud, inventoryUI, canvas, hand }) {
+function setupInput ({ socket, viewer, camera, hud, inventoryUI, canvas, hand, join }) {
   const held = Object.create(null)
   let locked = false
   let lastLookSent = 0
@@ -70,7 +70,7 @@ function setupInput ({ socket, viewer, camera, hud, inventoryUI, canvas, hand })
   // --- pointer lock ---------------------------------------------------------
 
   canvas.addEventListener('mousedown', event => {
-    if (inventoryUI.isOpen || hud.chatOpen) return
+    if (join.isOpen || inventoryUI.isOpen || hud.chatOpen) return
     if (!locked) {
       canvas.requestPointerLock()
       return
@@ -111,7 +111,7 @@ function setupInput ({ socket, viewer, camera, hud, inventoryUI, canvas, hand })
   // --- keyboard -------------------------------------------------------------
 
   window.addEventListener('keydown', event => {
-    if (hud.chatOpen) return
+    if (join.isOpen || hud.chatOpen) return
 
     if (event.code === 'KeyE') {
       event.preventDefault()
@@ -161,7 +161,7 @@ function setupInput ({ socket, viewer, camera, hud, inventoryUI, canvas, hand })
     sendControls()
   })
 
-  // A tab losing focus must not leave the shared bot sprinting into a ravine.
+  // A tab losing focus must not leave the bot sprinting into a ravine.
   window.addEventListener('blur', releaseAll)
 
   // --- chat -----------------------------------------------------------------
