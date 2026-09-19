@@ -18,7 +18,13 @@ module.exports = {
     port: int(process.env.PORT, 3000)
   },
   viewDistance: int(process.env.VIEW_DISTANCE, 6),
-  reach: Number(process.env.REACH) || 5,
+  // Clamped, not just defaulted. mineflayer's canDigBlock measures eye-to-block
+  // *centre* against 5.1, while blockAtCursor measures eye-to-the-face-the-ray-
+  // hit. Those differ by up to half a block diagonal, so a larger reach yields
+  // blocks the crosshair targets and the HUD names but the bot then refuses to
+  // dig, with no error anywhere. 4.5 is vanilla survival reach and stays inside
+  // the limit in the worst case.
+  reach: Math.min(Number(process.env.REACH) || 4.5, 4.5),
   // Look packets are rate limited per client so a fast mouse can't spam the
   // Minecraft server hard enough to look like a cheat client.
   lookIntervalMs: int(process.env.LOOK_INTERVAL_MS, 50),

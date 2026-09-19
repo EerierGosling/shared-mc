@@ -28,10 +28,16 @@ const MAX_CHAT_LENGTH = 256
  * stop the bot while someone else is still holding it. A client's contribution
  * is dropped when it disconnects. Look is last-write-wins.
  */
+// A dig that cannot proceed says so at most this often, so a held mouse button
+// cannot flood the chat log.
+const DIG_NOTICE_MS = 4000
+
 class Controller {
-  constructor (config, primitives) {
+  constructor (config, primitives, io) {
     this.config = config
     this.primitives = primitives
+    this.io = io
+    this.lastDigNoticeAt = 0
     this.bot = null
     this.desired = new Map() // socket.id -> control state
     this.effective = {}
@@ -137,13 +143,31 @@ class Controller {
     return entityAtCursor(this.bot, this.config.reach)
   }
 
+  /**
+   * Says why nothing is breaking. Without this the dig loop just sleeps, which
+   * is indistinguishable from the server ignoring the click.
+   */
+  _digNotice (text) {
+    if (!this.io) return
+    const now = Date.now()
+    if (now - this.lastDigNoticeAt < DIG_NOTICE_MS) return
+    this.lastDigNoticeAt = now
+    this.io.emit('chat', { text, position: 'system', ts: now })
+  }
+
   async _digLoop () {
     if (this.digging) return
     this.digging = true
     try {
       while (this.digHeld && this.bot) {
         const block = this.targetBlock()
-        if (!block || !this.bot.canDigBlock(block)) {
+        if (!block) {
+          this._digNotice('* nothing in reach to mine')
+          await sleep(100)
+          continue
+        }
+        if (!this.bot.canDigBlock(block)) {
+          this._digNotice(`* cannot mine ${block.displayName || block.name} from here`)
           await sleep(100)
           continue
         }
