@@ -21,13 +21,17 @@ doesn't stop the bot while someone else is still holding it.
 
 ```bash
 cp .env.example .env      # point MC_HOST/MC_PORT at your server
-npm install
+npm ci                    # npm install instead would drift off the lockfile
 npm run dev               # builds the client bundle, then starts the server
 # open http://localhost:3000
 ```
 
-Needs Node 18+. The bot joins in **offline mode** by default, so the Minecraft
-server must have `online-mode=false`. Set `MC_AUTH=microsoft` for a real account.
+Needs Node 22+ — `nvm use` picks it up from `.nvmrc`. minecraft-protocol
+requires it, and `.npmrc` sets `engine-strict`, so an older runtime fails at
+install time rather than midway through a session.
+
+The bot joins in **offline mode** by default, so the Minecraft server must have
+`online-mode=false`. Set `MC_AUTH=microsoft` for a real account.
 
 No Minecraft server handy? `docker compose up` brings up a vanilla 1.20.4 server
 with online mode off, plus this app, in one go.
