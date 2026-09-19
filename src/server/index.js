@@ -40,7 +40,7 @@ try {
 
 // --- wiring ----------------------------------------------------------------
 const primitives = new Primitives(io)
-const controller = new Controller(config, primitives)
+const controller = new Controller(config, primitives, io)
 const statePusher = new StatePusher(io, config)
 const inventory = new InventoryBridge(io)
 const holder = new BotHolder(config.mc)
