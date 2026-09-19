@@ -1,6 +1,15 @@
 'use strict'
 
-const MAX_CHAT_LINES = 40
+// Vanilla keeps 100 lines and hides each one 10 s after it arrived unless
+// the chat is open.
+const MAX_CHAT_LINES = 100
+const CHAT_LINE_MS = 10000
+
+// The sixteen §-code colours, straight from vanilla's ChatFormatting.
+const MC_COLOURS = {
+  0: '#000000', 1: '#0000aa', 2: '#00aa00', 3: '#00aaaa', 4: '#aa0000', 5: '#aa00aa', 6: '#ffaa00', 7: '#aaaaaa',
+  8: '#555555', 9: '#5555ff', a: '#55ff55', b: '#55ffff', c: '#ff5555', d: '#ff55ff', e: '#ffff55', f: '#ffffff'
+}
 
 // Vanilla HUD sprites, served out of minecraft-assets. Health and hunger are
 // both ten icons covering twenty points, so each icon is worth two.
@@ -19,11 +28,14 @@ class Hud {
     this.health = el('health')
     this.food = el('food')
     this.hotbar = el('hotbar')
+    this.chat = el('chat')
     this.chatLog = el('chat-log')
     this.chatInput = el('chat-input')
     this.players = el('players')
     this.ping = null
     this.lastState = null
+
+    setInterval(() => this._expireChat(), 500)
 
     this.slots = []
     for (let i = 0; i < 9; i++) {
@@ -95,25 +107,61 @@ class Hud {
     })
   }
 
-  addChat (text, kind) {
+  /**
+   * One line of the shared log. `entry` is what the server relays:
+   * { kind: 'chat' | 'system' | 'notice' | 'web', text, motd?, from? }.
+   * Minecraft lines carry their §-codes in `motd`; 'notice' is this app
+   * talking; browser lines are prefixed with who typed them since Minecraft
+   * would only ever credit the bot.
+   */
+  addChat (entry) {
+    if (typeof entry === 'string') entry = { kind: 'notice', text: entry }
     const line = document.createElement('div')
-    if (kind) line.className = kind
-    line.textContent = text
+    line.className = entry.kind || 'chat'
+    line.dataset.at = String(Date.now())
+    if (entry.kind === 'web') {
+      const tag = document.createElement('span')
+      tag.className = 'web-tag'
+      tag.textContent = '[web] '
+      line.appendChild(tag)
+      line.appendChild(document.createTextNode(`<${entry.from}> ${entry.text}`))
+    } else if (entry.motd) {
+      renderMotd(line, entry.motd)
+    } else {
+      line.textContent = entry.text
+    }
     this.chatLog.appendChild(line)
     while (this.chatLog.childElementCount > MAX_CHAT_LINES) {
       this.chatLog.removeChild(this.chatLog.firstChild)
     }
+    this.chatLog.scrollTop = this.chatLog.scrollHeight
+  }
+
+  /** The server's ring buffer, sent on connect so late joiners see the same log. */
+  setChatHistory (entries) {
+    this.chatLog.innerHTML = ''
+    for (const entry of entries) this.addChat(entry)
+  }
+
+  _expireChat () {
+    const cutoff = Date.now() - CHAT_LINE_MS
+    for (const line of this.chatLog.children) {
+      if (Number(line.dataset.at) < cutoff) line.classList.add('faded')
+    }
   }
 
   openChat () {
+    this.chat.classList.add('open')
     this.chatInput.classList.add('open')
     this.chatInput.focus()
+    this.chatLog.scrollTop = this.chatLog.scrollHeight
   }
 
   closeChat () {
     this.chatInput.value = ''
     this.chatInput.blur()
     this.chatInput.classList.remove('open')
+    this.chat.classList.remove('open')
   }
 
   get chatOpen () {
@@ -179,6 +227,44 @@ function paintIcons (cells, value, sprites) {
       ? `url(${top}), url(${sprites.empty})`
       : `url(${sprites.empty})`
   })
+}
+
+/**
+ * Renders legacy §-formatted text as spans. A colour code resets the styles
+ * that precede it, as in vanilla; §r resets everything. Obfuscated (§k) is
+ * ignored rather than animated.
+ */
+function renderMotd (parent, motd) {
+  const parts = motd.split(/§([0-9a-fk-or])/i)
+  let colour = null
+  const styles = new Set()
+  const emit = text => {
+    if (!text) return
+    const span = document.createElement('span')
+    if (colour) span.style.color = colour
+    if (styles.has('l')) span.style.fontWeight = 'bold'
+    if (styles.has('o')) span.style.fontStyle = 'italic'
+    const lines = []
+    if (styles.has('n')) lines.push('underline')
+    if (styles.has('m')) lines.push('line-through')
+    if (lines.length) span.style.textDecoration = lines.join(' ')
+    span.textContent = text
+    parent.appendChild(span)
+  }
+  emit(parts[0])
+  for (let i = 1; i < parts.length; i += 2) {
+    const code = parts[i].toLowerCase()
+    if (code === 'r') {
+      colour = null
+      styles.clear()
+    } else if (MC_COLOURS[code]) {
+      colour = MC_COLOURS[code]
+      styles.clear()
+    } else {
+      styles.add(code)
+    }
+    emit(parts[i + 1])
+  }
 }
 
 function escapeHtml (text) {

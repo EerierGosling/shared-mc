@@ -170,7 +170,10 @@ function setupInput ({ socket, viewer, camera, hud, inventoryUI, canvas, hand, j
     event.stopPropagation()
     if (event.key === 'Enter') {
       const text = hud.chatInput.value.trim()
-      if (text) socket.emit('chat', { text })
+      // /nick is ours, not Minecraft's: it names this browser in the shared log.
+      const nick = text.match(/^\/nick\s+(\S+)/)
+      if (nick) socket.emit('chat:name', { name: nick[1] })
+      else if (text) socket.emit('chat', { text })
       hud.closeChat()
     } else if (event.key === 'Escape') {
       hud.closeChat()

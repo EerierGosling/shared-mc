@@ -24,18 +24,11 @@ class StatePusher {
     this.listeners = []
   }
 
+  // Chat and death lines used to be relayed from here; chat.js and respawn.js
+  // own them now.
   setBot (bot) {
     this.clearBot()
     this.bot = bot
-    this._listen(bot, 'messagestr', (message, position) => {
-      this.socket.emit('chat', { text: message, position, ts: Date.now() })
-    })
-    this._listen(bot, 'death', () => {
-      this.socket.emit('chat', { text: '* the bot died', position: 'system', ts: Date.now() })
-    })
-    this._listen(bot, 'spawn', () => {
-      this.socket.emit('chat', { text: '* the bot spawned', position: 'system', ts: Date.now() })
-    })
   }
 
   clearBot () {

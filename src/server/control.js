@@ -43,11 +43,12 @@ const DIG_NOTICE_MS = 4000
  * from lag and gets reported as a bug.
  */
 class Controller {
-  constructor (emitter, config, primitives, budget) {
+  constructor (emitter, config, primitives, budget, chatLog) {
     this.emitter = emitter
     this.config = config
     this.primitives = primitives
     this.budget = budget
+    this.chatLog = chatLog
     this.bot = null
     this.desired = new Map() // socket.id -> that member's held keys
     this.effective = {}
@@ -322,15 +323,33 @@ class Controller {
 
   chat (socketId, text) {
     const bot = this.bot
-    if (!bot || typeof text !== 'string') return
-    const message = text.replace(/[\r\n]+/g, ' ').trim().slice(0, MAX_CHAT_LENGTH)
+    if (typeof text !== 'string') return
+    // Vanilla kicks the sender for § or control characters
+    // (multiplayer.disconnect.illegal_characters), and the sender here is the
+    // shared bot, so one pasted colour code would drop everyone.
+    const message = text
+      .replace(/[\r\n]+/g, ' ')
+      .replace(/[§\u0000-\u001f\u007f]/g, '')
+      .trim()
+      .slice(0, MAX_CHAT_LENGTH)
     if (!message) return
+    // A dropped message must say so; silence here reads as "chat is broken".
+    if (!bot) {
+      this.chatLog?.notice(socketId, '* not sent: the bot is not connected')
+      return
+    }
     const now = Date.now()
-    if (now - (this.lastChatAt.get(socketId) || 0) < this.config.chatIntervalMs) return
+    if (now - (this.lastChatAt.get(socketId) || 0) < this.config.chatIntervalMs) {
+      this.chatLog?.notice(socketId, '* not sent: one message per second')
+      return
+    }
     this.lastChatAt.set(socketId, now)
     try {
       bot.chat(message)
-    } catch (err) {}
+    } catch (err) {
+      return
+    }
+    this.chatLog?.said(socketId, message)
   }
 
   // --- click to walk -------------------------------------------------------

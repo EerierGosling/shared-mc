@@ -157,9 +157,8 @@ socket.on('state', state => {
   }
 })
 
-socket.on('chat', message => {
-  hud.addChat(message.text, message.position === 'system' ? 'system' : null)
-})
+socket.on('chat', entry => hud.addChat(entry))
+socket.on('chat:history', entries => hud.setChatHistory(entries))
 
 socket.on('lights', lights => blockLights.set(lights))
 

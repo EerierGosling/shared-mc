@@ -5,6 +5,7 @@ const Primitives = require('./primitives')
 const StatePusher = require('./state')
 const LightTracker = require('./lights')
 const InventoryBridge = require('./inventory')
+const ChatLog = require('./chat')
 const { Budget } = require('./limits')
 const { attachWorldView } = require('./worldStream')
 
@@ -37,7 +38,10 @@ class Session {
 
     this.primitives = new Primitives(emitter)
     this.budget = new Budget(config.limits)
-    this.controller = new Controller(emitter, config, this.primitives, this.budget)
+    // Chat history and the death screen are per session: a solo player's are
+    // theirs alone, road trip riders share both.
+    this.chatLog = new ChatLog(emitter)
+    this.controller = new Controller(emitter, config, this.primitives, this.budget, this.chatLog)
     this.statePusher = new StatePusher(emitter, config)
     this.lights = new LightTracker(emitter)
     this.inventory = new InventoryBridge(emitter)
@@ -67,6 +71,8 @@ class Session {
     this.socketsById.set(socket.id, socket)
     this.controller.register(socket)
     this.inventory.register(socket)
+    // A solo player is their own bot, so their chat lines carry that name.
+    this.chatLog.register(socket, this.mode === 'solo' ? this.identity.username : null)
     this.primitives.sendAll(socket)
     this.lights.sendTo(socket)
     socket.emit('bot:status', this.status)
@@ -79,6 +85,7 @@ class Session {
     this.members.delete(socket.id)
     this.socketsById.delete(socket.id)
     this.controller.dropSocket(socket.id)
+    this.chatLog.dropSocket(socket.id)
     const detach = this.detachByMember.get(socket.id)
     if (detach) {
       detach()
@@ -103,6 +110,7 @@ class Session {
   }
 
   _onReady (bot) {
+    this.chatLog.setBot(bot)
     this.controller.setBot(bot)
     this.controller.attachPathfinderEvents(bot)
     this.statePusher.setBot(bot)
@@ -118,6 +126,7 @@ class Session {
     this.statePusher.clearBot()
     this.lights.clearBot()
     this.inventory.clearBot()
+    this.chatLog.clearBot()
     this._detachAll()
     this._setStatus('reconnecting', reason)
   }
@@ -131,6 +140,7 @@ class Session {
     this.lights.stop()
     this.lights.clearBot()
     this.inventory.clearBot()
+    this.chatLog.clearBot()
     this.holder.removeAllListeners()
     this.holder.stop()
   }

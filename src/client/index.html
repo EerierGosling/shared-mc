@@ -179,29 +179,43 @@
   }
 
   /* --- chat ---------------------------------------------------------------- */
+  /* Vanilla: 320px-wide lines whose bottom edge sits 40px up, on a half-black
+     box, each line hidden 10s after it arrived unless the chat is open. */
   #chat {
-    bottom: calc(26 * var(--u)); left: calc(2 * var(--u));
-    width: min(46vw, 480px);
-    display: flex; flex-direction: column;
+    bottom: calc(40 * var(--u)); left: calc(2 * var(--u));
+    width: min(calc(320 * var(--u)), calc(100vw - 4 * var(--u)));
   }
   #chat-log {
-    max-height: 30vh; overflow: hidden;
+    max-height: calc(10 * 9 * var(--u)); overflow: hidden;
     display: flex; flex-direction: column; justify-content: flex-end;
   }
+  #chat.open #chat-log {
+    max-height: calc(20 * 9 * var(--u)); overflow-y: auto;
+    pointer-events: auto; scrollbar-width: none;
+  }
   #chat-log div {
+    flex: none;
     background: rgba(0, 0, 0, 0.5);
-    padding: 0 var(--u);
+    padding: 0 calc(2 * var(--u)) 0 var(--u);
+    min-height: calc(9 * var(--u)); line-height: calc(9 * var(--u));
     word-break: break-word;
     text-shadow: var(--u) var(--u) 0 var(--shadow);
+    transition: opacity 1s;
   }
-  #chat-log div.system { color: var(--mc-yellow); }
+  /* Faded lines keep their box (display:none would reflow the column) until
+     they scroll off the top; opening the chat brings them all back. */
+  #chat-log div.faded { opacity: 0; transition: opacity 1s; }
+  #chat.open #chat-log div.faded { opacity: 1; transition: none; }
+  #chat-log div.notice { color: var(--mc-yellow); }
+  #chat-log .web-tag { color: var(--mc-gray); }
+  /* The input bar runs the full width of the window 2px off the bottom. */
   #chat-input {
-    display: none; pointer-events: auto; width: 100%;
-    margin-top: var(--u);
-    padding: calc(1.5 * var(--u)) calc(2 * var(--u));
+    display: none; position: fixed; pointer-events: auto;
+    left: calc(2 * var(--u)); right: calc(2 * var(--u)); bottom: calc(2 * var(--u));
+    height: calc(12 * var(--u)); padding: 0 calc(2 * var(--u));
     color: var(--mc-white);
     background: rgba(0, 0, 0, 0.5);
-    border: var(--u) solid #a0a0a0;
+    border: none; border-radius: 0;
     font: inherit; outline: none;
     text-shadow: var(--u) var(--u) 0 var(--shadow);
   }
@@ -426,8 +440,9 @@
 
   <div id="chat" class="overlay">
     <div id="chat-log"></div>
-    <input id="chat-input" maxlength="256" placeholder="say something&hellip;" autocomplete="off">
   </div>
+  <input id="chat-input" maxlength="256" placeholder="say something&hellip; (/nick name)" autocomplete="off">
+
 
   <div id="hint" class="overlay tooltip shadowed">
     <b>click</b> to play &nbsp; <b>WASD</b> move &nbsp; <b>space</b> jump<br>
