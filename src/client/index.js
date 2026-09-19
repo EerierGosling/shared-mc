@@ -28,6 +28,8 @@ const viewer = new Viewer(renderer)
 // same real mob models but falls back to a body+head shape instead of a flat
 // box for the mobs prismarine-viewer never got geometry for (see entities.js).
 viewer.entities = new Entities(viewer.scene)
+// Debug hook: lets a devtools console or a headless probe poke the scene.
+window.__viewer = viewer
 // Websocket first: the default polling-then-upgrade dance never completes
 // here — the initial chunk dump saturates the polling transport so the
 // upgrade probe starves, leaving the whole stream on long-polling (seconds
