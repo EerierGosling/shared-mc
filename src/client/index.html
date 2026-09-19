@@ -107,6 +107,30 @@
   }
   #hint b { color: var(--mc-white); font-weight: normal; }
 
+  /* --- minimap -------------------------------------------------------------- */
+  /* One texture pixel per block, so the map rescales with the GUI like every
+     other sprite. Hidden until the first frame arrives from the server. */
+  #minimap {
+    top: calc(2 * var(--u)); right: calc(2 * var(--u));
+    padding: var(--u);
+    background: rgba(0, 0, 0, 0.5);
+    display: none;
+  }
+  #minimap.live { display: block; }
+  #minimap canvas {
+    display: block;
+    width: calc(64 * var(--u)); height: calc(64 * var(--u));
+    image-rendering: pixelated;
+  }
+  #minimap-arrow {
+    position: absolute; left: 50%; top: 50%;
+    width: calc(7 * var(--u)); height: calc(7 * var(--u));
+    background: var(--mc-white);
+    clip-path: polygon(50% 0%, 100% 100%, 50% 70%, 0% 100%);
+    transform: translate(-50%, -50%);
+    filter: drop-shadow(var(--u) var(--u) 0 var(--shadow));
+  }
+
   /* --- hearts and hunger --------------------------------------------------- */
   /* Both rows sit inside the hotbar's own 182px width, as they do in game. */
   #hud-bars {
@@ -236,6 +260,11 @@
   <div id="crosshair" class="overlay"></div>
   <div id="status" class="overlay tooltip shadowed" data-state="connecting">connecting&hellip;</div>
   <div id="stats" class="overlay shadowed"></div>
+
+  <div id="minimap" class="overlay">
+    <canvas id="minimap-canvas" width="64" height="64"></canvas>
+    <div id="minimap-arrow"></div>
+  </div>
 
   <div id="hud-bars" class="overlay">
     <div id="health" class="icon-row"></div>

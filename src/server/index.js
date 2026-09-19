@@ -9,6 +9,7 @@ const BotHolder = require('./bot')
 const Controller = require('./control')
 const Primitives = require('./primitives')
 const StatePusher = require('./state')
+const MinimapPusher = require('./minimap')
 const InventoryBridge = require('./inventory')
 const { attachWorldView } = require('./worldStream')
 
@@ -80,6 +81,7 @@ try {
 const primitives = new Primitives(io)
 const controller = new Controller(config, primitives, io)
 const statePusher = new StatePusher(io, config)
+const minimapPusher = new MinimapPusher(io)
 const inventory = new InventoryBridge(io)
 const holder = new BotHolder(config.mc)
 
@@ -112,6 +114,7 @@ io.on('connection', socket => {
   controller.register(socket)
   inventory.register(socket)
   primitives.sendAll(socket)
+  minimapPusher.sendTo(socket)
   attach(socket)
 
   socket.on('latency:ping', sentAt => socket.emit('latency:pong', sentAt))
@@ -130,6 +133,7 @@ holder.on('ready', bot => {
   controller.setBot(bot)
   controller.attachPathfinderEvents(bot)
   statePusher.setBot(bot)
+  minimapPusher.setBot(bot)
   inventory.setBot(bot)
   for (const client of clients.values()) attach(client.socket)
   setStatus('connected', `playing as ${bot.username}`)
@@ -138,12 +142,14 @@ holder.on('ready', bot => {
 holder.on('down', reason => {
   controller.clearBot()
   statePusher.clearBot()
+  minimapPusher.clearBot()
   inventory.clearBot()
   for (const client of clients.values()) detach(client)
   setStatus('reconnecting', reason)
 })
 
 statePusher.start()
+minimapPusher.start()
 holder.start()
 
 server.listen(config.web.port, () => {
@@ -154,6 +160,7 @@ const shutdown = () => {
   console.log('shutting down')
   holder.stop()
   statePusher.stop()
+  minimapPusher.stop()
   server.close(() => process.exit(0))
   setTimeout(() => process.exit(0), 2000).unref()
 }

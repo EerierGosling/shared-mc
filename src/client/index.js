@@ -8,6 +8,7 @@ const { Viewer } = require('prismarine-viewer/viewer')
 const { supportedVersions } = require('prismarine-viewer/viewer/lib/version')
 const { Hud } = require('./hud')
 const InventoryUI = require('./inventory')
+const Minimap = require('./minimap')
 const setupInput = require('./input')
 const { applySkyForTime } = require('./sky')
 
@@ -24,6 +25,7 @@ const viewer = new Viewer(renderer)
 const socket = io({ transports: ['websocket', 'polling'] })
 const hud = new Hud()
 const inventoryUI = new InventoryUI(socket)
+const minimap = new Minimap()
 
 // Local camera angles. The server owns position; we own where we are looking,
 // so mouse movement shows up on screen before the network round trip lands.
@@ -94,6 +96,8 @@ socket.on('chat', message => {
   hud.addChat(message.text, message.position === 'system' ? 'system' : null)
 })
 
+socket.on('minimap', frame => minimap.setFrame(frame))
+
 // --- latency readout --------------------------------------------------------
 socket.on('latency:pong', sentAt => hud.setPing(Date.now() - sentAt))
 setInterval(() => socket.emit('latency:ping', Date.now()), 2000)
@@ -102,6 +106,7 @@ setInterval(() => socket.emit('latency:ping', Date.now()), 2000)
 function animate () {
   window.requestAnimationFrame(animate)
   viewer.update()
+  minimap.setYaw(camera.yaw)
   renderer.render(viewer.scene, viewer.camera)
 }
 animate()
