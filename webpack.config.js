@@ -38,7 +38,17 @@ module.exports = {
     new webpack.ProvidePlugin({
       Buffer: ['buffer', 'Buffer'],
       process: 'process/browser'
-    })
+    }),
+    // viewer/lib/utils.js is the Node build: it pulls loadImage out of
+    // node-canvas-webgl through a safeRequire that silently yields {} when that
+    // native module is absent, so textures blow up at runtime with
+    // "loadImage is not a function". Upstream's own web config swaps in
+    // utils.web.js (XMLHttpRequest + THREE.TextureLoader) and we need the same.
+    new webpack.NormalModuleReplacementPlugin(
+      // eslint-disable-next-line
+      /viewer[\/|\\]lib[\/|\\]utils/,
+      './utils.web.js'
+    )
   ],
   performance: { hints: false },
   devtool: 'source-map'

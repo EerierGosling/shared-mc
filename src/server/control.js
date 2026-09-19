@@ -1,6 +1,7 @@
 'use strict'
 const Vec3 = require('vec3')
 const { goals } = require('mineflayer-pathfinder')
+const { blockAtCursor, entityAtCursor } = require('./raycast')
 
 const CONTROL_KEYS = ['forward', 'back', 'left', 'right', 'jump', 'sneak', 'sprint']
 
@@ -119,12 +120,7 @@ class Controller {
   // --- world interaction ---------------------------------------------------
 
   targetBlock () {
-    if (!this.bot) return null
-    try {
-      return this.bot.blockAtCursor(this.config.reach)
-    } catch (err) {
-      return null
-    }
+    return blockAtCursor(this.bot, this.config.reach)
   }
 
   setDig (active) {
@@ -138,13 +134,7 @@ class Controller {
   }
 
   _entityAtCursor () {
-    const bot = this.bot
-    if (!bot || typeof bot.entityAtCursor !== 'function') return null
-    try {
-      return bot.entityAtCursor(this.config.reach)
-    } catch (err) {
-      return null
-    }
+    return entityAtCursor(this.bot, this.config.reach)
   }
 
   async _digLoop () {

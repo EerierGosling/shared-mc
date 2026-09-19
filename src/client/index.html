@@ -5,149 +5,251 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Shared Minecraft</title>
 <style>
-  :root {
-    --panel: rgba(12, 14, 18, 0.78);
-    --border: rgba(255, 255, 255, 0.14);
-    --text: #e8ecf1;
-    --dim: #97a2b0;
-    --good: #5fd08a;
-    --warn: #e2b34a;
-    --bad: #e2685a;
+  /* Monocraft (SIL OFL) stands in for Minecraft's own font, which we cannot
+     redistribute. See fonts/Monocraft-OFL.txt. */
+  @font-face {
+    font-family: 'Monocraft';
+    src: url('/fonts/Monocraft.ttf') format('truetype');
+    font-display: swap;
   }
+
+  :root {
+    /* Vanilla's GUI scale. Every HUD measurement below is written in texture
+       pixels multiplied by this, so the whole interface rescales from here.
+       Vanilla picks this from the window size too; see the media query below. */
+    --px: 2;
+    --u: calc(var(--px) * 1px);
+
+    /* Minecraft draws text with a hard 1px shadow at 25% brightness. */
+    --shadow: #3f3f3f;
+
+    /* Container GUI palette, straight off the vanilla widget textures. */
+    --gui: #c6c6c6;
+    --gui-lit: #ffffff;
+    --gui-dim: #555555;
+    --slot: #8b8b8b;
+    --slot-dark: #373737;
+    --ink: #404040;
+
+    /* Vanilla's in-chat colour codes, used for status text. */
+    --mc-white: #ffffff;
+    --mc-gray: #aaaaaa;
+    --mc-green: #55ff55;
+    --mc-yellow: #ffff55;
+    --mc-red: #ff5555;
+  }
+
+  @media (min-width: 1800px) and (min-height: 1000px) {
+    :root { --px: 3; }
+  }
+
   * { box-sizing: border-box; }
+
   html, body {
     margin: 0; height: 100%; overflow: hidden;
-    background: #0b0d11; color: var(--text);
-    font: 13px/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    background: #000; color: var(--mc-white);
+    font-family: 'Monocraft', ui-monospace, Menlo, Consolas, monospace;
+    font-size: calc(var(--px) * 8px);
+    line-height: 1.25;
+    /* Pixel fonts must not be antialiased or the glyph edges go soft. */
+    -webkit-font-smoothing: none;
+    font-smooth: never;
   }
+
+  /* Every sprite here is a 9-to-22px texture blown up several times over;
+     without this the browser would smooth them into mush. */
+  img, .sprite, .sprite::after { image-rendering: pixelated; }
+
   #viewport { display: block; width: 100%; height: 100%; }
 
   .overlay { position: fixed; pointer-events: none; }
 
+  .shadowed { text-shadow: var(--u) var(--u) 0 var(--shadow); }
+
+  /* --- crosshair ---------------------------------------------------------- */
+  /* Vanilla inverts whatever is behind it rather than drawing solid white. */
   #crosshair {
-    left: 50%; top: 50%; width: 18px; height: 18px;
+    left: 50%; top: 50%;
+    width: calc(15 * var(--u)); height: calc(15 * var(--u));
     transform: translate(-50%, -50%);
-    opacity: 0.85;
+    background: url('/assets/gui/sprites/hud/crosshair.png') center/contain no-repeat;
+    mix-blend-mode: difference;
   }
-  #crosshair::before, #crosshair::after {
-    content: ''; position: absolute; background: #fff;
-    box-shadow: 0 0 2px rgba(0,0,0,0.9);
+
+  /* --- tooltip-style panels ----------------------------------------------- */
+  /* The purple-bordered box vanilla uses for item tooltips. */
+  .tooltip {
+    background: rgba(16, 0, 16, 0.94);
+    border: var(--u) solid #2d0a63;
+    padding: calc(2 * var(--u)) calc(3 * var(--u));
+    box-shadow: inset 0 0 0 var(--u) rgba(80, 0, 255, 0.28);
   }
-  #crosshair::before { left: 50%; top: 0; width: 2px; height: 100%; margin-left: -1px; }
-  #crosshair::after { top: 50%; left: 0; height: 2px; width: 100%; margin-top: -1px; }
 
   #status {
-    top: 12px; left: 50%; transform: translateX(-50%);
-    padding: 6px 14px; border-radius: 999px;
-    background: var(--panel); border: 1px solid var(--border);
-    backdrop-filter: blur(8px);
+    top: calc(3 * var(--u)); left: 50%; transform: translateX(-50%);
+    color: var(--mc-yellow);
   }
-  #status[data-state="connected"] { color: var(--good); }
-  #status[data-state="reconnecting"], #status[data-state="connecting"] { color: var(--warn); }
-  #status[data-state="error"] { color: var(--bad); }
+  #status[data-state="connected"] { color: var(--mc-green); }
+  #status[data-state="error"] { color: var(--mc-red); }
 
+  /* The coordinate readout apes the F3 debug overlay: plain translucent black. */
   #stats {
-    top: 12px; left: 12px; padding: 8px 12px; border-radius: 8px;
-    background: var(--panel); border: 1px solid var(--border);
-    color: var(--dim); white-space: pre; backdrop-filter: blur(8px);
+    top: calc(2 * var(--u)); left: calc(2 * var(--u));
+    padding: calc(1 * var(--u)) calc(2 * var(--u));
+    background: rgba(0, 0, 0, 0.5);
+    white-space: pre;
   }
-  #stats b { color: var(--text); font-weight: 600; }
-
-  #vitals {
-    bottom: 86px; left: 50%; transform: translateX(-50%);
-    display: flex; gap: 18px; text-shadow: 0 1px 3px #000;
-  }
-  #vitals span { letter-spacing: 1px; }
-  #health { color: #ff6b6b; }
-  #food { color: #d9a441; }
-
-  #hotbar {
-    bottom: 16px; left: 50%; transform: translateX(-50%);
-    display: flex; gap: 4px; padding: 4px; border-radius: 8px;
-    background: var(--panel); border: 1px solid var(--border);
-  }
-  .slot {
-    width: 52px; height: 52px; border-radius: 6px; position: relative;
-    background: rgba(255,255,255,0.05); border: 2px solid transparent;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 9px; color: var(--dim); text-align: center; overflow: hidden;
-    word-break: break-all; padding: 2px;
-  }
-  .slot.selected { border-color: #fff; background: rgba(255,255,255,0.14); }
-  .slot img { width: 36px; height: 36px; image-rendering: pixelated; }
-  .slot .count {
-    position: absolute; right: 3px; bottom: 1px;
-    font-size: 12px; color: #fff; text-shadow: 1px 1px 2px #000;
-  }
-
-  #chat {
-    bottom: 86px; left: 12px; width: 420px; max-width: 42vw;
-    display: flex; flex-direction: column; gap: 4px;
-  }
-  #chat-log {
-    max-height: 30vh; overflow: hidden; display: flex;
-    flex-direction: column; justify-content: flex-end; gap: 2px;
-  }
-  #chat-log div {
-    background: rgba(12,14,18,0.6); padding: 2px 8px; border-radius: 4px;
-    text-shadow: 0 1px 2px #000; word-break: break-word;
-  }
-  #chat-log div.system { color: var(--dim); font-style: italic; }
-  #chat-input {
-    display: none; pointer-events: auto; width: 100%;
-    padding: 8px 10px; border-radius: 6px; color: var(--text);
-    background: var(--panel); border: 1px solid var(--border);
-    font: inherit; outline: none;
-  }
-  #chat-input.open { display: block; }
+  #stats b { color: var(--mc-yellow); font-weight: normal; }
 
   #hint {
-    bottom: 16px; right: 16px; padding: 10px 14px; border-radius: 8px;
-    background: var(--panel); border: 1px solid var(--border);
-    color: var(--dim); backdrop-filter: blur(8px);
+    bottom: calc(4 * var(--u)); right: calc(4 * var(--u));
+    color: var(--mc-gray);
   }
-  #hint b { color: var(--text); }
+  #hint b { color: var(--mc-white); font-weight: normal; }
 
+  /* --- hearts and hunger --------------------------------------------------- */
+  /* Both rows sit inside the hotbar's own 182px width, as they do in game. */
+  #hud-bars {
+    bottom: calc(26 * var(--u)); left: 50%; transform: translateX(-50%);
+    width: calc(182 * var(--u));
+    display: flex; justify-content: space-between;
+  }
+  .icon-row { display: flex; }
+  /* Vanilla spaces these 8px apart though each icon is 9px, so they overlap. */
+  .icon-row i {
+    width: calc(9 * var(--u)); height: calc(9 * var(--u));
+    margin-right: calc(-1 * var(--u));
+    background-size: contain; background-repeat: no-repeat;
+  }
+  #food { flex-direction: row-reverse; }
+  #food i { margin-right: 0; margin-left: calc(-1 * var(--u)); }
+
+  /* --- hotbar -------------------------------------------------------------- */
+  /* The 182x22 hotbar texture: 1px frame, then nine 20px slots. */
+  #hotbar {
+    bottom: calc(2 * var(--u)); left: 50%; transform: translateX(-50%);
+    width: calc(182 * var(--u)); height: calc(22 * var(--u));
+    padding: var(--u);
+    display: flex;
+    background: url('/assets/gui/sprites/hud/hotbar.png') center/contain no-repeat;
+  }
+  .slot {
+    width: calc(20 * var(--u)); height: calc(20 * var(--u));
+    position: relative; flex: none;
+    display: flex; align-items: center; justify-content: center;
+    font-size: calc(var(--px) * 6px); color: var(--mc-gray);
+    text-align: center; overflow: hidden; word-break: break-all;
+  }
+  /* The selection frame is 24x23 and overhangs the slot by 1px on every side. */
+  #hotbar .slot.selected::after {
+    content: ''; position: absolute;
+    left: calc(-2 * var(--u)); top: calc(-2 * var(--u));
+    width: calc(24 * var(--u)); height: calc(23 * var(--u));
+    background: url('/assets/gui/sprites/hud/hotbar_selection.png') center/contain no-repeat;
+  }
+  .slot img { width: calc(16 * var(--u)); height: calc(16 * var(--u)); }
+  .slot .count {
+    position: absolute; right: 0; bottom: 0;
+    font-size: calc(var(--px) * 8px); color: var(--mc-white);
+    text-shadow: var(--u) var(--u) 0 var(--shadow);
+  }
+
+  /* --- chat ---------------------------------------------------------------- */
+  #chat {
+    bottom: calc(26 * var(--u)); left: calc(2 * var(--u));
+    width: min(46vw, 480px);
+    display: flex; flex-direction: column;
+  }
+  #chat-log {
+    max-height: 30vh; overflow: hidden;
+    display: flex; flex-direction: column; justify-content: flex-end;
+  }
+  #chat-log div {
+    background: rgba(0, 0, 0, 0.5);
+    padding: 0 var(--u);
+    word-break: break-word;
+    text-shadow: var(--u) var(--u) 0 var(--shadow);
+  }
+  #chat-log div.system { color: var(--mc-yellow); }
+  #chat-input {
+    display: none; pointer-events: auto; width: 100%;
+    margin-top: var(--u);
+    padding: calc(1.5 * var(--u)) calc(2 * var(--u));
+    color: var(--mc-white);
+    background: rgba(0, 0, 0, 0.5);
+    border: var(--u) solid #a0a0a0;
+    font: inherit; outline: none;
+    text-shadow: var(--u) var(--u) 0 var(--shadow);
+  }
+  #chat-input.open { display: block; }
+  #chat-input::placeholder { color: #7f7f7f; }
+
+  /* --- inventory ----------------------------------------------------------- */
   #inventory {
     inset: 0; display: none; align-items: center; justify-content: center;
-    background: rgba(6, 8, 11, 0.72); pointer-events: auto;
+    background: rgba(0, 0, 0, 0.6); pointer-events: auto;
   }
   #inventory.open { display: flex; }
+
+  /* Vanilla container chrome: light bevel top-left, dark bevel bottom-right. */
   #inventory-panel {
-    background: #14181f; border: 1px solid var(--border); border-radius: 12px;
-    padding: 18px; min-width: 460px; box-shadow: 0 24px 60px rgba(0,0,0,0.6);
+    background: var(--gui);
+    border-style: solid;
+    border-width: calc(2 * var(--u));
+    border-color: var(--gui-lit) var(--gui-dim) var(--gui-dim) var(--gui-lit);
+    padding: calc(3 * var(--u));
+    min-width: calc(176 * var(--u));
+    color: var(--ink);
   }
   #inventory-panel h2 {
-    margin: 0 0 14px; font-size: 14px; font-weight: 600;
+    margin: 0 0 calc(2 * var(--u));
+    font-size: calc(var(--px) * 8px); font-weight: normal;
     display: flex; justify-content: space-between; align-items: baseline;
   }
-  #inventory-panel h2 small { color: var(--dim); font-weight: 400; }
-  .grid { display: grid; grid-template-columns: repeat(9, 52px); gap: 4px; margin-bottom: 14px; }
-  .grid .slot { cursor: pointer; }
-  .grid .slot:hover { background: rgba(255,255,255,0.16); }
-  .section-label { color: var(--dim); margin: 0 0 6px; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; }
+  #inventory-panel h2 small { color: #7f7f7f; font-size: calc(var(--px) * 6px); }
+  .section-label {
+    color: #7f7f7f; margin: 0 0 var(--u);
+    font-size: calc(var(--px) * 6px);
+  }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(9, calc(18 * var(--u)));
+    gap: var(--u);
+    margin-bottom: calc(2 * var(--u));
+  }
+  /* Slots are inset: the bevel runs the other way round from the panel. */
+  .grid .slot {
+    width: calc(18 * var(--u)); height: calc(18 * var(--u));
+    background: var(--slot);
+    border-style: solid; border-width: var(--u);
+    border-color: var(--slot-dark) var(--gui-lit) var(--gui-lit) var(--slot-dark);
+    cursor: pointer; color: var(--ink);
+  }
+  .grid .slot:hover { background: #c5c5c5; }
+  .grid .slot img { width: calc(16 * var(--u)); height: calc(16 * var(--u)); }
+  .grid .slot .count { color: var(--mc-white); }
 </style>
 </head>
 <body>
   <canvas id="viewport"></canvas>
 
   <div id="crosshair" class="overlay"></div>
-  <div id="status" class="overlay" data-state="connecting">connecting…</div>
-  <div id="stats" class="overlay"></div>
+  <div id="status" class="overlay tooltip shadowed" data-state="connecting">connecting&hellip;</div>
+  <div id="stats" class="overlay shadowed"></div>
 
-  <div id="vitals" class="overlay">
-    <span id="health"></span>
-    <span id="food"></span>
+  <div id="hud-bars" class="overlay">
+    <div id="health" class="icon-row"></div>
+    <div id="food" class="icon-row"></div>
   </div>
 
   <div id="hotbar" class="overlay"></div>
 
   <div id="chat" class="overlay">
     <div id="chat-log"></div>
-    <input id="chat-input" maxlength="256" placeholder="say something…" autocomplete="off">
+    <input id="chat-input" maxlength="256" placeholder="say something&hellip;" autocomplete="off">
   </div>
 
-  <div id="hint" class="overlay">
+  <div id="hint" class="overlay tooltip shadowed">
     <b>click</b> to play &nbsp; <b>WASD</b> move &nbsp; <b>space</b> jump<br>
     <b>LMB</b> mine &nbsp; <b>RMB</b> use/place &nbsp; <b>1-9</b> hotbar<br>
     <b>E</b> inventory &nbsp; <b>T</b> chat &nbsp; <b>Q</b> drop &nbsp; <b>G</b> walk to cursor

@@ -1,5 +1,6 @@
 'use strict'
 const { describeItem } = require('./items')
+const { blockAtCursor } = require('./raycast')
 
 const TICK_MS = 100
 
@@ -77,18 +78,18 @@ class StatePusher {
     for (let i = 0; i < 9; i++) hotbar.push(describeItem(slots[36 + i]))
 
     let targetBlock = null
-    try {
-      const block = bot.blockAtCursor(this.config.reach)
-      if (block) {
+    const block = blockAtCursor(bot, this.config.reach)
+    if (block) {
+      try {
         targetBlock = {
           position: { x: block.position.x, y: block.position.y, z: block.position.z },
           name: block.name,
           displayName: block.displayName,
           diggable: bot.canDigBlock(block)
         }
+      } catch (err) {
+        targetBlock = null
       }
-    } catch (err) {
-      targetBlock = null
     }
 
     return {

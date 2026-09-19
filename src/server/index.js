@@ -26,6 +26,7 @@ const viewerPublic = path.join(path.dirname(require.resolve('prismarine-viewer/p
 
 app.get(['/', '/index.html'], (req, res) => res.sendFile(path.join(clientDir, 'index.html')))
 app.use('/dist', express.static(distDir))
+app.use('/fonts', express.static(path.join(clientDir, 'fonts')))
 app.use(express.static(viewerPublic))
 
 // Item icons for the inventory overlay. Optional: if this version has no asset
