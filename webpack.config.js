@@ -10,6 +10,12 @@ module.exports = {
     filename: 'bundle.js'
   },
   resolve: {
+    // canvas is not a core module, so it needs an alias rather than a
+    // fallback — and a real shim, not `false`: entities.js calls
+    // createCanvas() at runtime to draw player nametags.
+    alias: {
+      canvas: path.resolve(__dirname, 'src/client/shims/canvas.js')
+    },
     fallback: {
       fs: false,
       net: false,
