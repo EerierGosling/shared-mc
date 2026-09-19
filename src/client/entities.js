@@ -164,7 +164,17 @@ function attachNametag (mesh, entity) {
 
   const tex = new THREE.Texture(canvas)
   tex.needsUpdate = true
-  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex }))
+  // The chunk material is transparent too (alphaTest), so terrain and this
+  // sprite share three's back-to-front transparent pass, sorted by object
+  // origin — for a 16-block section that is its corner, so the wall right
+  // behind a tag routinely sorts in front of it. In that order a depth-writing
+  // sprite stamps its whole, mostly empty quad into the depth buffer and the
+  // wall fails the depth test behind it: an x-ray hole. Without the depth
+  // write the wall just paints over the tag instead. So draw tags after the
+  // world, testing depth against it but never writing, and discard the clear
+  // pixels so they cannot tint the mob underneath.
+  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthWrite: false, alphaTest: 0.1 }))
+  sprite.renderOrder = 1
   sprite.position.y += (entity.height || 1.8) + 0.6
   mesh.add(sprite)
 }
