@@ -60,7 +60,8 @@
      without this the browser would smooth them into mush. */
   img, .sprite, .sprite::after { image-rendering: pixelated; }
 
-  #viewport { display: block; width: 100%; height: 100%; }
+  /* touch-action: a finger on the canvas steers, it must not scroll or zoom. */
+  #viewport { display: block; width: 100%; height: 100%; touch-action: none; }
 
   .overlay { position: fixed; pointer-events: none; }
 
@@ -100,6 +101,7 @@
     white-space: pre;
   }
   #stats b { color: var(--mc-yellow); font-weight: normal; }
+  #stats.hidden { display: none; }
 
   #hint {
     bottom: calc(4 * var(--u)); right: calc(4 * var(--u));
@@ -132,12 +134,51 @@
   }
 
   /* --- hearts and hunger --------------------------------------------------- */
-  /* Both rows sit inside the hotbar's own 182px width, as they do in game. */
+  /* Both rows sit inside the hotbar's own 182px width, as they do in game:
+     vanilla puts their bottom edge 30px up, 2px more here for our hotbar
+     offset. */
   #hud-bars {
-    bottom: calc(26 * var(--u)); left: 50%; transform: translateX(-50%);
+    bottom: calc(32 * var(--u)); left: 50%; transform: translateX(-50%);
     width: calc(182 * var(--u));
     display: flex; justify-content: space-between;
   }
+  /* Vanilla shakes hearts by a pixel at random once you are down to two;
+     staggering by position makes a CSS loop look random enough. */
+  #health.low i { animation: heart-jitter 0.2s steps(2, end) infinite; }
+  #health.low i:nth-child(2n) { animation-direction: reverse; }
+  #health.low i:nth-child(3n) { animation-duration: 0.1s; }
+  @keyframes heart-jitter { to { transform: translateY(var(--u)); } }
+  /* No hearts, hunger or XP in creative. */
+  body[data-gamemode="creative"] #hud-bars,
+  body[data-gamemode="creative"] #xp { display: none; }
+
+  /* --- experience ----------------------------------------------------------- */
+  /* The 182x5 bar sits just above the hotbar; the level number straddles it in
+     vanilla's green with a black outline. */
+  #xp {
+    bottom: calc(26 * var(--u)); left: 50%; transform: translateX(-50%);
+    width: calc(182 * var(--u)); height: calc(5 * var(--u));
+    background: url('/assets/gui/sprites/hud/experience_bar_background.png') 0 0 / 100% 100% no-repeat;
+    image-rendering: pixelated;
+  }
+  #xp-fill {
+    height: 100%; width: 0;
+    background: url('/assets/gui/sprites/hud/experience_bar_progress.png') 0 0 / calc(182 * var(--u)) 100% no-repeat;
+    image-rendering: pixelated;
+  }
+  #xp-level {
+    position: absolute; left: 50%; bottom: calc(-1 * var(--u)); transform: translateX(-50%);
+    color: #80ff20; line-height: 1;
+    text-shadow: var(--u) 0 #000, calc(-1 * var(--u)) 0 #000, 0 var(--u) #000, 0 calc(-1 * var(--u)) #000;
+  }
+
+  /* The held item's name, shown above the hotbar when the selection changes. */
+  #held-name {
+    bottom: calc(53 * var(--u)); left: 50%; transform: translateX(-50%);
+    white-space: nowrap; opacity: 0;
+  }
+  #held-name.show { opacity: 1; }
+  #held-name.show.fade { opacity: 0; transition: opacity 0.5s 2s; }
   .icon-row { display: flex; }
   /* Vanilla spaces these 8px apart though each icon is 9px, so they overlap. */
   .icon-row i {
@@ -252,6 +293,55 @@
   .player[data-mode="roadtrip"] .badge { background-image: url(/assets/gui/sprites/hud/heart/full.png); }
   .player[data-mode="solo"] .badge { background-image: url(/assets/gui/sprites/hud/food_full.png); }
   .player[data-mode="player"] .badge { background-image: url(/assets/gui/sprites/icon/checkmark.png); }
+  /* Vanilla's connection bars, 10x8, blank until the state stream reports. */
+  .player .ping {
+    width: calc(10 * var(--u)); height: calc(8 * var(--u));
+    margin-left: auto;
+    background-size: contain; background-repeat: no-repeat; background-position: center;
+  }
+  .player .badge { margin-left: 0; }
+
+  /* --- touch controls ------------------------------------------------------- */
+  /* Shown only on coarse-pointer devices (or with ?touch for testing). A
+     D-pad and sneak toggle bottom left, mine/use/jump bottom right, chat and
+     inventory along the top; drag anywhere else to look. */
+  #touch { display: none; inset: 0; }
+  body.touch #touch { display: block; }
+  body.touch #hint { display: none; }
+  #touch button {
+    position: absolute; pointer-events: auto; touch-action: none;
+    width: calc(22 * var(--u)); height: calc(22 * var(--u));
+    padding: 0; cursor: pointer; opacity: 0.75;
+    color: var(--mc-white); background: #6b6b6b;
+    border-style: solid; border-width: calc(2 * var(--u));
+    border-color: #a0a0a0 #2b2b2b #2b2b2b #a0a0a0;
+    font: inherit; text-shadow: var(--u) var(--u) 0 var(--shadow);
+    -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;
+  }
+  #touch button.down { background: #7f8caa; }
+  #touch button.on { background: #7f8caa; border-color: var(--mc-white); }
+  #touch-pad {
+    position: absolute; left: calc(6 * var(--u)); bottom: calc(60 * var(--u));
+    width: calc(66 * var(--u)); height: calc(66 * var(--u));
+  }
+  #touch-pad .tb-up { left: calc(22 * var(--u)); top: 0; }
+  #touch-pad .tb-left { left: 0; top: calc(22 * var(--u)); }
+  #touch-pad .tb-right { left: calc(44 * var(--u)); top: calc(22 * var(--u)); }
+  #touch-pad .tb-down { left: calc(22 * var(--u)); top: calc(44 * var(--u)); }
+  #touch-pad .tb-sneak { left: calc(22 * var(--u)); top: calc(22 * var(--u)); }
+  #touch-actions {
+    position: absolute; right: calc(6 * var(--u)); bottom: calc(60 * var(--u));
+    width: calc(66 * var(--u)); height: calc(66 * var(--u));
+  }
+  #touch-actions .tb-mine { left: 0; top: calc(22 * var(--u)); width: calc(30 * var(--u)); }
+  #touch-actions .tb-use { left: calc(36 * var(--u)); top: calc(22 * var(--u)); width: calc(30 * var(--u)); }
+  #touch-actions .tb-jump { left: calc(22 * var(--u)); top: 0; }
+  #touch-menu {
+    position: absolute; top: calc(2 * var(--u)); left: 50%; transform: translateX(-50%);
+    display: flex; gap: var(--u);
+  }
+  #touch-menu button { position: static; width: auto; height: calc(14 * var(--u)); padding: 0 calc(3 * var(--u)); }
+  body.touch #status { top: calc(18 * var(--u)); }
 
   /* --- join screen ---------------------------------------------------------- */
   #join {
@@ -497,7 +587,31 @@
     <div id="food" class="icon-row"></div>
   </div>
 
+  <div id="xp" class="overlay">
+    <div id="xp-fill"></div>
+    <span id="xp-level" class="shadowed"></span>
+  </div>
+  <div id="held-name" class="overlay shadowed"></div>
   <div id="hotbar" class="overlay"></div>
+
+  <div id="touch" class="overlay">
+    <div id="touch-menu">
+      <button type="button" data-action="chat">chat</button>
+      <button type="button" data-action="inventory">inventory</button>
+    </div>
+    <div id="touch-pad">
+      <button type="button" class="tb-up" data-control="forward">&#9650;</button>
+      <button type="button" class="tb-left" data-control="left">&#9664;</button>
+      <button type="button" class="tb-sneak" data-action="sneak">&#8681;</button>
+      <button type="button" class="tb-right" data-control="right">&#9654;</button>
+      <button type="button" class="tb-down" data-control="back">&#9660;</button>
+    </div>
+    <div id="touch-actions">
+      <button type="button" class="tb-jump" data-control="jump">&#9650;</button>
+      <button type="button" class="tb-mine" data-action="mine">mine</button>
+      <button type="button" class="tb-use" data-action="use">use</button>
+    </div>
+  </div>
 
   <div id="chat" class="overlay">
     <div id="chat-log"></div>
@@ -514,8 +628,8 @@
 
   <div id="hint" class="overlay tooltip shadowed">
     <b>click</b> to play &nbsp; <b>WASD</b> move &nbsp; <b>space</b> jump<br>
-    <b>LMB</b> mine &nbsp; <b>RMB</b> use/place &nbsp; <b>1-9</b> hotbar<br>
-    <b>E</b> inventory &nbsp; <b>T</b> chat &nbsp; <b>Q</b> drop &nbsp; <b>G</b> walk to cursor
+    <b>LMB</b> mine &nbsp; <b>RMB</b> use/place &nbsp; <b>1-9</b>/<b>scroll</b> hotbar<br>
+    <b>E</b> inventory &nbsp; <b>T</b> chat &nbsp; <b>Q</b> drop &nbsp; <b>G</b> walk to cursor &nbsp; <b>F3</b> readout
   </div>
 
   <div id="players" class="overlay"></div>
