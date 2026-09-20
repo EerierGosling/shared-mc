@@ -86,13 +86,17 @@ function buildArmGeometry () {
 // Tuning constants for where the arm sits and how far it swings. Positions
 // are camera-local blocks, rotations are radians around the shoulder pivot.
 //
-// The position is vanilla's own numbers: Minecraft's ItemInHandRenderer
-// (renderPlayerArm) translates the right arm by (0.64, -0.6, -0.72) before
-// any swing/equip animation is applied, in the same eye-relative units we
-// use here. The 45° base yaw is vanilla's too (`rotate(45, Y)` right after
-// that translate) — it's what turns the arm to a 3/4 view instead of
-// presenting a flat face to the camera.
-const REST_POSITION = [0.64, -0.6, -0.72]
+// Vanilla's own ItemInHandRenderer numbers (translate ~(0.64, -0.6, -0.72),
+// then rotate 45° around Y) don't transfer directly: vanilla draws the hand
+// through its own narrow, fixed-FOV projection, independent of the world
+// camera's FOV/aspect. We share one camera (viewer.camera, vertical FOV 75°)
+// for both, so a shoulder placed at vanilla's y=-0.6 at that distance falls
+// outside our frustum's bottom edge and the whole arm renders off-screen —
+// confirmed by an actual render, not guessed. SCALE shrinks the arm so it
+// reads at a similar apparent size without needing to sit so far down/out
+// that it clips.
+const SCALE = 0.6
+const REST_POSITION = [0.45, -0.32, -0.55]
 const REST_ROTATION = [0.25, Math.PI / 4, -0.1]
 const SWING_ROTATION = [1.3, -0.1, -0.2]
 // 3x the original swing speed.
@@ -133,6 +137,7 @@ class Hand {
     this.pivot.position.set(...REST_POSITION)
     this.pivot.rotation.set(...REST_ROTATION)
     this.arm = mesh
+    this.pivot.scale.setScalar(SCALE)
     this.pivot.add(mesh)
     this.item = new THREE.Group()
     this.pivot.add(this.item)
