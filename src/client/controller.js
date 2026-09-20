@@ -11,7 +11,8 @@ let paired = false
 let wakeLock = null
 let wakeGeneration = 0
 const hashCode = window.location.hash.slice(1)
-if (/^[a-f0-9]{12}$/i.test(hashCode)) code.value = hashCode.toUpperCase()
+let autoPair = /^[a-f0-9]{12}$/i.test(hashCode)
+if (autoPair) code.value = hashCode.toUpperCase()
 // Keep the single-use token out of browser history after the page has read it.
 history.replaceState(null, '', window.location.pathname)
 
@@ -47,8 +48,7 @@ function ended (message) {
   connect.disabled = !socket.connected
   status.textContent = message
 }
-document.getElementById('pair-form').addEventListener('submit', event => {
-  event.preventDefault()
+function pair () {
   if (!socket.connected) return
   connect.disabled = true
   socket.timeout(5000).emit('motion:pair', { code: code.value }, (error, result) => {
@@ -59,15 +59,28 @@ document.getElementById('pair-form').addEventListener('submit', event => {
     }
     paired = true
     code.value = ''
-    status.textContent = 'Connected. Choose camera or phone steps, test in practice mode, then enable player control on both screens.'
+    status.textContent = 'Paired. Tap Enable phone steps to allow motion access and start tracking. Enable player control on the game screen when ready.'
     disconnect.hidden = false
     show.hidden = false
     controls.show()
+    document.querySelector('[data-action=motion]').scrollIntoView({ block: 'center' })
   })
+}
+document.getElementById('pair-form').addEventListener('submit', event => {
+  event.preventDefault()
+  pair()
 })
 disconnect.addEventListener('click', () => { socket.emit('motion:unpair'); ended('Disconnected. Generate a new code to pair again.') })
 show.addEventListener('click', () => controls.show())
-socket.on('connect', () => { connect.disabled = false; status.textContent = 'Ready to pair. Enter a code and connect.' })
+socket.on('connect', () => {
+  connect.disabled = false
+  status.textContent = 'Ready to pair. Enter a code and connect.'
+  if (autoPair) {
+    autoPair = false
+    status.textContent = 'Pairing with your game…'
+    pair()
+  }
+})
 socket.on('motion:ended', () => ended('Pairing ended. Generate a new code on the game screen.'))
 socket.on('disconnect', () => ended('Connection lost. Reconnect with a new pairing code.'))
 document.addEventListener('visibilitychange', () => {

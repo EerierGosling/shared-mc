@@ -161,7 +161,10 @@ module.exports = function setupCameraControls ({ apply, canPlay, onStart, socket
   }
   function show (withPhone = false) {
     panel.hidden = false
-    if (withPhone && $('[data-role=pairing]')) $('[data-role=pairing]').open = true
+    if (withPhone && $('[data-role=pairing]')) {
+      $('[data-role=pairing]').open = true
+      if (!paired && !$('[data-role=pair-code]').textContent) $('[data-action=pair]').click()
+    }
   }
   function renderSettings () {
     for (const [key] of Object.entries(FIELDS)) {
@@ -304,6 +307,7 @@ module.exports = function setupCameraControls ({ apply, canPlay, onStart, socket
       motionSince = performance.now()
       $('[data-action=motion]').textContent = 'Disable phone steps'
       status.textContent = 'Waiting for motion sensor data. Carry this device and walk in place.'
+      if (companion) $('[data-action=arm]').click()
     } catch (error) { status.textContent = error.message }
   })
   window.addEventListener('devicemotion', event => {
@@ -313,15 +317,19 @@ module.exports = function setupCameraControls ({ apply, canPlay, onStart, socket
 
   if (!companion && socket) {
     const pairStatus = $('[data-role=pair-status]')
+    const pairButton = $('[data-action=pair]')
     $('[data-role=pair-origin]').value = window.location.origin
-    $('[data-action=pair]').addEventListener('click', () => {
+    pairButton.addEventListener('click', () => {
       if (!socket.connected) { pairStatus.textContent = 'Connect to the game first.'; return }
       let link
       try {
         link = new URL('/controller', $('[data-role=pair-origin]').value)
         if (!['https:', 'http:'].includes(link.protocol) || link.username || link.password) throw new Error('address')
       } catch { pairStatus.textContent = 'Enter a valid HTTPS address for this game server.'; return }
+      pairButton.disabled = true
+      pairStatus.textContent = 'Creating phone pairing QR code…'
       socket.timeout(5000).emit('motion:create', async (error, result) => {
+        pairButton.disabled = false
         if (error || result?.error) { pairStatus.textContent = result?.error || 'Pairing request timed out. Retry.'; return }
         $('[data-role=pair-code]').textContent = result.code
         link.hash = result.code

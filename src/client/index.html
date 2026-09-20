@@ -844,6 +844,15 @@
         </div>
         <p class="section-label join-label">How to play</p>
         <div id="join-modes"></div>
+        <fieldset id="join-controls" aria-describedby="join-control-hint">
+          <legend>Controls</legend>
+          <label><input type="radio" name="control-mode" value="standard" checked> Keyboard / mouse / touch</label>
+          <label><input type="radio" name="control-mode" value="camera"> Use camera</label>
+          <label><input type="radio" name="control-mode" value="hybrid"> Camera + phone</label>
+          <label><input type="radio" name="control-mode" value="phone"> Paired phone controller</label>
+          <small id="join-control-hint">You can change controls from the game menu.</small>
+          <small><a href="/controller">Use this device as a phone controller</a></small>
+        </fieldset>
       </section>
       <section id="join-right">
         <p class="section-label join-label">Your character</p>
@@ -866,27 +875,6 @@
         <p id="join-error"></p>
         <button id="join-button" class="mc-button" type="submit" disabled>Play</button>
       </footer>
-    </form>
-  </div>
-      <div id="join-modes"></div>
-      <div id="join-identity">
-        <input id="join-name" maxlength="16" placeholder="your name" autocomplete="off" spellcheck="false">
-        <div id="join-skins"></div>
-      </div>
-      <div id="join-controls">
-        <label for="join-control-mode">Controls</label>
-        <select id="join-control-mode">
-          <option value="standard">Keyboard / mouse / touch</option>
-          <option value="camera">Camera gestures</option>
-          <option value="hybrid">Camera + paired phone steps</option>
-          <option value="phone">Paired phone controller</option>
-        </select>
-        <small id="join-control-hint">You can change controls from the game menu.</small>
-        <small><a href="/controller">Use this device as a phone controller</a></small>
-      </div>
-      <button id="join-button" type="submit" disabled>Play</button>
-      <p id="join-error"></p>
-      <p id="join-build"></p>
     </form>
   </div>
 

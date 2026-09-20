@@ -31,8 +31,11 @@
 #camera-controls [data-role=pair-link] { display: block; overflow-wrap: anywhere; }
 #camera-controls .motion-live { color: #a5ec87; }
 #camera-controls .motion-source { border-top: 1px solid #666; padding-top: 8px; }
-#join-controls { font: 14px/1.5 system-ui, sans-serif; margin: 8px 0; text-align: left; }
-#join-controls select { font: inherit; width: 100%; padding: 7px; }
+#join-controls { font: 14px/1.5 system-ui, sans-serif; margin: 8px 0; padding: 0; border: 0; min-width: 0; text-align: left; }
+#join-controls label { display: flex; align-items: center; gap: 8px; padding: 6px; margin: 3px 0; color: #fff; background: #2e2e2e; border: 1px solid #101010; cursor: pointer; }
+#join-controls label:has(input:checked) { border-color: #fff; background: #43434f; }
+#join-controls label:focus-within { outline: 2px solid #fff; outline-offset: 1px; }
+#join-controls input { margin: 0; accent-color: #78b94a; }
 #join-controls small { display: block; margin-top: 4px; }
 #join-panel { max-height: 90dvh; overflow-y: auto; }
 body.companion { margin: 0; padding: 20px; background: #202820; color: white; font: 16px/1.5 system-ui, sans-serif; }
