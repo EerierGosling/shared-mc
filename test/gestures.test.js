@@ -189,3 +189,27 @@ test('moderate arm movement does not mine; deliberate swings still do', () => {
   p[16].y += 0.05
   assert.equal(g.update(p, 1700).digging, true)
 })
+
+test('raising the off-hand overhead places one block per raise', () => {
+  const g = calibrated()
+  // Default arm is right, so the left wrist (15) is the placing hand.
+  const raised = () => { const p = pose(); p[15].y = 0.1; return p }
+  assert.equal(g.update(pose(), 1500).use, false, 'a resting off-hand does not place')
+  g.update(raised(), 1550)
+  assert.equal(g.update(raised(), 1800).use, true, 'a held raise places')
+  assert.equal(g.update(raised(), 1900).use, false, 'holding it up does not repeat')
+  // Lower, then a fresh raise places the next block.
+  g.update(pose(), 1950)
+  g.update(raised(), 2000)
+  assert.equal(g.update(raised(), 2250).use, true)
+})
+
+test('a brief off-hand raise below the hold window does not place', () => {
+  const g = calibrated()
+  const raised = () => { const p = pose(); p[15].y = 0.1; return p }
+  g.update(pose(), 1500)
+  g.update(raised(), 1550)
+  // Dropped again before the confirm window elapses.
+  assert.equal(g.update(pose(), 1650).use, false)
+  assert.equal(g.update(raised(), 1660).use, false)
+})

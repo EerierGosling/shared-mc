@@ -66,6 +66,7 @@ module.exports = function setupCameraControls ({ apply, canPlay, onStart, onDone
         <li>Test standing still for 10 seconds and each gesture 10 times. Change one slider at a time. Enable player control when ready.</li>
       </ol>
       <p>Walking automatically jumps while moving forward. To jump from camera input, both feet and hips must rise.</p>
+      <p>To place a block, raise your other hand above your shoulder and hold it there a moment; lower and raise it again for the next block.</p>
       <p>Use a mounted camera for body tracking. For phone mining, pair a separate phone, enable its motion sensor, hold it upright with the screen facing you, then thrust it forward to mine. Keep the controller page visible and awake.</p>
       <p>Calibration and sliders personalize a pretrained detector; they do not train a new AI model. No videos or landmarks are uploaded.</p>
     </details>
@@ -243,13 +244,29 @@ module.exports = function setupCameraControls ({ apply, canPlay, onStart, onDone
     renderSettings()
     syncFace()
   }
-  for (const [key, [label, min, max, step]] of Object.entries(FIELDS)) {
-    if (key === 'phoneThreshold') continue
-    const row = document.createElement('label')
-    row.className = 'mc-slider'
-    row.innerHTML = `<input type="range" data-setting="${key}" min="${min}" max="${max}" step="${step}"><span>${label}: <output data-output="${key}"></output></span>`
-    $('[data-role=sliders]').append(row)
-    row.querySelector('input').addEventListener('input', event => { settings[key] = Number(event.target.value); settingsChanged() })
+  // Sliders grouped by the body action they tune, so head / leg / arm
+  // adjustments read as a set instead of one flat list. phoneThreshold has no
+  // group here — it lives on the phone controller page (phone-controls.js).
+  const SLIDER_GROUPS = [
+    ['Head — looking', ['lookSpeed', 'deadzone', 'smoothing']],
+    ['Legs — walking', ['stepThreshold', 'walkHold', 'jumpThreshold']],
+    ['Arm — mining', ['swingThreshold', 'digHold']],
+    ['Arm — placing', ['placeThreshold']],
+    ['Face', ['faceThreshold']]
+  ]
+  for (const [title, keys] of SLIDER_GROUPS) {
+    const heading = document.createElement('h3')
+    heading.className = 'cs-group'
+    heading.textContent = title
+    $('[data-role=sliders]').append(heading)
+    for (const key of keys) {
+      const [label, min, max, step] = FIELDS[key]
+      const row = document.createElement('label')
+      row.className = 'mc-slider'
+      row.innerHTML = `<input type="range" data-setting="${key}" min="${min}" max="${max}" step="${step}"><span>${label}: <output data-output="${key}"></output></span>`
+      $('[data-role=sliders]').append(row)
+      row.querySelector('input').addEventListener('input', event => { settings[key] = Number(event.target.value); settingsChanged() })
+    }
   }
   for (const key of ['autojump', 'invertX', 'invertY', 'facial', 'arm']) {
     $(`[data-setting=${key}]`).addEventListener('change', event => {
@@ -260,8 +277,8 @@ module.exports = function setupCameraControls ({ apply, canPlay, onStart, onDone
   $('[data-setting=preset]').addEventListener('change', event => {
     const values = {
       normal: DEFAULTS,
-      gentle: { ...DEFAULTS, stepThreshold: 0.04, swingThreshold: 1.3, jumpThreshold: 0.1, phoneThreshold: 2, lookSpeed: 0.7 },
-      deliberate: { ...DEFAULTS, deadzone: 0.14, stepThreshold: 0.22, swingThreshold: 3.5, jumpThreshold: 0.25, phoneThreshold: 4 }
+      gentle: { ...DEFAULTS, stepThreshold: 0.04, swingThreshold: 1.3, jumpThreshold: 0.1, phoneThreshold: 2, lookSpeed: 0.7, placeThreshold: 0.6 },
+      deliberate: { ...DEFAULTS, deadzone: 0.14, stepThreshold: 0.22, swingThreshold: 3.5, jumpThreshold: 0.25, phoneThreshold: 4, placeThreshold: 1 }
     }
     settings = { ...values[event.target.value], camera: settings.camera }
     settingsChanged()
@@ -377,7 +394,7 @@ module.exports = function setupCameraControls ({ apply, canPlay, onStart, onDone
       forward,
       jump: Boolean(local.jump || face.jump || other.jump || (forward && settings.autojump)),
       digging: Boolean(local.digging || other.digging),
-      use: Boolean(face.use || other.use),
+      use: Boolean(local.use || face.use || other.use),
       dx: Math.max(-1, Math.min(1, local.dx + other.dx)),
       dy: Math.max(-1, Math.min(1, local.dy + other.dy))
     }
@@ -387,7 +404,7 @@ module.exports = function setupCameraControls ({ apply, canPlay, onStart, onDone
     $('[data-role=diagnostics]').textContent = [
       m && `Head: ${m.headX.toFixed(2)}, ${m.headY.toFixed(2)} | dead zone ${settings.deadzone}`,
       m && `Step lift: ${m.lift.toFixed(2)} / ${settings.stepThreshold} | arm: ${m.speed.toFixed(2)} / ${settings.swingThreshold}`,
-      m && `Jump rise: ${m.rise.toFixed(2)} / ${settings.jumpThreshold}`,
+      m && `Jump rise: ${m.rise.toFixed(2)} / ${settings.jumpThreshold} | raise: ${(m.place ?? 0).toFixed(2)} / ${settings.placeThreshold}`,
       settings.facial && `Expression: ${faceState.score.toFixed(2)} / ${settings.faceThreshold}`,
       running && `Tracking time: ${Math.round(inferenceMs)} ms. ${cameraFresh ? 'Camera live' : 'Waiting for fresh camera frames'}`
     ].filter(Boolean).join('\n') || 'Start an input to see measurements.'

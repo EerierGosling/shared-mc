@@ -1,6 +1,9 @@
 'use strict'
 const { normalize } = require('./motion-settings')
 const idle = () => ({ forward: false, jump: false, digging: false, use: false, dx: 0, dy: 0 })
+// Milliseconds the off-hand must stay raised before a place fires — long enough
+// that a hand passing overhead on its way somewhere does not drop a block.
+const PLACE_HOLD = 200
 const visible = (p, ids) => ids.every(i => p?.[i] && Number.isFinite(p[i].x) && Number.isFinite(p[i].y) && p[i].x >= 0 && p[i].x <= 1 && p[i].y >= 0 && p[i].y <= 1 && (p[i].visibility ?? 1) > 0.6)
 const deadzone = (value, threshold) => Math.sign(value) * Math.min(1, Math.max(0, Math.abs(value) - threshold) * 3)
 const average = (samples, key) => {
@@ -25,6 +28,10 @@ class Gestures {
     this.lastStep = -Infinity
     this.walkUntil = this.digUntil = this.jumpUntil = 0
     this.lastSwing = this.lastJump = -Infinity
+    this.raiseStart = null
+    // Latched true so a hand already raised (e.g. mid arm-to-play gesture) must
+    // come back down before the first place; ordinary resting re-arms at once.
+    this.placeLatched = true
   }
 
   // X and Z are normalized by image width; Y by image height. Convert them to
@@ -38,6 +45,10 @@ class Gestures {
     const legs = hips && visible(p, [25, 26, 27, 28])
     const [shoulder, elbow, hand] = settings.arm === 'left' ? [11, 13, 15] : [12, 14, 16]
     const arm = shoulders && visible(p, [elbow, hand])
+    // The hand not set for mining signals placing, so a place and a mine can
+    // never come from one motion. Only its wrist against its shoulder matters.
+    const [offShoulder, offHand] = settings.arm === 'left' ? [12, 16] : [11, 15]
+    const offArm = shoulders && visible(p, [offHand])
     const tracking = { head, arm, legs, jumpReady: false }
     const gap = this.lastSampleTime !== null && (now - this.lastSampleTime > 300 || now <= this.lastSampleTime)
     this.lastSampleTime = now
@@ -130,6 +141,19 @@ class Gestures {
       } else this.swingStart = null
     } else this.swingStart = null
     if (!wrist) this.digUntil = 0
+    // Placing: raise the off-hand above the shoulder and hold it a moment. A
+    // still, high pose on the arm that never mines, so it cannot be confused
+    // for a thrust. One block per raise — it latches when it fires and re-arms
+    // only once the hand drops well back down, so a hover cannot repeat-place.
+    const offWristY = offArm ? (p[offHand].y - p[offShoulder].y) / upperScale : null
+    let placing = false
+    if (offWristY !== null && offWristY < -settings.placeThreshold) {
+      if (this.raiseStart === null) this.raiseStart = now
+      else if (!this.placeLatched && now - this.raiseStart >= PLACE_HOLD) { placing = true; this.placeLatched = true }
+    } else {
+      this.raiseStart = null
+      if (offWristY === null || offWristY > -settings.placeThreshold * 0.6) this.placeLatched = false
+    }
     this.previous = { hipY, wrist, time: now }
     const forward = legs && now < this.walkUntil
     const headX = head ? pose.x - this.neutral.x : 0
@@ -141,10 +165,11 @@ class Gestures {
     this.smoothedX = x === 0 ? 0 : this.smoothedX * smoothing + x * (1 - smoothing)
     this.smoothedY = y === 0 ? 0 : this.smoothedY * smoothing + y * (1 - smoothing)
     return {
-      metrics: { headX, headY, lift, speed, rise }, tracking,
+      metrics: { headX, headY, lift, speed, rise, place: offWristY !== null ? -offWristY : 0 }, tracking,
       tracked: true, forward,
       jump: (forward && settings.autojump) || now < this.jumpUntil,
       digging: now < this.digUntil,
+      use: placing,
       dx: this.smoothedX || 0, dy: this.smoothedY || 0,
       status: !legs ? 'Upper-body tracking — show legs for walking/jumping' : !tracking.jumpReady ? 'Tracking — recalibrate with feet visible for physical jumps' : 'Tracking — walk in place to move'
     }

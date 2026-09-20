@@ -8,6 +8,10 @@ const FIELDS = {
   jumpThreshold: ['Jump height threshold', 0.08, 0.4, 0.01, 0.18],
   walkHold: ['Walking stop delay (ms)', 250, 1000, 50, 650],
   digHold: ['Mining hold (ms)', 250, 1500, 50, 800],
+  // How high the off-hand (the arm not set for mining) must rise above the
+  // shoulder — in shoulder-widths — to place a block. Higher asks for a fuller
+  // reach overhead, lower places from a smaller lift.
+  placeThreshold: ['Off-hand raise to place', 0.4, 1.5, 0.05, 0.8],
   phoneThreshold: ['Phone mining threshold (m/s²)', 0.1, 2, 0.05, 0.1],
   faceThreshold: ['Smile / mouth threshold', 0.3, 0.95, 0.05, 0.65]
 }

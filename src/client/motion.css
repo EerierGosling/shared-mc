@@ -97,6 +97,13 @@
 }
 .mc-slider:hover span, .mc-slider:has(input:focus-visible) span { color: var(--mc-yellow); }
 #camera-controls [data-role=sliders] { display: flex; flex-direction: column; gap: calc(4 * var(--u)); margin: calc(4 * var(--u)) 0; }
+/* A quiet caption naming the body action the sliders under it tune. */
+#camera-controls [data-role=sliders] .cs-group {
+  margin: calc(3 * var(--u)) 0 calc(-1 * var(--u));
+  font: inherit; font-size: calc(var(--px) * 6px); font-weight: normal; line-height: 1;
+  color: var(--mc-gray);
+}
+#camera-controls [data-role=sliders] .cs-group:first-child { margin-top: 0; }
 
 /* Vanilla opens a sub screen from a "Controls..." button. A collapsible with
    the button as its summary is the same idea without leaving the page. */
