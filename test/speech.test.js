@@ -136,7 +136,7 @@ test('spoken lines queue one per chat interval instead of being refused', async 
   const said = []
   const notices = []
   const controller = new Controller({ emit () {} }, { chatIntervalMs: 30, limits: {} }, null, null, { notice: (id, text) => notices.push(text), said: (id, text) => said.push([id, text]) }, null)
-  controller.bot = { chat: text => said.push(['bot', text]) }
+  controller.bot = { chat: text => said.push(['bot', text]), removeListener () {} }
   controller.say('a', 'one')
   controller.say('b', 'two')
   controller.say('a', 'three')
