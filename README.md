@@ -29,4 +29,4 @@ npm run dev
 | `PORT` | `3000` | web server |
 | `VIEW_DISTANCE` | `6` | chunk radius streamed per browser |
 | `REACH` | `5` | block reach for dig/place/interact |
-| `DEEPGRAM_API_KEY` | unset | enables the push-to-talk button on touch devices |
+| `DEEPGRAM_API_KEY` | unset | enables push to talk: hold V on a keyboard, the mic button on touch |

@@ -153,6 +153,21 @@
   }
   #held-name.show { opacity: 1; }
   #held-name.show.fade { opacity: 0; transition: opacity 0.5s 2s; }
+  /* Push to talk on a keyboard: a readout above the hotbar while V is held,
+     dimmed while the words are on their way back. Touch has the mic button. */
+  #talk {
+    bottom: calc(60 * var(--u)); left: 50%; transform: translateX(-50%);
+    padding: calc(1 * var(--u)) calc(3 * var(--u));
+    background: rgba(0, 0, 0, 0.5); color: #ff8080;
+    white-space: nowrap; display: none;
+  }
+  body.talking:not(.touch) #talk, body.talk-busy:not(.touch) #talk { display: block; }
+  /* Both can hold at once (V pressed again before the last result is back);
+     the open mic is what matters then, so `talking` is written last. */
+  body.talk-busy #talk { opacity: 0.5; color: #ffffff; }
+  body.talk-busy #talk::before { content: 'sending…'; }
+  body.talking #talk { opacity: 1; color: #ff8080; }
+  body.talking #talk::before { content: 'listening…'; }
   .icon-row { display: flex; }
   /* Vanilla spaces these 8px apart though each icon is 9px, so they overlap. */
   .icon-row i {
@@ -329,8 +344,8 @@
      mic is open, dimmed while the words are on their way back. */
   #touch [data-action=talk] { display: none; }
   body.speech #touch [data-action=talk] { display: block; }
-  #touch [data-action=talk].on { background: #a03030; border-color: #ff8080 #501010 #501010 #ff8080; }
-  #touch [data-action=talk].busy { opacity: 0.4; }
+  body.talking #touch [data-action=talk] { background: #a03030; border-color: #ff8080 #501010 #501010 #ff8080; }
+  body.talk-busy #touch [data-action=talk] { opacity: 0.4; }
   /* Bedrock's HUD: vitals in the top corners, so the bottom is only the
      hotbar and the thumbs. The readouts move down to make room. */
   body.touch #hud-bars {
@@ -568,6 +583,8 @@
   }
   #pause-controls .row.creative-only { display: none; }
   body.creative #pause-controls .row.creative-only { display: flex; }
+  #pause-controls .row.speech-only { display: none; }
+  body.speech #pause-controls .row.speech-only { display: flex; }
 
   /* --- advancements -------------------------------------------------------- */
   /* Vanilla's toast sprite is 160x32: icon at (8,8), headline at (30,7),
@@ -815,6 +832,7 @@
     <span id="xp-level" class="shadowed"></span>
   </div>
   <div id="held-name" class="overlay shadowed"></div>
+  <div id="talk" class="overlay shadowed"></div>
   <div id="hotbar" class="overlay"></div>
 
   <div id="touch" class="overlay">
@@ -877,6 +895,7 @@
       <div class="row"><b>1-9 / scroll</b><span>hotbar</span></div>
       <div class="row"><b>E</b><span>inventory</span></div>
       <div class="row"><b>T</b><span>chat (/ for a command)</span></div>
+      <div class="row speech-only"><b>V</b><span>hold to talk (speech to chat)</span></div>
       <div class="row"><b>Q</b><span>drop item</span></div>
       <div class="row"><b>G</b><span>walk to cursor</span></div>
       <div class="row"><b>L</b><span>advancements</span></div>
