@@ -71,15 +71,19 @@ function pickAssetVersion (version) {
   return above[0] || getVersion(version)
 }
 
-// Item icons for the inventory overlay, and the player skins the join screen
-// offers. Optional: if this version has no asset pack the UI falls back to
-// text labels.
+// HUD sprites and the player skins the join screen offers. Optional: without
+// an asset pack the HUD chrome just goes missing.
 try {
   const assets = require('minecraft-assets')(config.mc.version)
   if (assets && assets.directory) app.use('/assets', express.static(assets.directory))
 } catch (err) {
-  console.warn(`no minecraft-assets for ${config.mc.version}; inventory will use text labels`)
+  console.warn(`no minecraft-assets for ${config.mc.version}; HUD sprites will 404`)
 }
+
+// Item icons, classified and served out of the same asset set as the atlas —
+// minecraft-assets' loose texture folders are too incomplete to guess from
+// (see src/server/icons.js).
+if (assetVersion) require('./icons')(app, viewerPublic, assetVersion)
 
 // --- wiring ----------------------------------------------------------------
 // Two ways to play: ride the shared bot with everyone else, or drive one of

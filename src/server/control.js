@@ -2,21 +2,9 @@
 const Vec3 = require('vec3')
 const { goals } = require('mineflayer-pathfinder')
 const { blockAtCursor, entityAtCursor } = require('./raycast')
+const { FACE_VECTORS, INTERACTABLE, isPlaceable } = require('./placement')
 
 const CONTROL_KEYS = ['forward', 'back', 'left', 'right', 'jump', 'sneak', 'sprint']
-
-// prismarine's raycast reports the hit face as an index; placing a block needs
-// the matching normal vector.
-const FACE_VECTORS = [
-  new Vec3(0, -1, 0),
-  new Vec3(0, 1, 0),
-  new Vec3(0, 0, -1),
-  new Vec3(0, 0, 1),
-  new Vec3(-1, 0, 0),
-  new Vec3(1, 0, 0)
-]
-
-const INTERACTABLE = /chest|furnace|crafting_table|barrel|shulker_box|hopper|dispenser|dropper|anvil|enchanting_table|brewing_stand|beacon|lectern|loom|smoker|blast_furnace|cartography|grindstone|stonecutter|door|trapdoor|fence_gate|button|lever|bed$|note_block|jukebox|comparator|repeater|sign$/
 
 const MAX_CHAT_LENGTH = 256
 
@@ -317,11 +305,14 @@ class Controller {
           // fall through to placing / using the held item
         }
       }
-      if (held && this._isPlaceable(bot, held)) {
+      if (held && isPlaceable(bot, held)) {
         if (!this._afford('place')) return
         const face = FACE_VECTORS[block.face] || new Vec3(0, 1, 0)
         try {
-          await bot.placeBlock(block, face)
+          // 'ignore' skips placeBlock's smooth lookAt — several physics ticks
+          // before the packet even leaves, on a head the browser has already
+          // pointed at this block. Same reason the dig path passes it.
+          await bot._placeBlockWithOptions(block, face, { swingArm: 'right', forceLook: 'ignore' })
           return
         } catch (err) {
           // no valid placement; fall through
@@ -337,12 +328,6 @@ class Controller {
         } catch (err) {}
       }, 200)
     } catch (err) {}
-  }
-
-  _isPlaceable (bot, item) {
-    const registry = bot.registry || bot.mcData
-    if (!registry || !registry.blocksByName) return false
-    return Boolean(registry.blocksByName[item.name])
   }
 
   attack () {

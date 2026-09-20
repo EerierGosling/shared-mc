@@ -28,7 +28,7 @@ const DOUBLE_TAP_MS = 300
  * the server, so aiming never waits for a round trip. Everything else is a
  * plain message; the bot stays authoritative over what actually happens.
  */
-function setupInput ({ socket, viewer, camera, hud, inventoryUI, canvas, hand, join }) {
+function setupInput ({ socket, viewer, camera, hud, inventoryUI, canvas, hand, join, placePrediction }) {
   const held = Object.create(null)
   let locked = false
   let lastLookSent = 0
@@ -105,6 +105,10 @@ function setupInput ({ socket, viewer, camera, hud, inventoryUI, canvas, hand, j
       hand.startSwinging()
     } else if (event.button === 2) {
       flushLook()
+      // Draw the assumed placement before the round trip; the server's
+      // blockUpdate confirms or corrects it.
+      placePrediction.place()
+      hand.swing()
       socket.emit('action:use')
     }
   })

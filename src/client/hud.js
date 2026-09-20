@@ -18,6 +18,8 @@ const ICON_COUNT = 10
 const HEART = { empty: HUD + 'heart/container.png', half: HUD + 'heart/half.png', full: HUD + 'heart/full.png' }
 const FOOD = { empty: HUD + 'food_empty.png', half: HUD + 'food_half.png', full: HUD + 'food_full.png' }
 
+const icons = require('./icons')
+
 const el = id => document.getElementById(id)
 
 /** Everything drawn in DOM on top of the canvas. */
@@ -128,6 +130,12 @@ class Hud {
     })
   }
 
+  /** Repaint slots drawn before the icon data had loaded (see icons.js). */
+  refreshHotbar () {
+    this.lastHotbarKey = null
+    if (this.lastState) this.renderHotbar(this.lastState)
+  }
+
   /**
    * One line of the shared log. `entry` is what the server relays:
    * { kind: 'chat' | 'system' | 'notice' | 'web', text, motd?, from? }.
@@ -231,24 +239,25 @@ function renderSlot (slot, item) {
   slot.innerHTML = ''
   if (!item) return
 
-  const img = document.createElement('img')
-  img.alt = ''
-  // Native HTML drag-and-drop on this <img> would hijack our own mouse-based
-  // slot dragging (stack splitting) before it ever sees a mouseenter.
-  img.draggable = false
-  // minecraft-assets splits textures between items/ and blocks/; try both
-  // before giving up and showing the item name as text.
-  img.src = `/assets/items/${item.name}.png`
-  img.onerror = () => {
-    if (img.dataset.retried) {
+  // A flat item texture or a little 3D render of the block model (icons.js).
+  // Null means the icon data is still loading or the item has no texture
+  // anywhere; show the name as text, as vanilla shows missing models.
+  const url = icons.iconFor(item.name)
+  if (url) {
+    const img = document.createElement('img')
+    img.alt = ''
+    // Native HTML drag-and-drop on this <img> would hijack our own mouse-based
+    // slot dragging (stack splitting) before it ever sees a mouseenter.
+    img.draggable = false
+    img.src = url
+    img.onerror = () => {
       slot.textContent = item.displayName || item.name
       if (item.count > 1) appendCount(slot, item.count)
-      return
     }
-    img.dataset.retried = '1'
-    img.src = `/assets/blocks/${item.name}.png`
+    slot.appendChild(img)
+  } else {
+    slot.textContent = item.displayName || item.name
   }
-  slot.appendChild(img)
   if (item.count > 1) appendCount(slot, item.count)
   slot.title = `${item.displayName || item.name} x${item.count}`
 }

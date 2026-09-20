@@ -11,12 +11,14 @@ const InventoryUI = require('./inventory')
 const BlockLights = require('./lights')
 const Minimap = require('./minimap')
 const BreakingAnimation = require('./breaking')
+const PlacePrediction = require('./place')
 const setupInput = require('./input')
 const { createSky, applySkyForTime } = require('./sky')
 const { Entities } = require('./entities')
 const { Hand } = require('./hand')
 const { JoinScreen } = require('./join')
 const SkinPainter = require('./skins')
+const icons = require('./icons')
 
 const canvas = document.getElementById('viewport')
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: false })
@@ -40,6 +42,7 @@ const hud = new Hud()
 const inventoryUI = new InventoryUI(socket)
 const minimap = new Minimap(viewer.entities)
 const breaking = new BreakingAnimation(viewer.scene)
+const placePrediction = new PlacePrediction(viewer, socket)
 
 // First-person hand viewmodel, parented to the camera so it rides along with
 // look direction for free. Swung from input.js while a dig/attack is held.
@@ -62,7 +65,7 @@ const join = new JoinScreen(socket, identity => {
   hud.setStatus('connecting', `joining as ${identity.username}…`)
 })
 
-const input = setupInput({ socket, viewer, camera, hud, inventoryUI, canvas, hand, join })
+const input = setupInput({ socket, viewer, camera, hud, inventoryUI, canvas, hand, join, placePrediction })
 
 const highlight = new THREE.LineSegments(
   new THREE.EdgesGeometry(new THREE.BoxGeometry(1.002, 1.002, 1.002)),
@@ -117,6 +120,10 @@ socket.on('version', version => {
     return
   }
   breaking.setVersion(version)
+  icons.init(version, () => {
+    hud.refreshHotbar()
+    inventoryUI.refresh()
+  })
   if (!listening) {
     // Wires loadChunk / unloadChunk / entity / blockUpdate straight off the socket.
     viewer.listen(socket)
@@ -149,6 +156,7 @@ socket.on('dig:stop', () => breaking.stop())
 
 socket.on('state', state => {
   hud.setState(state)
+  placePrediction.setTarget(state.placeTarget)
   applySkyForTime(viewer, state.timeOfDay, sky)
   if (state.targetBlock) {
     const { x, y, z } = state.targetBlock.position
