@@ -61,7 +61,7 @@ module.exports = function setupCameraControls ({ apply, canPlay, onStart, socket
         <li>Test standing still for 10 seconds and each gesture 10 times. Change one slider at a time. Enable player control when ready.</li>
       </ol>
       <p>Walking automatically jumps while moving forward. To jump from camera input, both feet and hips must rise.</p>
-      <p>Use a mounted camera for body tracking. For phone mining, pair a separate phone, enable its motion sensor, and swing it deliberately to mine. Keep the controller page visible and awake.</p>
+      <p>Use a mounted camera for body tracking. For phone mining, pair a separate phone, enable its motion sensor, hold it upright with the screen facing you, then thrust it forward to mine. Keep the controller page visible and awake.</p>
       <p>Calibration and sliders personalize a pretrained detector; they do not train a new AI model. No videos or landmarks are uploaded.</p>
     </details>
     ${companion ? '' : `<details data-role="pairing"><summary>Pair a phone</summary>
@@ -317,7 +317,7 @@ module.exports = function setupCameraControls ({ apply, canPlay, onStart, socket
       motionEnabled = true
       motionSince = performance.now()
       $('[data-action=motion]').textContent = 'Disable phone mining'
-      status.textContent = 'Waiting for motion sensor data. Hold this device and make repeated deliberate swings to mine.'
+      status.textContent = 'Waiting for motion sensor data. Hold the phone upright, screen facing you. Thrust forward repeatedly to keep mining; stop moving to release.'
       if (companion) $('[data-action=arm]').click()
     } catch (error) { status.textContent = error.message }
   })

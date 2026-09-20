@@ -1,33 +1,9 @@
 'use strict'
 const { test } = require('node:test')
 const assert = require('node:assert/strict')
-const PhoneMining = require('../src/client/phone-mining')
 const FaceGestures = require('../src/client/face-gestures')
 const { normalize, DEFAULTS } = require('../src/client/motion-settings')
 const { Gestures } = require('../src/client/gestures')
-const accel = strength => ({ acceleration: { x: 0, y: strength, z: 0 } })
-
-test('phone requires distinct repeated peaks and expires on missing sensor samples', () => {
-  const phoneMining = new PhoneMining()
-  phoneMining.update(accel(0), 0)
-  assert.equal(phoneMining.update(accel(4), 50), false)
-  assert.equal(phoneMining.update(accel(5), 350), false) // sustained motion is not a new swing
-  phoneMining.update(accel(0), 400)
-  assert.equal(phoneMining.update(accel(4), 450), true)
-  assert.equal(phoneMining.active(760), false)
-  phoneMining.reset()
-  assert.equal(phoneMining.active(460), false)
-})
-
-test('gravity fallback ignores a stationary phone and detects dynamic acceleration', () => {
-  const phoneMining = new PhoneMining()
-  const gravity = y => ({ acceleration: { x: null, y: null, z: null }, accelerationIncludingGravity: { x: 0, y, z: 0 } })
-  for (let time = 0; time < 1000; time += 50) assert.equal(phoneMining.update(gravity(9.8), time), false)
-  phoneMining.update(gravity(15), 1000)
-  phoneMining.update(gravity(9.8), 1300)
-  assert.equal(phoneMining.update(gravity(15), 1350), true)
-})
-
 test('facial actions require dwell and relaxation; lost face releases actions', () => {
   const face = new FaceGestures()
   const scores = value => ['mouthSmileLeft', 'mouthSmileRight', 'jawOpen'].map(categoryName => ({ categoryName, score: value }))

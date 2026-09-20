@@ -75,11 +75,10 @@ expressions on some cameras.
    a socket disconnect requires a new code.
 
 Recommended hybrid setup: mount the computer camera for head/arm/body input;
-use the phone for mining with repeated deliberate swings. Camera knee lifts still control walking. On the phone,
+use the phone for mining: hold it upright with the screen facing you, pause briefly, then thrust forward. Camera knee lifts still control walking. On the phone,
 choose **Enable phone mining** (no camera required), allow motion permission if
 prompted. This enables phone input; enable player control on the game screen when ready. The live measurements show acceleration
-and warn if no samples arrive. Mining recognition requires repeated peaks, not a
-single shake. There is a gravity-filter fallback for devices that only report
+and warn if no samples arrive. Mining requires a forward thrust followed by braking; sideways shakes and isolated impacts are rejected. Repeated forward thrusts keep mining held through brief pauses between strokes. Resting for about 350 ms stops mining. There is a gravity-filter fallback for devices that only report
 acceleration including gravity.
 
 Alternatively, mount the phone to use its camera as the sole tracker and leave

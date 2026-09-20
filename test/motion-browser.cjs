@@ -84,19 +84,35 @@ async function main () {
     await host.locator('[data-action=arm]').click()
     await phone.locator('[data-action=motion]').click()
     assert.match(await phone.locator('[data-role=mode]').textContent(), /Player control enabled/)
-    const sendAcceleration = y => phone.evaluate(value => {
-      window.dispatchEvent(new DeviceMotionEvent('devicemotion', { acceleration: { x: 0, y: value, z: 0 } }))
-    }, y)
-    await sendAcceleration(0)
+    const sendMotion = (z, count, y = 0) => phone.evaluate(async ({ z, count, y }) => {
+      for (let i = 0; i < count; i++) {
+        window.dispatchEvent(new DeviceMotionEvent('devicemotion', {
+          acceleration: { x: 0, y, z },
+          accelerationIncludingGravity: { x: 0, y: y + 9.8, z }
+        }))
+        await new Promise(resolve => setTimeout(resolve, 20))
+      }
+    }, { z, count, y })
+    await sendMotion(0, 15)
+    await sendMotion(0, 6, 5)
+    await sendMotion(0, 6, -5)
+    await sendMotion(0, 15)
+    assert.ok(!packets.some(state => state.digging), 'Stationary and vertical handling do not mine')
+    await sendMotion(-4, 6)
+    await sendMotion(4, 4)
     await phone.waitForTimeout(80)
-    await sendAcceleration(4)
-    await phone.waitForTimeout(350)
-    await sendAcceleration(0)
-    await phone.waitForTimeout(80)
-    await sendAcceleration(4)
-    await phone.waitForTimeout(200)
     assert.ok(packets.some(state => state.digging), 'Phone swings start mining')
     assert.ok(!packets.some(state => state.forward || state.jump), 'Phone acceleration never walks or autojumps')
+    const miningStart = packets.length
+    for (let stroke = 0; stroke < 5; stroke++) {
+      await sendMotion(0, 8)
+      await sendMotion(-4, 6)
+      await sendMotion(4, 4)
+    }
+    assert.ok(!packets.slice(miningStart).some(p => p.digging === false), 'Repeated thrusts hold mining continuously')
+    await sendMotion(0, 30)
+    await phone.waitForTimeout(100)
+    assert.equal(packets.filter(p => 'digging' in p).at(-1).digging, false, 'Resting releases mining')
     await phone.locator('[data-action=stop]').click()
     await phone.waitForTimeout(200)
     assert.equal(packets.filter(p => 'digging' in p).at(-1).digging, false)

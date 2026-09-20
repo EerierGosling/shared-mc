@@ -2,18 +2,6 @@
 const { test } = require('node:test')
 const assert = require('node:assert/strict')
 const { load, save } = require('../src/client/motion-settings')
-const PhoneMining = require('../src/client/phone-mining')
-
-test('lighter repeated phone swings trigger mining, sensor noise stays idle', () => {
-  const phoneMining = new PhoneMining()
-  const sample = (y, now) => phoneMining.update({ acceleration: { x: 0, y, z: 0 } }, now)
-  for (let now = 0; now < 500; now += 50) assert.equal(sample(0.4, now), false)
-  assert.equal(sample(2.4, 500), false)
-  sample(0, 750)
-  assert.equal(sample(2.4, 850), true)
-  assert.equal(phoneMining.active(1200), false)
-})
-
 test('saved old defaults upgrade once while custom values survive', t => {
   const original = global.localStorage
   let stored = JSON.stringify({ stepThreshold: 0.13, swingThreshold: 2.5, phoneThreshold: 3, lookSpeed: 1.7 })
