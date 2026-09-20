@@ -35,6 +35,8 @@ const PING_BARS = [[150, 5], [300, 4], [600, 3], [1000, 2], [Infinity, 1]]
 
 const icons = require('./icons')
 
+const { modeBadge } = require('./badges')
+
 const el = id => document.getElementById(id)
 
 /** Everything drawn in DOM on top of the canvas. */
@@ -93,8 +95,8 @@ class Hud {
   /**
    * Who else is here. Vanilla shows this on Tab; we keep it always visible.
    * Each row is badged by how that name got onto the server — a real Minecraft
-   * client, a solo bot from this page, or the shared road trip bot — using
-   * the same sprites the join screen used to describe the two modes. Pings
+   * client, a solo bot from this page, or the shared collaborative bot — with
+   * the same glyphs the join screen uses to describe the modes (badges.js). Pings
    * come separately, off the state stream, since they change every tick and
    * the roster only on joins and leaves.
    */
@@ -112,9 +114,7 @@ class Hud {
       face.style.backgroundImage = `url(/assets/entity/player/wide/${skin || 'steve'}.png)`
       const bars = document.createElement('i')
       bars.className = 'ping'
-      const badge = document.createElement('i')
-      badge.className = 'badge'
-      row.append(face, document.createTextNode(username), bars, badge)
+      row.append(face, document.createTextNode(username), bars, modeBadge(mode))
       this.players.appendChild(row)
       this.pingByName.set(username, bars)
     }
