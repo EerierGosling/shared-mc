@@ -15,6 +15,7 @@ services:
       - "25565:25565"
     volumes:
       - mc-data:/data
+    restart: unless-stopped
 
   app:
     build:
@@ -25,14 +26,22 @@ services:
       - minecraft
     environment:
       MC_HOST: minecraft
+      # The service name above only resolves inside the compose network; this
+      # is what the join screen shows visitors.
+      MC_PUBLIC_HOST: ${MC_PUBLIC_HOST:-localhost}
       MC_PORT: "25565"
       MC_VERSION: "1.20.4"
       MC_USERNAME: StreamBot
       MC_AUTH: offline
       PORT: "3000"
       VIEW_DISTANCE: "6"
+      MAX_BOTS: ${MAX_BOTS:-32}
+      PLAYER_SLOTS_RESERVED: ${PLAYER_SLOTS_RESERVED:-2}
+      # .env is not baked into the image; compose reads it for these.
+      DEEPGRAM_API_KEY: ${DEEPGRAM_API_KEY:-}
     ports:
       - "3000:3000"
+    restart: unless-stopped
 
 volumes:
   mc-data: {}
