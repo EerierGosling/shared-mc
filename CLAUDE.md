@@ -12,8 +12,11 @@ The browser is a real client surface, not a video player: it receives world
 state and renders it, and its input is replayed by whichever bot it drives.
 `README.md` has the file-by-file map and the full socket protocol.
 
-A browser gets nothing until it joins. `src/server/sessions.js` vets the mode
-(and, for solo, a name and skin), then `src/server/session.js` builds the bot,
+A browser gets nothing until it joins. The visitor names the server: `MC_HOST`
+is only a placeholder and a fallback for a blank field, and sessions are
+grouped by `host:port` (one road trip bot per server, rosters per server).
+`src/server/sessions.js` vets the address and the mode (and, for solo, a name
+and skin), `index.js` pings the address before spending a login, then `src/server/session.js` builds the bot,
 controller, state pusher, inventory bridge and world views. **Both modes are
 the same Session class** — the only differences are how many member sockets it
 has and what it speaks through: one socket for solo, a socket.io room for the
@@ -39,9 +42,11 @@ road trip.
   both modes — do not "simplify" it into a single held-key object.
 - **Only solo visitors cost a login.** Road trip riders share one bot, so they
   are uncapped; solo bots are capped by the Minecraft server's own player
-  limit. `sessions.js` pings the server at startup and lowers its cap to
-  `max-players` minus `playerSlotsReserved`, never raising it. Skipping that
-  would let the page lock real players out.
+  limit. `sessions.js` pings the default server at startup (if `MC_HOST` is
+  set) and lowers its cap to `max-players` minus `playerSlotsReserved`, never
+  raising it; a server the visitor typed is pinged at join and refused when
+  its player count is already at its max. Skipping that would let the page
+  lock real players out.
 - **A session's emitter is not always a socket.** Solo sessions speak through
   the member's socket; road trip sessions speak through `io.to(room)`. Anything
   taking that emitter must only ever call `.emit()` on it — `state.js`,

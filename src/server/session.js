@@ -26,9 +26,11 @@ const { attachWorldView } = require('./worldStream')
  * setBot/clearBot rather than anything caching it.
  */
 class Session {
-  constructor ({ mode, identity, config, emitter, io, onPlayers }) {
+  constructor ({ mode, identity, server, config, emitter, io, onPlayers }) {
     this.mode = mode // 'solo' | 'roadtrip'
     this.identity = identity // { username, skin }
+    this.server = server // { host, port } this bot logs into
+    this.serverKey = `${server.host}:${server.port}`
     this.onPlayers = onPlayers || (() => {}) // the server's tab list changed
     this.config = config
     this.emitter = emitter
@@ -51,12 +53,14 @@ class Session {
 
     this.holder = new BotHolder({
       ...config.mc,
+      host: server.host,
+      port: server.port,
       username: identity.username,
       // One chunk past what WorldView streams: its ring is exclusive, and the
       // pathfinder and the cursor raycast both like a little margin.
       viewDistance: Math.max(2, config.viewDistance + 1)
     })
-    this.holder.on('log', message => console.log(`[${identity.username}] ${message}`))
+    this.holder.on('log', message => console.log(`[${identity.username}@${this.serverKey}] ${message}`))
     this.holder.on('ready', bot => this._onReady(bot))
     this.holder.on('down', reason => this._onDown(reason))
   }
