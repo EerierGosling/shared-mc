@@ -102,12 +102,19 @@ const RETURN_MS = 65
 // mesh lit by it goes flat or blows out depending purely on which way the
 // world camera happens to be pointed, with no relation to how it actually
 // sits on screen. Real Minecraft's first-person hand doesn't have that
-// problem — its shading is baked per-face, not relit by the world sun. We
-// fake the same effect by keeping the hand off the world lights' layer and
-// lighting it instead from a light that's parented to the camera, so the
-// arm's shading direction is always the same relative to the screen.
-const HAND_LIGHT_LAYER = 1
-
+// problem — its shading is baked per-face, not relit by the world sun. So
+// the arm lives in a scene of its own with its own two lights, drawn as a
+// second pass over the world each frame (render() below).
+//
+// It used to sit in the world scene on a separate layer, on the assumption
+// that layers keep lights apart. They do not: three.js collects a light
+// whenever the *camera's* layers include it (WebGLRenderer.projectObject)
+// and then applies every collected light to every mesh, so the arm's white
+// fill and 0.9 key light were shining on the whole world. A snowfield at
+// noon summed to well over 2x white and clipped to a shapeless sheet.
+//
+// The second pass clears depth first, which also keeps the arm from cutting
+// into a wall the player stands against, the way vanilla draws it.
 class Hand {
   constructor () {
     const material = new THREE.MeshLambertMaterial({ transparent: true, alphaTest: 0.1 })
@@ -120,7 +127,6 @@ class Hand {
     })
 
     const mesh = new THREE.Mesh(buildArmGeometry(), material)
-    mesh.layers.set(HAND_LIGHT_LAYER)
 
     this.pivot = new THREE.Group()
     this.pivot.position.set(...REST_POSITION)
@@ -130,31 +136,35 @@ class Hand {
     this.light = new THREE.DirectionalLight(0xffffff, 0.9)
     this.light.position.set(1, 1.5, 0.5)
     this.light.target.position.set(...REST_POSITION)
-    this.light.layers.set(HAND_LIGHT_LAYER)
 
-    // Fill light so the side of the arm facing away from `light` isn't pure
-    // black — the world's own ambient light is on layer 0 and skips it.
+    // Fill so the side of the arm facing away from `light` isn't pure black.
     this.fill = new THREE.AmbientLight(0xffffff, 0.5)
-    this.fill.layers.set(HAND_LIGHT_LAYER)
+
+    // `root` stands in for the camera: its matrix is copied from the camera's
+    // every frame, so everything under it is in camera-local space (-Z
+    // forward, +X right, +Y up) exactly as if parented to the camera.
+    this.root = new THREE.Group()
+    this.root.matrixAutoUpdate = false
+    this.root.add(this.pivot, this.light, this.light.target, this.fill)
+    this.scene = new THREE.Scene()
+    this.scene.add(this.root)
 
     this.swinging = false
     this.repeatTimer = null
+  }
+
+  /** Draw over the finished world frame. Assumes renderer.autoClear is off. */
+  render (renderer, camera) {
+    if (!this.pivot.visible) return
+    this.root.matrix.copy(camera.matrixWorld)
+    renderer.clearDepth()
+    renderer.render(this.scene, camera)
   }
 
   // Nothing to hold before a bot is joined; the arm would float over the
   // join screen.
   setVisible (visible) {
     this.pivot.visible = visible
-  }
-
-  attachTo (camera) {
-    camera.add(this.pivot)
-    // The mesh only being on HAND_LIGHT_LAYER means the world's lights skip
-    // it; the camera still needs that layer enabled to render it at all.
-    camera.layers.enable(HAND_LIGHT_LAYER)
-    camera.add(this.light)
-    camera.add(this.light.target)
-    camera.add(this.fill)
   }
 
   // Punch-and-return. Calls while a swing is already in flight are dropped, so

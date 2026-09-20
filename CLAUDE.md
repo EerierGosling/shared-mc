@@ -130,6 +130,12 @@ road trip.
   to force them on a desktop for testing. They speak the same messages as the
   keyboard; a finger dragging the canvas owns the camera the way pointer lock
   does for a mouse (`ownsLook()` in `input.js`).
+- **three.js layers do not isolate lights.** A light is collected whenever
+  the *camera's* layers include it, then applied to every mesh drawn. The
+  hand viewmodel once sat on layer 1 with its own two lights and they lit the
+  whole world, blowing snow out to a flat sheet. Anything that needs its own
+  lighting gets its own scene and a second `renderer.render()` pass
+  (`hand.js`), which is also why `renderer.autoClear` is off in `index.js`.
 - The bot object is **replaced** on reconnect. Anything holding a reference gets
   it through `setBot()` / `clearBot()` from the `BotHolder` events. Don't cache
   `bot` at module scope.
