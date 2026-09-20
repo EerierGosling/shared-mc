@@ -35,7 +35,7 @@ const controls = setupPhoneControls({
   onStart: () => { if (paired) keepAwake() },
   onStop: releaseWake,
   apply: state => {
-    if (paired && socket.connected) socket.volatile.emit('motion:state', state)
+    if (paired && socket.connected) socket.volatile.emit('motion:state', { digging: state.digging === true })
   }
 })
 function ended (message) {

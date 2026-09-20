@@ -4,13 +4,9 @@ const { randomBytes } = require('crypto')
 const EMPTY = { forward: false, jump: false, digging: false, use: false, dx: 0, dy: 0 }
 function sanitize (value) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null
-  const state = { ...EMPTY }
-  for (const key of ['forward', 'jump', 'digging', 'use']) state[key] = value[key] === true
-  for (const key of ['dx', 'dy']) {
-    if (!Number.isFinite(value[key])) return null
-    state[key] = Math.max(-1, Math.min(1, value[key]))
-  }
-  return state
+  if (typeof value.digging !== 'boolean') return null
+  // Phones are accelerometer mining controllers, never camera controllers.
+  return { ...EMPTY, digging: value.digging }
 }
 
 // A phone sends only derived controls to its owning browser. It never joins a
@@ -36,7 +32,11 @@ class MotionPairing {
     }
     socket.on('motion:create', reply => {
       if (typeof reply !== 'function') return
-      if (!allowed() || !this.isPlayer(socket.id)) return reply({ error: 'Join the game first, or wait a second and retry.' })
+      if (!allowed()) {
+        const pending = this.hosts.get(socket.id)
+        if (pending?.code && pending.expires > this.now()) return reply({ code: pending.code, expires: pending.expires })
+        return reply({ error: 'Please wait a second before generating another code.' })
+      }
       this.remove(socket)
       // Six readable characters; omit ambiguous I, O, 0 and 1.
       const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
@@ -54,7 +54,7 @@ class MotionPairing {
       if (!allowed()) return reply({ error: 'Wait a second before trying again.' })
       const code = typeof value?.code === 'string' ? value.code.replace(/[\s-]/g, '').toUpperCase() : ''
       const entry = this.codes.get(code)
-      if (!entry || entry.expires <= this.now() || entry.host.id === socket.id || !entry.host.connected || !this.isPlayer(entry.host.id) || this.isPlayer(socket.id)) {
+      if (!entry || entry.expires <= this.now() || entry.host.id === socket.id || !entry.host.connected || this.isPlayer(socket.id)) {
         return reply({ error: 'Code is invalid or expired. Generate a new code on the game screen.' })
       }
       this.remove(socket)

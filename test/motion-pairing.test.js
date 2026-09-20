@@ -24,7 +24,7 @@ function setup (t) {
   t.after(() => manager.destroy())
   return { manager, host, phone, other, advance: ms => { now += ms } }
 }
-const packet = { forward: true, jump: true, digging: false, use: false, dx: 0.4, dy: 0 }
+const packet = { forward: false, jump: false, digging: true, use: false, dx: 0, dy: 0 }
 
 test('pairing sends controls only to the owning player, and consumes code', t => {
   const { manager, host, phone, other } = setup(t)
@@ -41,9 +41,8 @@ test('pairing sends controls only to the owning player, and consumes code', t =>
   assert.equal(manager.phones.size, 1)
 })
 
-test('expiry, replacing a code, and unjoined hosts are rejected', t => {
+test('expired and replaced codes are rejected', t => {
   const { host, phone, advance, manager } = setup(t)
-  assert.ok(phone.request('motion:create').error)
   const old = host.request('motion:create').code
   advance(1001)
   const next = host.request('motion:create').code
@@ -59,12 +58,12 @@ test('stale frames release controls; disconnect removes the pair', t => {
   phone.request('motion:pair', { code: host.request('motion:create').code })
   phone.receive('motion:state', packet)
   advance(501); manager.expire()
-  assert.equal(host.sent.at(-2).payload.forward, false)
+  assert.equal(host.sent.at(-2).payload.digging, false)
   assert.equal(host.sent.at(-1).event, 'motion:stale')
   phone.receive('motion:state', packet)
-  assert.equal(host.sent.at(-1).payload.forward, true)
+  assert.equal(host.sent.at(-1).payload.digging, true)
   phone.receive('disconnect')
-  assert.equal(host.sent.at(-2).payload.forward, false)
+  assert.equal(host.sent.at(-2).payload.digging, false)
   assert.equal(manager.phones.size, 0)
   assert.equal(manager.hosts.size, 0)
 })
@@ -73,10 +72,10 @@ test('packets are bounded, malformed packets rejected, requests throttled', t =>
   assert.equal(sanitize({ dx: NaN, dy: 0 }), null)
   assert.equal(sanitize({ dx: '1', dy: 0 }), null)
   assert.equal(sanitize(null), null)
-  assert.deepEqual(sanitize({ ...packet, forward: 'yes', dx: 99, dy: -8, socketId: 'other' }), { ...packet, forward: false, dx: 1, dy: -1 })
+  assert.deepEqual(sanitize({ ...packet, forward: true, jump: true, use: true, dx: 99, dy: -8, socketId: 'other' }), packet)
   const { host, phone } = setup(t)
   const { code } = host.request('motion:create')
-  assert.ok(host.request('motion:create').error)
+  assert.equal(host.request('motion:create').code, code)
   phone.request('motion:pair', { code })
   phone.receive('motion:state', packet)
   const count = host.sent.length
@@ -93,4 +92,26 @@ test('host disconnect and explicit unpair revoke phone authorization', t => {
   assert.equal(host.sent.length, count)
   assert.equal(phone.sent.at(-1).event, 'motion:ended')
   assert.equal(manager.hosts.size, 0)
+})
+
+test('pair before joining; only mining is relayed once the host joins', t => {
+  const joined = new Set()
+  const manager = new MotionPairing(id => joined.has(id))
+  t.after(() => manager.destroy())
+  const host = new Socket('lobby-host')
+  const phone = new Socket('phone')
+  manager.register(host)
+  manager.register(phone)
+  const created = host.request('motion:create')
+  assert.match(created.code, /^[A-HJ-NP-Z2-9]{6}$/)
+  assert.deepEqual(host.request('motion:create'), created, 'Immediate retries reuse the valid code')
+  assert.deepEqual(phone.request('motion:pair', { code: created.code }), { ok: true })
+  const count = host.sent.length
+  const gestures = { digging: true, forward: true, jump: true, use: true, dx: 1, dy: -1 }
+  phone.receive('motion:state', gestures)
+  assert.equal(host.sent.length, count, 'No game input before joining')
+  joined.add(host.id)
+  phone.receive('motion:state', gestures)
+  assert.deepEqual(host.sent.at(-1), { event: 'motion:state', payload: packet })
+  assert.deepEqual(sanitize({ digging: false }), { ...packet, digging: false })
 })
