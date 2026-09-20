@@ -364,7 +364,6 @@
   /* Minecraft's world-select list: stacked rows, selection is a white outline. */
   #join-modes { display: flex; flex-direction: column; gap: var(--u); }
   .mode-row {
-    position: relative;
     display: flex; align-items: center; gap: calc(3 * var(--u));
     width: 100%; text-align: left; cursor: pointer; font: inherit;
     padding: calc(2 * var(--u)) calc(3 * var(--u));
@@ -372,11 +371,7 @@
     border: calc(1 * var(--u)) solid #101010;
   }
   .mode-row:hover:not(:disabled) { background: #43434f; }
-  .mode-row.selected, .mode-row:has(input:checked) { border-color: var(--mc-white); background: #43434f; }
-  .mode-row:has(input:focus-visible) { outline: var(--u) solid var(--mc-white); outline-offset: var(--u); }
-  /* A row picked by a radio: the input covers the row, unseen, so the click
-     and the keyboard land on the real control. */
-  .mode-row input[type=radio] { position: absolute; inset: 0; margin: 0; opacity: 0; cursor: pointer; }
+  .mode-row.selected { border-color: var(--mc-white); background: #43434f; }
   .mode-row.full { color: #7f7f7f; cursor: default; }
   .mode-row .badge { width: calc(16 * var(--u)); height: calc(16 * var(--u)); }
   .mode-row span { display: flex; flex-direction: column; gap: calc(0.5 * var(--u)); flex: 1; min-width: 0; }
@@ -390,12 +385,12 @@
     text-shadow: var(--u) var(--u) 0 var(--shadow);
   }
   .mode-row.full .chip { color: var(--mc-red); }
-  /* How the bot is driven: the same rows, one per input, and the way to make
-     this device someone else's controller instead. */
-  #join-controls { display: flex; flex-direction: column; gap: var(--u); margin: 0; padding: 0; border: 0; min-width: 0; }
+  /* The way to make this device someone else's controller instead. */
+  #join-controls { display: flex; flex-direction: column; gap: var(--u); min-width: 0; }
   #join-controls .join-label { margin-bottom: 0; }
   #join-controls .mode-row b { font-size: calc(var(--px) * 8px); }
   #join-controls a.mode-row { text-decoration: none; }
+  #join-controls a.mode-row:focus-visible { outline: var(--u) solid var(--mc-white); outline-offset: var(--u); }
   #join-controls small { font-size: calc(var(--px) * 6px); color: #7f7f7f; line-height: 1.4; margin: var(--u) 0; }
 
   /* The right column: a player figure in the skin about to be worn, then the
@@ -677,6 +672,8 @@
     <canvas id="minimap-canvas" width="64" height="64"></canvas>
     <div id="minimap-arrow"></div>
   </div>
+  <!-- The motion camera while its panel is closed; camera-controls.js moves the video in here. -->
+  <div id="motion-feed" class="overlay"></div>
 
   <div id="hud-bars" class="overlay">
     <div id="health" class="icon-row"></div>
@@ -771,16 +768,11 @@
         </div>
         <p class="section-label join-label">How to play</p>
         <div id="join-modes"></div>
-        <fieldset id="join-controls" aria-describedby="join-control-hint">
-          <legend class="section-label join-label">Controls</legend>
-          <label class="mode-row"><input type="radio" name="control-mode" value="standard" checked><span><b>Keyboard / mouse / touch</b></span></label>
-          <label class="mode-row"><input type="radio" name="control-mode" value="camera"><span><b>Use camera</b></span></label>
-          <label class="mode-row"><input type="radio" name="control-mode" value="hybrid"><span><b>Camera + phone</b></span></label>
-          <label class="mode-row"><input type="radio" name="control-mode" value="phone"><span><b>Paired phone controller</b></span></label>
-          <small id="join-control-hint">You can change controls from the game menu.</small>
+        <div id="join-controls">
+          <p class="section-label join-label">Controller</p>
           <a id="join-controller" class="mode-row" href="/controller" aria-describedby="join-controller-hint"><span><b>Use this device as a controller</b></span></a>
-          <small id="join-controller-hint">Pair with a game on another screen using its pairing code. No extra player needed.</small>
-        </fieldset>
+          <small id="join-controller-hint">Pair with a game on another screen using its pairing code. No extra player needed. Motion controls for this screen are in the game menu.</small>
+        </div>
       </section>
       <section id="join-right">
         <p class="section-label join-label">Your character</p>

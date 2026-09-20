@@ -57,13 +57,16 @@ async function main () {
     assert.equal(new URL(host.url()).pathname, '/controller')
     assert.equal(joined.size, 0, 'Opening the controller does not join a player')
     await host.getByRole('link', { name: 'Back to game' }).click()
-    await host.getByRole('radio', { name: 'Use camera', exact: true }).check()
-    assert.match(await host.locator('#join-control-hint').textContent(), /allow camera access/)
-    await host.getByRole('radio', { name: 'Camera + phone', exact: true }).check()
     await host.getByRole('button', { name: /Collaborative/ }).click()
     await host.locator('#join-button').click()
+    await host.waitForFunction(() => document.getElementById('join').classList.contains('open') === false)
+    assert.equal(await host.locator('#camera-controls').isVisible(), false, 'Joining does not open motion controls')
+    // The game menu is the only way in; Escape needs pointer lock, so press its button directly.
+    await host.evaluate(() => document.getElementById('pause-motion').click())
     await host.locator('#camera-controls').waitFor({ state: 'visible' })
     assert.match(await host.locator('[data-role=mode]').textContent(), /Practice mode/)
+    await host.locator('[data-role=pairing] > summary').click()
+    await host.locator('[data-action=pair]').click()
     await host.locator('[data-role=pair-qr]').waitFor({ state: 'visible' })
     const code = await host.locator('[data-role=pair-code]').textContent()
     assert.match(code, /^[A-F0-9]{12}$/)
@@ -133,6 +136,7 @@ async function main () {
       await host.reload()
       await host.getByRole('button', { name: /Collaborative/ }).click()
       await host.locator('#join-button').click()
+      await host.evaluate(() => document.getElementById('pause-motion').click())
       await host.locator('[data-action=start]').click()
       await host.waitForFunction(() => {
         const text = document.querySelector('[data-role=status]').textContent
@@ -148,10 +152,8 @@ async function main () {
       await host.locator('[data-action=stop]').click()
       console.log('Live MediaPipe pose and face models initialized successfully with a synthetic camera.')
     }
-    await host.reload()
-    assert.equal(await host.getByRole('radio', { name: 'Camera + phone', exact: true }).isChecked(), true)
     assert.deepEqual(errors, [])
-    console.log('Browser checks passed: opening selection, QR generation, pairing, phone steps/autojump, stop/unpair, saved settings, calibration and camera cleanup.')
+    console.log('Browser checks passed: menu-only panel, QR generation, pairing, phone steps/autojump, stop/unpair, saved settings, calibration and camera cleanup.')
   } finally {
     await browser?.close()
     pairing.destroy()

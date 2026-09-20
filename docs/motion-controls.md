@@ -1,12 +1,11 @@
 # Motion controls: setup, practice, and tuning
 
-## Choose controls when opening the game
+## Open the setup panel from the game menu
 
-The opening screen offers **Keyboard / mouse / touch**, **Camera gestures**,
-**Camera + paired phone steps**, and **Paired phone controller**. Your selection
-is remembered in this browser. Join the game normally; motion selections open
-setup in **practice mode**, without requesting camera permission until you press
-**Start Camera**. You can reopen setup from **Game menu → Motion Controls**.
+Join the game normally, then open **Game menu → Motion Controls**. Setup starts
+in **practice mode**, without requesting camera permission until you press
+**Start Camera**. While the camera runs and the panel is closed, its feed stays
+in a small box beside the minimap.
 
 Practice mode displays detected actions without sending them to the player.
 Press **Enable Player Control** when ready. **Return to Practice** releases all

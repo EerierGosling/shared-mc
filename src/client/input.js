@@ -448,7 +448,6 @@ function setupInput ({ socket, viewer, camera, hud, inventoryUI, canvas, hand, j
   })
 
   return {
-    showMotion: withPhone => cameraControls.show(withPhone),
     ownsLook,
     releaseAll,
     resume

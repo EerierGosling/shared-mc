@@ -70,7 +70,6 @@ const join = new JoinScreen(socket, identity => {
   inventoryUI.setSkin(identity.skin)
   hand.setVisible(true)
   pause.setServer(identity.server)
-  if (join.controlMode !== 'standard') input.showMotion(join.controlMode !== 'camera')
 })
 
 // Escape's game menu. Quitting is a reload: the socket drops, the server

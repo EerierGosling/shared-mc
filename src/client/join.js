@@ -52,24 +52,6 @@ class JoinScreen {
     this.button = document.getElementById('join-button')
     this.doll = document.getElementById('join-doll')
 
-    this.controlOptions = document.getElementById('join-controls')
-    try {
-      const saved = localStorage.getItem('control-mode')
-      if (['standard', 'camera', 'hybrid', 'phone'].includes(saved)) this.controlOptions.querySelector(`[value=${saved}]`).checked = true
-    } catch {}
-    const updateControlHint = () => {
-      const hints = {
-        standard: 'You can change controls from the game menu.',
-        camera: 'After joining: allow camera access, calibrate, and practice before enabling control.',
-        hybrid: 'After joining: a QR code appears automatically. Scan it to pair your phone, then enable phone steps.',
-        phone: 'After joining: scan the pairing QR code on a phone. No second player is created.'
-      }
-      document.getElementById('join-control-hint').textContent = hints[this.controlMode]
-      try { localStorage.setItem('control-mode', this.controlMode) } catch {}
-    }
-    this.controlOptions.addEventListener('change', updateControlHint)
-    updateControlHint()
-
     this.mode = null
     this.skin = 'steve'
     this.options = null
@@ -85,8 +67,6 @@ class JoinScreen {
       this.submit()
     })
   }
-
-  get controlMode () { return this.controlOptions.querySelector('input:checked').value }
 
   get isOpen () {
     return this.root.classList.contains('open')

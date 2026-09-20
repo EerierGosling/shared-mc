@@ -22,15 +22,16 @@
 #camera-controls a { color: var(--ink); }
 #camera-controls .motion-live { color: var(--ink-green); }
 
-/* The camera, framed like the join screen's player figure. */
-#camera-controls .motion-preview {
+/* The camera, framed like the join screen's player figure. Not scoped to the
+   panel: the same element moves into #motion-feed while the panel is closed. */
+.motion-preview {
   position: relative;
   background: #000;
   border-style: solid; border-width: var(--u);
   border-color: var(--slot-dark) var(--gui-lit) var(--gui-lit) var(--slot-dark);
 }
-#camera-controls video { display: block; width: 100%; max-height: calc(95 * var(--u)); object-fit: contain; transform: scaleX(-1); }
-#camera-controls [data-role=landmarks] { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; transform: scaleX(-1); pointer-events: none; }
+.motion-preview video { display: block; width: 100%; max-height: calc(95 * var(--u)); object-fit: contain; transform: scaleX(-1); }
+.motion-preview [data-role=landmarks] { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; transform: scaleX(-1); pointer-events: none; }
 
 /* Vanilla options rows: two 150x20 buttons per line, one full width. */
 #camera-controls .motion-buttons {
@@ -139,6 +140,19 @@
 #camera-controls [data-role=pair-qr][hidden] { display: none; }
 #camera-controls label.motion-field { display: block; }
 #camera-controls .motion-field .mc-text { margin-top: var(--u); }
+
+/* --- the camera feed in the HUD --------------------------------------------- */
+/* Left of the minimap, in its translucent frame: 64px tall, a 4:3 frame wide. */
+#motion-feed {
+  top: calc(2 * var(--u)); right: calc(70 * var(--u));
+  padding: var(--u);
+  background: rgba(0, 0, 0, 0.5);
+  display: none;
+}
+#motion-feed.live { display: block; }
+#minimap:not(.live) ~ #motion-feed { right: calc(2 * var(--u)); }
+#motion-feed .motion-preview { width: calc(85 * var(--u)); height: calc(64 * var(--u)); border: 0; }
+#motion-feed video { width: 100%; height: 100%; max-height: none; }
 
 /* --- the phone controller page ---------------------------------------------- */
 body.companion {

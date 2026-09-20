@@ -147,6 +147,7 @@ module.exports = function setupCameraControls ({ apply, canPlay, onStart, socket
     faceDetector = null
     faceLoading = false
     startButton.disabled = false
+    syncFeed()
   }
   function stop () {
     practice()
@@ -162,13 +163,23 @@ module.exports = function setupCameraControls ({ apply, canPlay, onStart, socket
     practice()
     status.textContent = `Camera stopped: ${error.message || error}. Check permission, HTTPS and connectivity, then retry.`
   }
-  function show (withPhone = false) {
-    panel.hidden = false
-    if (withPhone && $('[data-role=pairing]')) {
-      $('[data-role=pairing]').open = true
-      if (!paired && !$('[data-role=pair-code]').textContent) $('[data-action=pair]').click()
-    }
+  // With the panel closed the same video (and its landmarks) sits in a HUD
+  // box by the minimap while the camera runs; one element, so the detector
+  // keeps reading the frames it was reading.
+  const feed = document.getElementById('motion-feed')
+  const previewBox = $('.motion-preview')
+  function syncFeed () {
+    if (!feed) return
+    const live = running && panel.hidden
+    feed.classList.toggle('live', live)
+    const home = live ? feed : panel
+    if (previewBox.parentNode === home) return
+    if (live) home.append(previewBox)
+    else $('[data-role=tracking]').before(previewBox)
+    video.play().catch(() => {})
   }
+  function show () { panel.hidden = false; syncFeed() }
+  function hide () { panel.hidden = true; syncFeed() }
   function renderSettings () {
     for (const [key] of Object.entries(FIELDS)) {
       $(`[data-setting=${key}]`).value = settings[key]
@@ -279,6 +290,7 @@ module.exports = function setupCameraControls ({ apply, canPlay, onStart, socket
       gestures.calibrate()
       lastVideoTime = -1
       running = true
+      syncFeed()
       syncFace()
       tick()
     } catch (error) { if (token === generation) fail(error) }
@@ -298,7 +310,7 @@ module.exports = function setupCameraControls ({ apply, canPlay, onStart, socket
     document.activeElement?.blur()
   })
   $('[data-action=stop]').addEventListener('click', stop)
-  $('[data-action=hide]').addEventListener('click', () => { panel.hidden = true })
+  $('[data-action=hide]').addEventListener('click', hide)
   $('[data-action=motion]').addEventListener('click', async () => {
     if (motionEnabled) { motionEnabled = false; practice(); $('[data-action=motion]').textContent = 'Phone Steps: OFF'; return }
     const token = generation
