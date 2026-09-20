@@ -5,7 +5,8 @@
 Two ways to play the same Minecraft server, chosen on the way in:
 
 - **road trip** — everyone who picks it shares one bot, one character and one
-  inventory, the way the project started.
+  inventory, the way the project started. The page calls this *Collaborative*;
+  `roadtrip` is still its id in the code, the socket protocol and the CSS.
 - **solo** — that visitor gets a bot of their own.
 
 The browser is a real client surface, not a video player: it receives world

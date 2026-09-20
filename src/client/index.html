@@ -282,17 +282,15 @@
     background-size: calc(64 * var(--u)) calc(64 * var(--u));
     background-position: calc(-8 * var(--u)) calc(-8 * var(--u));
   }
-  /* How the name got onto the server, in the join screen's own vocabulary:
-     heart for the road trip, drumstick for a solo bot, and vanilla's
-     checkmark for a real Minecraft client. All three sprites are 9 texels. */
+  /* How the name got onto the server, in the join screen's own vocabulary
+     (badges.js): a group for collaborative, one figure for solo, the dirt
+     block for a real Minecraft client. All 10 texels square. */
+  .badge { display: block; flex: none; }
+  .badge svg, .badge img { display: block; width: 100%; height: 100%; image-rendering: pixelated; }
   .player .badge {
-    width: calc(9 * var(--u)); height: calc(9 * var(--u));
+    width: calc(10 * var(--u)); height: calc(10 * var(--u));
     margin-left: auto;
-    background-size: contain; background-repeat: no-repeat; background-position: center;
   }
-  .player[data-mode="roadtrip"] .badge { background-image: url(/assets/gui/sprites/hud/heart/full.png); }
-  .player[data-mode="solo"] .badge { background-image: url(/assets/gui/sprites/hud/food_full.png); }
-  .player[data-mode="player"] .badge { background-image: url(/assets/gui/sprites/icon/checkmark.png); }
   /* Vanilla's connection bars, 10x8, blank until the state stream reports. */
   .player .ping {
     width: calc(10 * var(--u)); height: calc(8 * var(--u));
@@ -390,11 +388,7 @@
   .mode-row:hover:not(:disabled) { background: #43434f; }
   .mode-row.selected { border-color: var(--mc-white); background: #43434f; }
   .mode-row.full { color: #7f7f7f; cursor: default; }
-  .mode-row i {
-    flex: none;
-    width: calc(16 * var(--u)); height: calc(16 * var(--u));
-    background-size: contain; background-repeat: no-repeat; background-position: center;
-  }
+  .mode-row .badge { width: calc(16 * var(--u)); height: calc(16 * var(--u)); }
   .mode-row span { display: flex; flex-direction: column; gap: calc(0.5 * var(--u)); }
   .mode-row b { font-weight: normal; font-size: calc(var(--px) * 9px); }
   .mode-row small { font-size: calc(var(--px) * 6px); color: #a0a0a0; line-height: 1.4; }

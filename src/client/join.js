@@ -4,20 +4,22 @@
 // differs between wide and slim, and we only ship the wide one.
 const SKIN_VARIANT = 'wide'
 
+const { modeBadge } = require('./badges')
+
 const skinUrl = skin => `/assets/entity/player/${SKIN_VARIANT}/${skin}.png`
 
+// 'roadtrip' is the id the server and the socket protocol know it by; the
+// page calls it Collaborative.
 const MODES = [
   {
     id: 'roadtrip',
-    title: 'Road Trip',
-    blurb: 'Everyone drives one character together.',
-    icon: '/assets/gui/sprites/hud/heart/full.png'
+    title: 'Collaborative',
+    blurb: 'Everyone drives one character together.'
   },
   {
     id: 'solo',
-    title: 'Individual',
-    blurb: 'Spawn a character of your own on the same world.',
-    icon: '/assets/gui/sprites/hud/food_full.png'
+    title: 'Solo',
+    blurb: 'Spawn a character of your own on the same world.'
   }
 ]
 
@@ -25,7 +27,8 @@ const MODES = [
  * The mode-and-identity screen shown before a visitor gets a bot.
  *
  * Laid out like Minecraft's world select: the server address, a list of rows
- * you pick from, then a button along the bottom. Choosing Road Trip needs nothing else, since that
+ * you pick from, then a button along the bottom. Choosing Collaborative needs
+ * nothing else, since that
  * character is shared and already named; choosing your own bot reveals the
  * name and skin fields.
  *
@@ -104,16 +107,14 @@ class JoinScreen {
       row.className = 'mode-row' + (this.mode === mode.id ? ' selected' : '') + (full ? ' full' : '')
       row.disabled = full
 
-      const icon = document.createElement('i')
-      icon.style.backgroundImage = `url(${mode.icon})`
-      row.appendChild(icon)
+      row.appendChild(modeBadge(mode.id))
 
       const text = document.createElement('span')
       const title = document.createElement('b')
       title.textContent = mode.title
       const sub = document.createElement('small')
       sub.textContent = mode.id === 'roadtrip'
-        ? `${mode.blurb} (${roadtripRiders} riding)`
+        ? `${mode.blurb} (${roadtripRiders} playing)`
         : full
           ? `All ${capacity} bots are in use.`
           : `${mode.blurb} (${capacity - botCount} free)`
@@ -149,7 +150,7 @@ class JoinScreen {
     // Only your own bot needs a name and a face; the shared one already has both.
     this.identity.classList.toggle('open', mode === 'solo')
     this.button.disabled = false
-    this.button.textContent = mode === 'roadtrip' ? 'Join the road trip' : 'Play'
+    this.button.textContent = mode === 'roadtrip' ? 'Join in' : 'Play'
     if (mode === 'solo') this.nameInput.focus()
     this.refreshHint()
   }
