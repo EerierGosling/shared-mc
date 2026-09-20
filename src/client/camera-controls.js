@@ -41,7 +41,7 @@ module.exports = function setupCameraControls ({ apply, canPlay, onStart, onDone
     <div class="motion-buttons">
       <button type="button" class="mc-button" data-action="start">Start Camera</button>
       <button type="button" class="mc-button" data-action="calibrate">Calibrate</button>
-      <label class="mc-button mc-cycle">Camera:&nbsp;<select data-setting="camera"><option value="user">Front</option><option value="environment">Rear</option></select></label>
+      <label class="mc-button mc-cycle">Camera:&nbsp;<select data-setting="camera" aria-label="Camera to track from"><option value="user">Front</option><option value="environment">Rear</option></select></label>
     </div>
     <div class="motion-buttons">
       <button type="button" class="mc-button wide" data-action="arm">Enable Player Control</button>
@@ -189,6 +189,44 @@ module.exports = function setupCameraControls ({ apply, canPlay, onStart, onDone
     }
     for (const key of ['autojump', 'invertX', 'invertY', 'facial']) $(`[data-setting=${key}]`).checked = settings[key]
     $('[data-setting=arm]').value = settings.arm
+    renderCameras()
+  }
+  // Front/Rear stay as facingMode requests; every video input the browser
+  // reports is listed under them by deviceId so an external webcam can be
+  // picked over the built-in one. Labels are blank until a camera permission
+  // has been granted once, so the list is refilled after each successful
+  // start and whenever a device is plugged in or removed.
+  const cameraSelect = $('[data-setting=camera]')
+  let cameras = []
+  function renderCameras () {
+    for (const option of [...cameraSelect.options].filter(option => option.dataset.device)) option.remove()
+    cameras.forEach((device, index) => {
+      const option = document.createElement('option')
+      option.value = device.deviceId
+      option.dataset.device = 'true'
+      option.textContent = device.label || `Camera ${index + 1}`
+      cameraSelect.append(option)
+    })
+    cameraSelect.value = settings.camera
+    // A saved deviceId whose camera is gone (unplugged, other machine) falls
+    // back to the front camera rather than leaving the select blank.
+    if (cameraSelect.selectedIndex === -1) cameraSelect.value = 'user'
+  }
+  async function listCameras () {
+    try {
+      const devices = await navigator.mediaDevices.enumerateDevices()
+      cameras = devices.filter(device => device.kind === 'videoinput' && device.deviceId)
+    } catch { cameras = [] }
+    renderCameras()
+  }
+  function cameraConstraints () {
+    const choice = cameraSelect.value
+    const facing = choice === 'user' || choice === 'environment'
+    return { audio: false, video: { ...(facing ? { facingMode: choice } : { deviceId: { exact: choice } }), width: { ideal: 640 }, height: { ideal: 480 } } }
+  }
+  if (navigator.mediaDevices?.enumerateDevices) {
+    listCameras()
+    navigator.mediaDevices.addEventListener?.('devicechange', listCameras)
   }
   async function syncFace () {
     if (!settings.facial || !running) {
@@ -242,10 +280,10 @@ module.exports = function setupCameraControls ({ apply, canPlay, onStart, onDone
       gentle: { ...DEFAULTS, stepThreshold: 0.07, swingThreshold: 1.3, jumpThreshold: 0.1, phoneThreshold: 2, lookSpeed: 0.7 },
       deliberate: { ...DEFAULTS, deadzone: 0.14, stepThreshold: 0.22, swingThreshold: 3.5, jumpThreshold: 0.25, phoneThreshold: 4 }
     }
-    settings = { ...values[event.target.value] }
+    settings = { ...values[event.target.value], camera: settings.camera }
     settingsChanged()
   })
-  $('[data-action=defaults]').addEventListener('click', () => { settings = { ...DEFAULTS }; settingsChanged() })
+  $('[data-action=defaults]').addEventListener('click', () => { settings = { ...DEFAULTS, camera: settings.camera }; settingsChanged() })
   renderSettings()
 
   function tick () {
@@ -281,9 +319,18 @@ module.exports = function setupCameraControls ({ apply, canPlay, onStart, onDone
     status.textContent = 'Loading camera tracking…'
     try {
       if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia) throw new Error('Use HTTPS or localhost for camera access')
-      const media = await navigator.mediaDevices.getUserMedia({ audio: false, video: { facingMode: $('[data-setting=camera]').value, width: { ideal: 640 }, height: { ideal: 480 } } })
+      const media = await navigator.mediaDevices.getUserMedia(cameraConstraints()).catch(error => {
+        // A chosen webcam that is no longer attached fails with an exact
+        // deviceId constraint; drop back to the front camera instead of dying.
+        if (error.name !== 'OverconstrainedError' && error.name !== 'NotFoundError') throw error
+        if (cameraSelect.value === 'user') throw error
+        settings.camera = 'user'; save(settings); renderCameras()
+        mode.textContent = 'Chosen camera not found; tracking from the front camera.'
+        return navigator.mediaDevices.getUserMedia(cameraConstraints())
+      })
       if (token !== generation) { media.getTracks().forEach(track => track.stop()); return }
       stream = media
+      listCameras()
       stream.getVideoTracks()[0].addEventListener('ended', () => { if (token === generation) fail(new Error('Camera disconnected')) })
       video.srcObject = stream
       await video.play()
@@ -305,7 +352,13 @@ module.exports = function setupCameraControls ({ apply, canPlay, onStart, onDone
       tick()
     } catch (error) { if (token === generation) fail(error) }
   })
-  $('[data-setting=camera]').addEventListener('change', () => { stopCamera(); practice(); status.textContent = 'Camera changed. Click Start camera and recalibrate.' })
+  cameraSelect.addEventListener('change', () => {
+    settings.camera = cameraSelect.value
+    save(settings)
+    stopCamera()
+    practice()
+    status.textContent = 'Camera changed. Click Start Camera and recalibrate.'
+  })
   $('[data-action=calibrate]').addEventListener('click', () => { practice(); gestures.calibrate() })
   $('[data-action=arm]').addEventListener('click', () => {
     if (armed) { practice(); return }

@@ -12,7 +12,9 @@ const FIELDS = {
   faceThreshold: ['Smile / mouth threshold', 0.3, 0.95, 0.05, 0.65]
 }
 const DEFAULTS = Object.fromEntries(Object.entries(FIELDS).map(([key, field]) => [key, field[4]]))
-Object.assign(DEFAULTS, { autojump: true, invertX: false, invertY: false, facial: false, arm: 'right' })
+// camera is a facingMode ('user' / 'environment') or a deviceId from
+// enumerateDevices(); the latter is only meaningful on the browser that saved it.
+Object.assign(DEFAULTS, { autojump: true, invertX: false, invertY: false, facial: false, arm: 'right', camera: 'user' })
 function normalize (data = {}) {
   const result = { ...DEFAULTS }
   for (const [key, [, min, max]] of Object.entries(FIELDS)) {
@@ -20,6 +22,7 @@ function normalize (data = {}) {
   }
   for (const key of ['autojump', 'invertX', 'invertY', 'facial']) if (typeof data?.[key] === 'boolean') result[key] = data[key]
   if (data?.arm === 'left') result.arm = 'left'
+  if (typeof data?.camera === 'string' && data.camera && data.camera.length <= 128) result.camera = data.camera
   return result
 }
 function load () {
