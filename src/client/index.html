@@ -103,11 +103,6 @@
   #stats b { color: var(--mc-yellow); font-weight: normal; }
   #stats.hidden { display: none; }
 
-  #hint {
-    bottom: calc(4 * var(--u)); right: calc(4 * var(--u));
-    color: var(--mc-gray);
-  }
-  #hint b { color: var(--mc-white); font-weight: normal; }
 
   /* --- minimap -------------------------------------------------------------- */
   /* One texture pixel per block, so the map rescales with the GUI like every
@@ -327,7 +322,6 @@
      inventory along the top; drag anywhere else to look. */
   #touch { display: none; inset: 0; }
   body.touch #touch { display: block; }
-  body.touch #hint { display: none; }
   #touch button {
     position: absolute; pointer-events: auto; touch-action: none;
     width: calc(22 * var(--u)); height: calc(22 * var(--u));
@@ -447,6 +441,48 @@
   #join-button:disabled { color: #a0a0a0; cursor: default; }
   #join-error { margin-top: calc(3 * var(--u)); font-size: calc(var(--px) * 7px); color: #555; }
   #join-error.bad { color: #a83232; }
+
+  /* --- game menu ----------------------------------------------------------- */
+  /* Vanilla's pause screen: the world dimmed, "Game menu" up top, a stack of
+     200x20 buttons. Ours adds the controls under the buttons (they used to
+     live permanently in a corner of the HUD) and where the bot is connected.
+     Nothing is paused, the bot is still standing on a live server. */
+  #pause {
+    inset: 0; display: none; pointer-events: auto;
+    background: rgba(16, 16, 16, 0.75);
+    flex-direction: column; align-items: center; text-align: center;
+    overflow-y: auto;
+  }
+  #pause.open { display: flex; }
+  body.paused #crosshair { display: none; }
+  #pause h1 {
+    margin: calc(20 * var(--u)) 0 calc(16 * var(--u));
+    font-size: calc(var(--px) * 8px); font-weight: normal; line-height: 1;
+  }
+  #pause .mc-button { margin-top: calc(4 * var(--u)); }
+  #pause .mc-button:first-of-type { margin-top: 0; }
+  /* Where this bot really is: the address as typed, then the IP the socket
+     resolved to when they differ. */
+  #pause-where {
+    margin-top: calc(12 * var(--u));
+    color: var(--mc-gray);
+    font-size: calc(var(--px) * 7px);
+  }
+  #pause-server { color: var(--mc-white); }
+  #pause-address:empty { display: none; }
+  #pause-controls {
+    margin: calc(8 * var(--u)) 0 calc(12 * var(--u));
+    width: calc(200 * var(--u)); max-width: 92vw;
+    text-align: left; color: var(--mc-gray);
+    font-size: calc(var(--px) * 7px);
+  }
+  #pause-controls .row { display: flex; gap: calc(3 * var(--u)); line-height: 1.5; }
+  #pause-controls .row b {
+    flex: none; width: calc(60 * var(--u)); text-align: right;
+    color: var(--mc-white); font-weight: normal;
+  }
+  #pause-controls .row.creative-only { display: none; }
+  body.creative #pause-controls .row.creative-only { display: flex; }
 
   /* --- death screen -------------------------------------------------------- */
   /* Vanilla fills the screen with a 0x60500000 -> 0xA0803030 gradient, draws
@@ -644,6 +680,7 @@
     <div id="touch-menu">
       <button type="button" data-action="chat">chat</button>
       <button type="button" data-action="inventory">inventory</button>
+      <button type="button" data-action="menu">menu</button>
     </div>
     <div id="touch-pad">
       <button type="button" class="tb-up" data-control="forward">&#9650;</button>
@@ -672,11 +709,33 @@
     <div id="death-countdown" class="shadowed"></div>
   </div>
 
-  <div id="hint" class="overlay tooltip shadowed">
-    <b>click</b> to play &nbsp; <b>WASD</b> move &nbsp; <b>space</b> jump<br>
-    <b>LMB</b> mine &nbsp; <b>RMB</b> use/place &nbsp; <b>1-9</b>/<b>scroll</b> hotbar<br>
-    <b>E</b> inventory &nbsp; <b>T</b> chat &nbsp; <b>Q</b> drop &nbsp; <b>G</b> walk to cursor &nbsp; <b>F3</b> readout
-    <span class="creative-only"><br><b>MMB</b> pick block &nbsp; <b>double-space</b> fly &nbsp; <b>space/shift</b> up/down</span>
+  <div id="pause" class="overlay shadowed">
+    <h1>Game menu</h1>
+    <button id="pause-resume" class="mc-button" type="button">Back to Game</button>
+    <button id="pause-quit" class="mc-button" type="button">Quit to Title</button>
+    <div id="pause-where">
+      <div>Connected to</div>
+      <div id="pause-server">not connected</div>
+      <div id="pause-address"></div>
+    </div>
+    <div id="pause-controls" class="tooltip">
+      <div class="row"><b>WASD</b><span>move (double-tap W to sprint)</span></div>
+      <div class="row"><b>space</b><span>jump</span></div>
+      <div class="row"><b>shift</b><span>sneak</span></div>
+      <div class="row"><b>ctrl</b><span>sprint</span></div>
+      <div class="row"><b>LMB</b><span>mine / attack</span></div>
+      <div class="row"><b>RMB</b><span>use / place</span></div>
+      <div class="row"><b>1-9 / scroll</b><span>hotbar</span></div>
+      <div class="row"><b>E</b><span>inventory</span></div>
+      <div class="row"><b>T</b><span>chat (/ for a command)</span></div>
+      <div class="row"><b>Q</b><span>drop item</span></div>
+      <div class="row"><b>G</b><span>walk to cursor</span></div>
+      <div class="row"><b>F3</b><span>coordinate readout</span></div>
+      <div class="row"><b>esc</b><span>this menu</span></div>
+      <div class="row creative-only"><b>MMB</b><span>pick block</span></div>
+      <div class="row creative-only"><b>double-space</b><span>toggle flight</span></div>
+      <div class="row creative-only"><b>space / shift</b><span>fly up / down</span></div>
+    </div>
   </div>
 
   <div id="players" class="overlay"></div>
