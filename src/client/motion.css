@@ -1,52 +1,175 @@
+/* Motion controls: the setup panel camera-controls.js builds, the join screen's
+   control rows and the phone controller page. Widgets are the vanilla sprites
+   under gui/sprites/widget at --px, like the rest of the interface. */
+
+/* --- the setup panel ------------------------------------------------------- */
+/* A container window at the top right of the world, so the practice readout
+   stays in view while you move. On the phone page it is the page itself. */
 #camera-controls {
-  position: fixed; top: 12px; right: 12px; z-index: 100;
-  box-sizing: border-box; width: min(360px, calc(100vw - 24px));
-  max-height: calc(100dvh - 24px); overflow-y: auto;
-  padding: 12px; border: 2px solid #888; border-radius: 5px;
-  background: #171717f5; color: #fff; font: 14px/1.45 system-ui, sans-serif;
-  text-shadow: none; pointer-events: auto;
+  position: fixed; top: calc(4 * var(--u)); right: calc(4 * var(--u)); z-index: 100;
+  width: calc(212 * var(--u)); max-width: calc(100vw - 8 * var(--u));
+  max-height: calc(100dvh - 8 * var(--u)); overflow-y: auto;
+  padding: calc(4 * var(--u)) calc(5 * var(--u));
+  pointer-events: auto;
 }
 #camera-controls[hidden] { display: none; }
-#camera-controls h2 { font-size: 18px; margin: 0 0 6px; }
-#camera-controls .motion-preview { position: relative; }
-#camera-controls video { display: block; width: 100%; max-height: 190px; object-fit: contain; transform: scaleX(-1); }
-#camera-controls p { margin: 8px 0; }
-#camera-controls button, #camera-controls select, #camera-controls input[type=text] {
-  font: inherit; border: 1px solid #888; border-radius: 3px; color: white; background: #343434; padding: 7px; margin: 3px 0;
+#camera-controls h2 {
+  margin: 0 0 calc(3 * var(--u));
+  font-size: calc(var(--px) * 8px); font-weight: normal; text-align: center;
 }
-#camera-controls button { cursor: pointer; }
-#camera-controls button:disabled { opacity: .5; cursor: default; }
-#camera-controls button:focus-visible, #camera-controls input:focus-visible, #camera-controls select:focus-visible { outline: 2px solid #9ee875; }
-#camera-controls .motion-buttons { display: flex; gap: 6px; flex-wrap: wrap; }
-#camera-controls [data-action=arm] { background: #315c26; }
-#camera-controls label { display: block; margin: 9px 0; }
-#camera-controls input[type=range] { width: 100%; }
-#camera-controls output { float: right; font-variant-numeric: tabular-nums; }
-#camera-controls details { border-top: 1px solid #666; padding-top: 7px; margin-top: 8px; }
-#camera-controls summary { cursor: pointer; font-weight: 600; }
-#camera-controls small { display: block; color: #ccc; }
-#camera-controls a { color: #a6d9ff; }
-#camera-controls [data-role=diagnostics] { font: 12px/1.5 ui-monospace, monospace; white-space: pre-wrap; }
-#camera-controls [data-role=pair-code] { display: block; font: bold 22px monospace; letter-spacing: 2px; user-select: all; }
-#camera-controls [data-role=pair-link] { display: block; overflow-wrap: anywhere; }
-#camera-controls .motion-live { color: #a5ec87; }
-#camera-controls .motion-source { border-top: 1px solid #666; padding-top: 8px; }
-#join-controls { font: 14px/1.5 system-ui, sans-serif; margin: 8px 0; padding: 0; border: 0; min-width: 0; text-align: left; }
-#join-controls label, #join-controller { display: flex; align-items: center; gap: 8px; padding: 6px; margin: 3px 0; color: #fff; background: #2e2e2e; border: 1px solid #101010; cursor: pointer; }
-#join-controls label:has(input:checked) { border-color: #fff; background: #43434f; }
-#join-controls label:focus-within, #join-controller:focus-visible { outline: 2px solid #fff; outline-offset: 1px; }
-#join-controller { text-decoration: none; }
-#join-controller:hover { background: #43434f; border-color: #fff; }
-#join-controls input { margin: 0; accent-color: #78b94a; }
-#join-controls small { display: block; margin-top: 4px; }
-#join-panel { max-height: 90dvh; overflow-y: auto; }
-body.companion { margin: 0; padding: 20px; background: #202820; color: white; font: 16px/1.5 system-ui, sans-serif; }
-.companion main { max-width: 620px; margin: auto; }
-.companion input, .companion button { font: inherit; padding: 10px; margin: 5px 0; }
-.companion a { color: #a6d9ff; }
-.companion #camera-controls { position: relative; top: auto; right: auto; width: 100%; max-height: none; margin: 20px auto; }
-#camera-controls [data-role=pair-qr] { display: block; width: 240px; max-width: 100%; height: auto; margin: 12px auto; image-rendering: pixelated; }
-#camera-controls [data-role=pair-qr][hidden] { display: none; }
-#camera-controls [data-role=pair-origin] { box-sizing: border-box; width: 100%; }
-#camera-controls .motion-primary { position: sticky; top: -12px; z-index: 1; background: #171717; padding: 5px 0; }
+#camera-controls p { margin: calc(2 * var(--u)) 0; }
+#camera-controls small { display: block; color: #7f7f7f; font-size: calc(var(--px) * 6px); line-height: 1.4; }
+#camera-controls a { color: var(--ink); }
+#camera-controls .motion-live { color: var(--ink-green); }
+
+/* The camera, framed like the join screen's player figure. */
+#camera-controls .motion-preview {
+  position: relative;
+  background: #000;
+  border-style: solid; border-width: var(--u);
+  border-color: var(--slot-dark) var(--gui-lit) var(--gui-lit) var(--slot-dark);
+}
+#camera-controls video { display: block; width: 100%; max-height: calc(95 * var(--u)); object-fit: contain; transform: scaleX(-1); }
 #camera-controls [data-role=landmarks] { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; transform: scaleX(-1); pointer-events: none; }
+
+/* Vanilla options rows: two 150x20 buttons per line, one full width. */
+#camera-controls .motion-buttons {
+  display: grid; grid-template-columns: 1fr 1fr; gap: calc(2 * var(--u));
+  margin: calc(2 * var(--u)) 0;
+}
+#camera-controls .motion-buttons > * { width: 100%; height: calc(20 * var(--u)); margin: 0; }
+#camera-controls .motion-buttons .wide { grid-column: 1 / -1; }
+/* Enable / stop stay reachable while the tuning below is scrolled. */
+#camera-controls .motion-primary {
+  position: sticky; top: calc(-4 * var(--u)); z-index: 1;
+  padding: calc(2 * var(--u)) 0; margin: 0;
+  background: var(--gui);
+}
+#camera-controls .motion-buttons + .motion-buttons { margin-top: 0; }
+
+/* Vanilla cycles a choice with a button reading "Camera: Front". The native
+   select sits inside the button, drawn as its text, so the list still opens. */
+.mc-cycle {
+  display: flex; align-items: center; justify-content: center; gap: 0;
+  cursor: pointer; white-space: nowrap;
+}
+.mc-cycle select {
+  appearance: none; -webkit-appearance: none;
+  background: none; border: 0; padding: 0; margin: 0;
+  color: inherit; font: inherit; text-shadow: inherit; cursor: pointer;
+  outline: none;
+}
+.mc-cycle select option { color: #000; text-shadow: none; }
+
+/* A checkbox drawn as vanilla's "Autojump: ON" toggle. The input covers the
+   button unseen so clicks, Space and the browser test land on the control. */
+.mc-toggle { position: relative; display: flex; align-items: center; justify-content: center; }
+.mc-toggle input { position: absolute; inset: 0; margin: 0; opacity: 0; cursor: pointer; }
+.mc-toggle span::after { content: ': OFF'; }
+.mc-toggle:has(input:checked) span::after { content: ': ON'; }
+.mc-toggle:has(input:focus-visible) { background-image: url('/assets/gui/sprites/widget/button_highlighted.png'); color: var(--mc-yellow); }
+
+/* Vanilla's slider: a 200x20 track, an 8x20 handle, the value printed over. */
+.mc-slider {
+  position: relative; display: block;
+  height: calc(20 * var(--u));
+  color: var(--mc-white); text-shadow: var(--u) var(--u) 0 var(--shadow);
+}
+.mc-slider input {
+  appearance: none; -webkit-appearance: none;
+  display: block; width: 100%; height: calc(20 * var(--u)); margin: 0; padding: 0;
+  background: url('/assets/gui/sprites/widget/slider.png') 0 0 / 100% 100%;
+  image-rendering: pixelated; cursor: pointer; outline: none;
+}
+.mc-slider input::-webkit-slider-runnable-track { height: calc(20 * var(--u)); background: none; }
+.mc-slider input::-moz-range-track { height: calc(20 * var(--u)); background: none; }
+.mc-slider input::-webkit-slider-thumb {
+  appearance: none; -webkit-appearance: none;
+  width: calc(8 * var(--u)); height: calc(20 * var(--u)); border: 0; border-radius: 0;
+  background: url('/assets/gui/sprites/widget/slider_handle.png') 0 0 / 100% 100%;
+}
+.mc-slider input::-moz-range-thumb {
+  width: calc(8 * var(--u)); height: calc(20 * var(--u)); border: 0; border-radius: 0;
+  background: url('/assets/gui/sprites/widget/slider_handle.png') 0 0 / 100% 100%;
+}
+.mc-slider input:hover::-webkit-slider-thumb, .mc-slider input:focus-visible::-webkit-slider-thumb { background-image: url('/assets/gui/sprites/widget/slider_handle_highlighted.png'); }
+.mc-slider input:hover::-moz-range-thumb, .mc-slider input:focus-visible::-moz-range-thumb { background-image: url('/assets/gui/sprites/widget/slider_handle_highlighted.png'); }
+.mc-slider span {
+  position: absolute; inset: 0; text-align: center; line-height: calc(20 * var(--u));
+  pointer-events: none; white-space: nowrap;
+}
+.mc-slider:hover span, .mc-slider:has(input:focus-visible) span { color: var(--mc-yellow); }
+#camera-controls [data-role=sliders] { display: flex; flex-direction: column; gap: calc(2 * var(--u)); margin: calc(2 * var(--u)) 0; }
+
+/* Vanilla opens a sub screen from a "Controls..." button. A collapsible with
+   the button as its summary is the same idea without leaving the panel. */
+#camera-controls details { margin-top: calc(2 * var(--u)); }
+#camera-controls summary { list-style: none; width: 100%; height: calc(20 * var(--u)); margin: 0; display: flex; align-items: center; justify-content: center; }
+#camera-controls summary::-webkit-details-marker { display: none; }
+#camera-controls details[open] > summary { color: var(--mc-yellow); }
+#camera-controls details > :not(summary) { margin-top: calc(2 * var(--u)); }
+#camera-controls ol { margin: 0; padding-left: calc(8 * var(--u)); font-size: calc(var(--px) * 7px); }
+#camera-controls li { margin-bottom: var(--u); }
+#camera-controls .motion-help p { font-size: calc(var(--px) * 7px); }
+
+/* Numbers, in the inset field the inventory uses for its search. */
+#camera-controls [data-role=diagnostics] {
+  margin: 0; white-space: pre-wrap;
+  font: inherit; font-size: calc(var(--px) * 6px); line-height: 1.5;
+  padding: calc(2 * var(--u));
+  color: var(--ink); background: var(--slot);
+  border-style: solid; border-width: var(--u);
+  border-color: var(--slot-dark) var(--gui-lit) var(--gui-lit) var(--slot-dark);
+}
+
+/* Pairing: the code large enough to read across a room, the QR on white. */
+#camera-controls [data-role=pair-code] {
+  display: block; text-align: center;
+  font-size: calc(var(--px) * 12px); font-weight: normal; letter-spacing: calc(1 * var(--u));
+  user-select: all;
+}
+#camera-controls [data-role=pair-code]:empty { display: none; }
+#camera-controls [data-role=pair-link] { display: block; overflow-wrap: anywhere; font-size: calc(var(--px) * 6px); }
+#camera-controls [data-role=pair-qr] {
+  display: block; width: calc(120 * var(--u)); max-width: 100%; height: auto; margin: calc(2 * var(--u)) auto;
+  image-rendering: pixelated;
+  border-style: solid; border-width: var(--u);
+  border-color: var(--slot-dark) var(--gui-lit) var(--gui-lit) var(--slot-dark);
+}
+#camera-controls [data-role=pair-qr][hidden] { display: none; }
+#camera-controls label.motion-field { display: block; }
+#camera-controls .motion-field .mc-text { margin-top: var(--u); }
+
+/* --- the phone controller page ---------------------------------------------- */
+body.companion {
+  margin: 0; min-height: 100dvh;
+  padding: calc(4 * var(--u));
+  display: flex; align-items: flex-start; justify-content: center;
+  color: var(--mc-white);
+}
+.companion main {
+  width: calc(200 * var(--u)); max-width: 100%;
+  padding: calc(4 * var(--u)) calc(5 * var(--u));
+}
+.companion h1 {
+  margin: 0 0 calc(3 * var(--u));
+  font-size: calc(var(--px) * 8px); font-weight: normal; text-align: center;
+}
+.companion p { margin: calc(2 * var(--u)) 0; }
+.companion small { display: block; color: #7f7f7f; font-size: calc(var(--px) * 6px); line-height: 1.4; }
+.companion a { color: var(--ink); }
+.companion .mc-button {
+  display: flex; align-items: center; justify-content: center;
+  width: 100%; margin: calc(2 * var(--u)) 0 0;
+  color: var(--mc-white); text-decoration: none;
+}
+.companion .mc-button:hover, .companion .mc-button:focus-visible { color: var(--mc-yellow); }
+.companion .mc-button[hidden] { display: none; }
+.companion #pair-code { margin-top: var(--u); }
+/* Inside the page's own panel: no second frame, no floating. */
+.companion #camera-controls {
+  position: static; width: auto; max-width: none; max-height: none;
+  border: 0; padding: 0; margin: calc(4 * var(--u)) 0 0;
+  border-top: var(--u) solid var(--slot); padding-top: calc(3 * var(--u));
+}
+.companion #camera-controls .motion-primary { position: static; }

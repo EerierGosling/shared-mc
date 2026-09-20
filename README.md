@@ -42,7 +42,7 @@ npm run dev               # builds the client bundle, then starts the server
 Choose **Camera gestures**, **Camera + paired phone steps**, or **Paired phone
 controller** on the opening screen. Setup starts in practice mode: allow the
 camera, calibrate, test gestures, then enable player control. Reopen settings
-from **Game menu → Motion controls & phone**.
+from **Game menu → Motion Controls**.
 
 - Head movement steers; arm swings mine; walking in place moves forward with autojump.
 - Physical jumps jump; optional facial actions map smiles to use/place and an open mouth to jump.

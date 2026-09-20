@@ -73,7 +73,7 @@ app.get('/controller', (req, res) => {
   res.set('Cache-Control', 'no-cache')
   res.send(controllerPage)
 })
-app.get('/motion.css', (req, res) => res.sendFile(path.join(clientDir, 'motion.css')))
+for (const sheet of ['ui.css', 'motion.css']) app.get(`/${sheet}`, (req, res) => res.sendFile(path.join(clientDir, sheet)))
 app.use('/dist', precompressed(distDir, FOREVER))
 app.use('/fonts', express.static(path.join(clientDir, 'fonts'), { maxAge: '7d' }))
 

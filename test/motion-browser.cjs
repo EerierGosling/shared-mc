@@ -24,7 +24,7 @@ async function main () {
     .replace('/dist/bundle.js', `/dist/${bundle('bundle')}`)))
   app.get('/controller', (req, res) => res.type('html').send(fs.readFileSync(path.join(root, 'src/client/controller.html'), 'utf8')
     .replace('/dist/controller.js', `/dist/${bundle('controller')}`)))
-  app.get('/motion.css', (req, res) => res.sendFile(path.join(root, 'src/client/motion.css')))
+  for (const sheet of ['ui.css', 'motion.css']) app.get(`/${sheet}`, (req, res) => res.sendFile(path.join(root, 'src/client', sheet)))
   app.use('/dist', express.static(path.join(root, 'dist')))
   app.use('/fonts', express.static(path.join(root, 'src/client/fonts')))
   app.use('/assets', express.static(require('minecraft-assets')('1.20.4').directory))
