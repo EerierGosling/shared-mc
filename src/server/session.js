@@ -8,6 +8,7 @@ const InventoryBridge = require('./inventory')
 const ChatLog = require('./chat')
 const Respawner = require('./respawn')
 const Creative = require('./creative')
+const Advancements = require('./advancements')
 const { Budget } = require('./limits')
 const { attachWorldView } = require('./worldStream')
 
@@ -59,6 +60,9 @@ class Session {
     this.statePusher = new StatePusher(emitter, config)
     this.lights = new LightTracker(emitter)
     this.inventory = new InventoryBridge(emitter)
+    // Per session like the chat log: solo players earn their own, road trip
+    // riders all share the one character's progress.
+    this.advancements = new Advancements(emitter)
 
     this.holder = new BotHolder({
       ...config.mc,
@@ -103,6 +107,7 @@ class Session {
     this.chatLog.register(socket, this.mode === 'solo' ? this.identity.username : null)
     this.respawner.register(socket)
     this.creative.register(socket)
+    this.advancements.register(socket)
     this.primitives.sendAll(socket)
     this.lights.sendTo(socket)
     this.creative.sendTo(socket)
@@ -143,6 +148,7 @@ class Session {
     this.statePusher.setBot(bot)
     this.lights.setBot(bot)
     this.inventory.setBot(bot)
+    this.advancements.setBot(bot)
     // The roster lists everyone on the server, not just our bots, and this
     // bot's tab list is where that comes from. Listeners die with the bot.
     bot.on('playerJoined', () => this.onPlayers())
@@ -165,6 +171,7 @@ class Session {
     this.statePusher.clearBot()
     this.lights.clearBot()
     this.inventory.clearBot()
+    this.advancements.clearBot()
     this.chatLog.clearBot()
     this.respawner.clearBot()
     this._detachStream()
@@ -187,6 +194,7 @@ class Session {
     this.lights.stop()
     this.lights.clearBot()
     this.inventory.clearBot()
+    this.advancements.clearBot()
     this.chatLog.clearBot()
     this.respawner.clearBot()
     this.holder.removeAllListeners()

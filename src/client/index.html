@@ -519,6 +519,76 @@
   #pause-controls .row.creative-only { display: none; }
   body.creative #pause-controls .row.creative-only { display: flex; }
 
+  /* --- advancements -------------------------------------------------------- */
+  /* Vanilla's toast sprite is 160x32: icon at (8,8), headline at (30,7),
+     title at (30,18); it slides in at the top right. */
+  #toast {
+    top: 0; right: 0; z-index: 21;
+    width: calc(160 * var(--u)); height: calc(32 * var(--u));
+    background: url('/assets/gui/sprites/toast/advancement.png') 0 0 / 100% 100% no-repeat;
+    image-rendering: pixelated;
+    transform: translateY(-100%); transition: transform 0.3s;
+    font-size: calc(var(--px) * 8px); line-height: 1; color: var(--mc-white);
+  }
+  #toast.show { transform: none; }
+  #toast .adv-icon { position: absolute; left: calc(8 * var(--u)); top: calc(8 * var(--u)); }
+  #toast .toast-headline, #toast .toast-title {
+    position: absolute; left: calc(30 * var(--u)); right: calc(4 * var(--u));
+    white-space: nowrap; overflow: hidden;
+  }
+  #toast .toast-headline { top: calc(7 * var(--u)); color: var(--mc-yellow); }
+  #toast[data-frame="challenge"] .toast-headline { color: #ff88ff; }
+  #toast .toast-title { top: calc(18 * var(--u)); }
+  .adv-icon {
+    display: block; position: relative; flex: none;
+    width: calc(16 * var(--u)); height: calc(16 * var(--u));
+  }
+  .adv-icon img { width: 100%; height: 100%; image-rendering: pixelated; }
+
+  /* The screen behind L: vanilla's tabs as sections, its 26x26 frame sprites
+     around each icon, unearned entries dimmed. */
+  #advancements {
+    inset: 0; display: none; pointer-events: auto;
+    background: rgba(16, 16, 16, 0.75);
+    flex-direction: column; align-items: center;
+    overflow-y: auto;
+  }
+  #advancements.open { display: flex; }
+  #advancements h1 {
+    margin: calc(20 * var(--u)) 0 calc(4 * var(--u));
+    font-size: calc(var(--px) * 8px); font-weight: normal; line-height: 1;
+  }
+  #advancements-summary { color: var(--mc-gray); font-size: calc(var(--px) * 7px); }
+  #advancements-list { width: calc(240 * var(--u)); max-width: 92vw; text-align: left; }
+  #advancements .mc-button { margin: calc(12 * var(--u)) 0 calc(20 * var(--u)); }
+  .adv-tab h2 {
+    margin: calc(12 * var(--u)) 0 calc(6 * var(--u));
+    font-size: calc(var(--px) * 8px); font-weight: normal; line-height: 1;
+    color: var(--mc-yellow);
+  }
+  .adv-row {
+    display: flex; align-items: center; gap: calc(6 * var(--u));
+    margin-bottom: calc(4 * var(--u));
+    font-size: calc(var(--px) * 7px); line-height: 1.4;
+  }
+  .adv-row .adv-icon {
+    width: calc(26 * var(--u)); height: calc(26 * var(--u));
+    padding: calc(5 * var(--u)); box-sizing: border-box;
+    background: url('/assets/gui/sprites/advancements/task_frame_unobtained.png') 0 0 / 100% 100% no-repeat;
+    image-rendering: pixelated;
+  }
+  .adv-row[data-frame="goal"] .adv-icon { background-image: url('/assets/gui/sprites/advancements/goal_frame_unobtained.png'); }
+  .adv-row[data-frame="challenge"] .adv-icon { background-image: url('/assets/gui/sprites/advancements/challenge_frame_unobtained.png'); }
+  .adv-row[data-done="yes"] .adv-icon { background-image: url('/assets/gui/sprites/advancements/task_frame_obtained.png'); }
+  .adv-row[data-done="yes"][data-frame="goal"] .adv-icon { background-image: url('/assets/gui/sprites/advancements/goal_frame_obtained.png'); }
+  .adv-row[data-done="yes"][data-frame="challenge"] .adv-icon { background-image: url('/assets/gui/sprites/advancements/challenge_frame_obtained.png'); }
+  .adv-row[data-done="no"] { opacity: 0.5; }
+  .adv-text { display: flex; flex-direction: column; min-width: 0; }
+  .adv-text b { font-weight: normal; color: var(--mc-white); }
+  .adv-row[data-frame="challenge"] .adv-text b { color: #ff88ff; }
+  .adv-text span { color: var(--mc-gray); }
+  .adv-text small { color: #55ff55; font-size: calc(var(--px) * 6px); }
+
   /* --- death screen -------------------------------------------------------- */
   /* Vanilla fills the screen with a 0x60500000 -> 0xA0803030 gradient, draws
      the title at 2x, the cause and score under it, and a 200x20 button. */
@@ -736,6 +806,7 @@
     <h1>Game menu</h1>
     <button id="pause-resume" class="mc-button" type="button">Back to Game</button>
     <button id="pause-motion" class="mc-button" type="button">Motion Controls...</button>
+    <button id="pause-advancements" class="mc-button" type="button">Advancements</button>
     <button id="pause-quit" class="mc-button" type="button">Quit to Title</button>
     <div id="pause-where">
       <div>Connected to</div>
@@ -754,6 +825,7 @@
       <div class="row"><b>T</b><span>chat (/ for a command)</span></div>
       <div class="row"><b>Q</b><span>drop item</span></div>
       <div class="row"><b>G</b><span>walk to cursor</span></div>
+      <div class="row"><b>L</b><span>advancements</span></div>
       <div class="row"><b>F3</b><span>coordinate readout</span></div>
       <div class="row"><b>esc</b><span>this menu</span></div>
       <div class="row creative-only"><b>MMB</b><span>pick block</span></div>
@@ -761,6 +833,14 @@
       <div class="row creative-only"><b>space / shift</b><span>fly up / down</span></div>
     </div>
     </div>
+  </div>
+
+  <div id="toast" class="overlay shadowed"></div>
+  <div id="advancements" class="overlay shadowed">
+    <h1>Advancements</h1>
+    <div id="advancements-summary"></div>
+    <div id="advancements-list"></div>
+    <button id="advancements-close" class="mc-button" type="button">Done</button>
   </div>
 
   <div id="players" class="overlay"></div>

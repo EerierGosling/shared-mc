@@ -40,7 +40,7 @@ const CHAT_HISTORY = 50
  * Touch devices get the same messages from on-screen buttons (see #touch in
  * index.html) and steer by dragging the canvas.
  */
-function setupInput ({ socket, viewer, camera, hud, inventoryUI, canvas, hand, join, creative, placePrediction, pause }) {
+function setupInput ({ socket, viewer, camera, hud, inventoryUI, advancementsUI, canvas, hand, join, creative, placePrediction, pause }) {
   const held = Object.create(null)
   let locked = false
   let cameraControls = null
@@ -62,7 +62,7 @@ function setupInput ({ socket, viewer, camera, hud, inventoryUI, canvas, hand, j
   let chatHistoryPos = 0
   let chatDraft = ''
 
-  const uiOpen = () => join.isOpen || inventoryUI.isOpen || hud.chatOpen || hud.dead || pause.isOpen
+  const uiOpen = () => join.isOpen || inventoryUI.isOpen || advancementsUI.isOpen || hud.chatOpen || hud.dead || pause.isOpen
   const ownsLook = () => locked || touchLook || Boolean(cameraControls?.active)
 
   const sendControls = () => {
@@ -368,14 +368,22 @@ function setupInput ({ socket, viewer, camera, hud, inventoryUI, canvas, hand, j
       if (inventoryUI.isOpen) creative.focusSearch()
       return
     }
+    if (event.code === 'KeyL' && !hud.dead) {
+      event.preventDefault()
+      if (inventoryUI.isOpen) return
+      if (locked) document.exitPointerLock()
+      advancementsUI.toggle()
+      return
+    }
     if (event.code === 'Escape') {
       if (inventoryUI.isOpen) inventoryUI.close()
+      else if (advancementsUI.isOpen) advancementsUI.close()
       // Escape with nothing open and no lock held (say, after Esc closed
       // the inventory) opens the menu the way it does on desktop vanilla.
       else if (!locked && join.joined && !hud.dead && !isTouchDevice) pause.open()
       return
     }
-    if (inventoryUI.isOpen) return
+    if (inventoryUI.isOpen || advancementsUI.isOpen) return
 
     if (event.code === 'KeyT' || event.code === 'Enter' || event.code === 'Slash') {
       event.preventDefault()

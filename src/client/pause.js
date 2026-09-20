@@ -19,7 +19,7 @@
  * brings the main page back. onPage tells the owner which one is showing.
  */
 class PauseMenu {
-  constructor ({ onResume, onQuit, onPage }) {
+  constructor ({ onResume, onQuit, onPage, onAdvancements }) {
     this.root = document.getElementById('pause')
     this.main = document.getElementById('pause-main')
     this.serverLine = document.getElementById('pause-server')
@@ -32,6 +32,9 @@ class PauseMenu {
     document.getElementById('pause-resume').addEventListener('click', () => onResume())
     document.getElementById('pause-quit').addEventListener('click', () => onQuit())
     document.getElementById('pause-motion').addEventListener('click', () => { this.open(); this.showPage('motion') })
+    // The advancements screen is its own overlay, not a page of this menu:
+    // it also opens from the L key with no menu involved.
+    document.getElementById('pause-advancements').addEventListener('click', () => { this.close(); onAdvancements() })
   }
 
   get isOpen () {

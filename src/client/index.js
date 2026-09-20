@@ -8,6 +8,7 @@ const { Viewer } = require('prismarine-viewer/viewer')
 const { supportedVersions } = require('prismarine-viewer/viewer/lib/version')
 const { Hud } = require('./hud')
 const InventoryUI = require('./inventory')
+const AdvancementsUI = require('./advancements')
 const CreativeUI = require('./creative')
 const BlockLights = require('./lights')
 const Minimap = require('./minimap')
@@ -44,6 +45,7 @@ window.__socket = socket
 const hud = new Hud()
 const underwater = document.getElementById('underwater')
 const inventoryUI = new InventoryUI(socket)
+const advancementsUI = new AdvancementsUI()
 // Hidden until the Minecraft server says the bot really is in creative.
 const creative = new CreativeUI(socket)
 creative.onState = state => hud.setCreative(state)
@@ -78,10 +80,11 @@ const join = new JoinScreen(socket, identity => {
 const pause = new PauseMenu({
   onResume: () => input.resume(),
   onQuit: () => window.location.reload(),
-  onPage: page => input.showMotion(page === 'motion')
+  onPage: page => input.showMotion(page === 'motion'),
+  onAdvancements: () => advancementsUI.open()
 })
 
-const input = setupInput({ socket, viewer, camera, hud, inventoryUI, canvas, hand, join, creative, placePrediction, pause })
+const input = setupInput({ socket, viewer, camera, hud, inventoryUI, advancementsUI, canvas, hand, join, creative, placePrediction, pause })
 
 const highlight = new THREE.LineSegments(
   new THREE.EdgesGeometry(new THREE.BoxGeometry(1.002, 1.002, 1.002)),
@@ -232,12 +235,18 @@ setInterval(() => socket.emit('latency:ping', Date.now()), 2000)
 // --- render loop ------------------------------------------------------------
 // Two passes share the frame (world, then the hand over it), so the clear is
 // ours to do rather than render()'s.
+  advancementsUI.close()
 renderer.autoClear = false
 let lastFrameTime = performance.now()
 function animate () {
   window.requestAnimationFrame(animate)
   const now = performance.now()
   const dt = (now - lastFrameTime) / 1000
+// The bot's advancement tree as deltas (full on join), and one event per
+// advancement newly earned, for the toast.
+socket.on('advancements', delta => advancementsUI.update(delta))
+socket.on('advancement:earned', entry => advancementsUI.earned(entry))
+
   lastFrameTime = now
   viewer.update()
   breaking.update()

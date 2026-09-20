@@ -226,6 +226,16 @@ road trip.
   whole world, blowing snow out to a flat sheet. Anything that needs its own
   lighting gets its own scene and a second `renderer.render()` pass
   (`hand.js`), which is also why `renderer.autoClear` is off in `index.js`.
+- **Advancements are read raw off the `advancements` packet** (`advancements.js`,
+  mineflayer has no plugin for it). Only entries with display data are kept:
+  the rest are the ~1000 `minecraft:recipes/*` unlocks vanilla never shows.
+  Done is vanilla's rule, one achieved criterion per requirement group, and a
+  toast fires only for a flip to done on a packet after the login dump, which
+  already carries everything earned. Hidden entries reach the browser once
+  done. The relay is deltas (`reset`, `entries`, `removed`) and a late rider
+  gets the full set in `register`. The toast and the L screen draw
+  `gui/sprites/toast/advancement.png` and the `advancements/*_frame_*.png`
+  sprites in `--u` like the rest of the HUD.
 - The bot object is **replaced** on reconnect. Anything holding a reference gets
   it through `setBot()` / `clearBot()` from the `BotHolder` events. Don't cache
   `bot` at module scope.
