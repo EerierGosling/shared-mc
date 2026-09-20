@@ -318,8 +318,11 @@ module.exports = function setupCameraControls ({ apply, canPlay, onStart, socket
   if (!companion && socket) {
     const pairStatus = $('[data-role=pair-status]')
     const pairButton = $('[data-action=pair]')
+    const pairing = $('[data-role=pairing]')
+    let lastPairRequest = -Infinity
     $('[data-role=pair-origin]').value = window.location.origin
-    pairButton.addEventListener('click', () => {
+    pairButton.addEventListener('click', async () => {
+      if (pairButton.disabled) return
       if (!socket.connected) { pairStatus.textContent = 'Connect to the game first.'; return }
       let link
       try {
@@ -328,9 +331,23 @@ module.exports = function setupCameraControls ({ apply, canPlay, onStart, socket
       } catch { pairStatus.textContent = 'Enter a valid HTTPS address for this game server.'; return }
       pairButton.disabled = true
       pairStatus.textContent = 'Creating phone pairing QR code…'
-      socket.timeout(5000).emit('motion:create', async (error, result) => {
+      // Respect the server's request limit even when Generate is clicked
+      // immediately after automatic generation.
+      const wait = Math.max(0, 1100 - (performance.now() - lastPairRequest))
+      if (wait) await new Promise(resolve => setTimeout(resolve, wait))
+      if (!socket.connected) {
         pairButton.disabled = false
-        if (error || result?.error) { pairStatus.textContent = result?.error || 'Pairing request timed out. Retry.'; return }
+        pairStatus.textContent = 'Connection lost. Reconnect to the game and retry.'
+        return
+      }
+      lastPairRequest = performance.now()
+      socket.timeout(5000).emit('motion:create', async (error, result) => {
+        if (error || result?.error || !/^[A-F0-9]{12}$/.test(result?.code || '')) {
+          pairButton.disabled = false
+          pairStatus.textContent = result?.error || 'Pairing request failed or timed out. Retry.'
+          pairStatus.scrollIntoView({ block: 'nearest' })
+          return
+        }
         $('[data-role=pair-code]').textContent = result.code
         link.hash = result.code
         const anchor = $('[data-role=pair-link]')
@@ -343,7 +360,11 @@ module.exports = function setupCameraControls ({ apply, canPlay, onStart, socket
           await QRCode.toCanvas(qr, link.href, { width: 240, margin: 4, errorCorrectionLevel: 'M' })
           if ($('[data-role=pair-code]').textContent === result.code) { qr.hidden = false; qr.scrollIntoView({ block: 'center' }) }
         } catch { pairStatus.textContent += ' QR generation failed; enter the code manually.' }
+        finally { pairButton.disabled = false }
       })
+    })
+    pairing.addEventListener('toggle', () => {
+      if (pairing.open && !paired && !$('[data-role=pair-code]').textContent) pairButton.click()
     })
     $('[data-action=unpair]').addEventListener('click', () => socket.emit('motion:unpair'))
     socket.on('motion:paired', () => {

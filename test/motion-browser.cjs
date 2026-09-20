@@ -150,6 +150,21 @@ async function main () {
     }
     await host.reload()
     assert.equal(await host.getByRole('radio', { name: 'Camera + phone', exact: true }).isChecked(), true)
+    // Pairing must also work when opened manually after choosing camera only.
+    await host.getByRole('radio', { name: 'Use camera', exact: true }).check()
+    await host.getByRole('button', { name: /Collaborative/ }).click()
+    await host.locator('#join-button').click()
+    await host.locator('[data-role=pairing] > summary').click()
+    await host.locator('[data-role=pair-qr]').waitFor({ state: 'visible', timeout: 7000 })
+    const manualCode = await host.locator('[data-role=pair-code]').textContent()
+    assert.match(manualCode, /^[A-F0-9]{12}$/)
+    await host.locator('[data-action=pair]').click()
+    await host.waitForFunction(previous => {
+      const code = document.querySelector('[data-role=pair-code]').textContent
+      return code && code !== previous && !document.querySelector('[data-role=pair-qr]').hidden
+    }, manualCode)
+    assert.ok(!(await host.locator('[data-role=pair-status]').textContent()).includes('retry'))
+    assert.match(await host.locator('[data-role=pair-code]').textContent(), /^[A-F0-9]{12}$/)
     assert.deepEqual(errors, [])
     console.log('Browser checks passed: opening selection, QR generation, pairing, phone steps/autojump, stop/unpair, saved settings, calibration and camera cleanup.')
   } finally {
