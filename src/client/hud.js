@@ -76,6 +76,7 @@ class Hud {
     this.pingByName = new Map() // username -> its bars element
     this.lastPingsKey = null
     this.lastHeldKey = null
+    this.lastStatsHtml = null
     // Health before the hit that started the current blink, so the hearts
     // that were just lost can flash white the way vanilla's do.
     this.blink = null // { until, from }
@@ -149,6 +150,7 @@ class Hud {
   /** F3: the coordinate readout. */
   toggleDebug () {
     this.stats.classList.toggle('hidden')
+    this.renderStats() // repaint at once if just unhidden
   }
 
   setPing (ms) {
@@ -210,6 +212,10 @@ class Hud {
   }
 
   renderStats () {
+    // Runs on every state packet; while the F3 readout is hidden that is a
+    // 10 Hz innerHTML rebuild nobody can see, so skip it. When visible, only
+    // assign when the markup actually changed.
+    if (this.stats.classList.contains('hidden')) return
     const state = this.lastState
     if (!state) return
     const { x, y, z } = state.position
@@ -220,12 +226,15 @@ class Hud {
     const mode = state.gameMode
       ? `mode ${escapeHtml(state.gameMode)}${this.creative.flying ? ' · flying' : ''}\n`
       : ''
-    this.stats.innerHTML =
+    const html =
       `<b>${escapeHtml(state.username || 'bot')}</b>  ${ping}\n` +
       `xyz  ${x.toFixed(1)} ${y.toFixed(1)} ${z.toFixed(1)}\n` +
       `look ${escapeHtml(target)}\n` +
       mode +
       `${state.playerCount} player(s) online`
+    if (html === this.lastStatsHtml) return
+    this.lastStatsHtml = html
+    this.stats.innerHTML = html
   }
 
   renderVitals (state) {

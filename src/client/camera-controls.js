@@ -1,5 +1,5 @@
 'use strict'
-const QRCode = require('qrcode')
+const { PhoneLink, buildPairingUI } = require('./phone-pairing')
 const { Gestures, idle } = require('./gestures')
 const posePreview = require('./pose-preview')
 const FaceGestures = require('./face-gestures')
@@ -11,28 +11,18 @@ const MODEL_ROOT = 'https://storage.googleapis.com/mediapipe-models/'
 
 // The panel is a page of the game menu. Camera configures local tracking;
 // Phone pairs the dedicated accelerometer controller. Done returns to the menu.
-module.exports = function setupCameraControls ({ apply, canPlay, onStart, onDone, socket, mount = document.body }) {
+module.exports = function setupCameraControls ({ apply, canPlay, onStart, onDone, socket, phoneLink, mount = document.body }) {
   let settings = load()
   const gestures = new Gestures(settings)
   const faces = new FaceGestures()
   const startGesture = new StartGesture()
+  // The join screen can have minted this pairing already; both blocks render
+  // the one PhoneLink, and the phone's input merges in once armed.
+  const link = phoneLink || (socket ? new PhoneLink(socket) : null)
   const panel = document.createElement('section')
   panel.id = 'camera-controls'
   panel.hidden = true
   panel.setAttribute('aria-label', 'Motion controls setup')
-  const pairing = `<details data-role="pairing"><summary class="mc-button">Phone</summary>
-      <p>Open <a href="/controller" target="_blank" rel="noopener">the phone controller</a> on your phone and enter the code, or scan it. Both devices must reach this site over HTTPS.</p>
-      <div class="motion-buttons">
-        <button type="button" class="mc-button" data-action="pair">Generate QR Code</button>
-        <button type="button" class="mc-button" data-action="unpair">Disconnect Phone</button>
-      </div>
-      <canvas data-role="pair-qr" tabindex="-1" role="img" aria-label="Scan to open the phone controller with the pairing code" hidden></canvas>
-      <strong data-role="pair-code"></strong><a data-role="pair-link"></a>
-      <p data-role="pair-status">No phone connected. Codes expire after five minutes and work once.</p>
-      <label class="motion-field">Site address reachable from your phone <input type="text" class="mc-text" data-role="pair-origin" aria-label="Phone-accessible HTTPS site address"></label>
-      <small>Use this server's HTTPS address. localhost on your phone points to the phone, not your computer.</small>
-      <small>The phone uses its accelerometer for mining. Recommended: desktop camera + phone mining. Pairing does not create another player.</small>
-    </details>`
   panel.innerHTML = `<h2>Motion Controls</h2>
     <small>Start in practice mode. Calibrate, test your gestures, then enable player control.</small>
     <div class="motion-preview"><video autoplay muted playsinline aria-label="Mirrored camera preview"></video><canvas data-role="landmarks" aria-hidden="true"></canvas></div>
@@ -50,7 +40,6 @@ module.exports = function setupCameraControls ({ apply, canPlay, onStart, onDone
     <p data-role="mode">Practice mode: gestures do not affect the player.</p>
     <small data-role="start-hint">After camera calibration, raise both hands above your head and hold for one second to enable player control.</small>
     <p data-role="detected">Detected: idle</p>
-    ${pairing}
     <details data-role="tuning"><summary class="mc-button">Sensitivity &amp; Tuning...</summary>
       <div class="motion-buttons">
         <label class="mc-button mc-cycle wide">Preset:&nbsp;<select data-setting="preset"><option value="normal">Balanced</option><option value="gentle">Small movements</option><option value="deliberate">Deliberate movements</option></select></label>
@@ -90,7 +79,7 @@ module.exports = function setupCameraControls ({ apply, canPlay, onStart, onDone
   const cameraButtons = $('[data-action=start]').parentElement
   for (const element of [$('.motion-preview'), $('[data-role=tracking]'), $('[data-role=status]'), cameraButtons,
     $('[data-role=start-hint]'), $('[data-role=tuning]'), $('[data-role=diagnostics]').parentElement, $('.motion-help')]) cameraOptions.append(element)
-  cameraOptions.after($('[data-role=pairing]'))
+  if (link) cameraOptions.after(buildPairingUI(link))
   const video = $('video')
   const preview = posePreview($('[data-role=landmarks]'))
   const status = $('[data-role=status]')
@@ -109,9 +98,6 @@ module.exports = function setupCameraControls ({ apply, canPlay, onStart, onDone
   let lastControl = performance.now()
   let candidate = idle()
   let faceState = { use: false, jump: false, score: 0 }
-  let remote = idle()
-  let remoteAt = -Infinity
-  let paired = false
   let inferenceMs = 0
   let vision = null
   let files = null
@@ -124,8 +110,6 @@ module.exports = function setupCameraControls ({ apply, canPlay, onStart, onDone
     candidate = idle()
     preview.clear()
     faceState = { use: false, jump: false, score: 0 }
-    remote = idle()
-    remoteAt = -Infinity
     apply(idle())
   }
   function practice () {
@@ -155,8 +139,7 @@ module.exports = function setupCameraControls ({ apply, canPlay, onStart, onDone
   function stop () {
     practice()
     stopCamera()
-    socket?.emit('motion:unpair')
-    paired = false
+    link?.unpair()
     status.textContent = 'All motion inputs stopped.'
   }
   function fail (error) {
@@ -309,7 +292,7 @@ module.exports = function setupCameraControls ({ apply, canPlay, onStart, onDone
   $('[data-action=calibrate]').addEventListener('click', () => { practice(); gestures.calibrate() })
   $('[data-action=arm]').addEventListener('click', () => {
     if (armed) { practice(); return }
-    if (!running && !paired) { status.textContent = 'Start Camera or pair a Phone first.'; return }
+    if (!running && !link?.paired) { status.textContent = 'Start Camera or pair a Phone first.'; return }
     reset()
     armed = true
     onStart()
@@ -321,73 +304,7 @@ module.exports = function setupCameraControls ({ apply, canPlay, onStart, onDone
   })
   $('[data-action=stop]').addEventListener('click', stop)
   $('[data-action=hide]').addEventListener('click', onDone || hide)
-  if (socket) {
-    const pairStatus = $('[data-role=pair-status]')
-    const pairButton = $('[data-action=pair]')
-    const pairing = $('[data-role=pairing]')
-    $('[data-role=pair-origin]').value = window.location.origin
-    pairButton.addEventListener('click', async () => {
-      if (pairButton.disabled) return
-      show()
-      pairing.open = true
-      if (!socket.connected) { pairStatus.textContent = 'Connect to the game first.'; return }
-      let link
-      try {
-        link = new URL('/p', $('[data-role=pair-origin]').value)
-        if (!['https:', 'http:'].includes(link.protocol) || link.username || link.password) throw new Error('address')
-      } catch { pairStatus.textContent = 'Enter a valid HTTPS address for this game server.'; return }
-      pairButton.disabled = true
-      pairStatus.textContent = 'Creating phone pairing QR code…'
-      socket.timeout(5000).emit('motion:create', async (error, result) => {
-        if (error || result?.error || !/^(?:[A-HJ-NP-Z2-9]{6}|[A-F0-9]{12})$/.test(result?.code || '')) {
-          pairButton.disabled = false
-          pairStatus.textContent = result?.error || 'Pairing request failed or timed out. Retry.'
-          pairStatus.scrollIntoView({ block: 'nearest' })
-          return
-        }
-        $('[data-role=pair-code]').textContent = result.code
-        link.hash = result.code
-        const anchor = $('[data-role=pair-link]')
-        anchor.href = link.href; anchor.textContent = 'Open phone controller'
-        pairStatus.textContent = 'Scan this QR code with your phone to connect automatically. Code expires in five minutes.'
-        if (link.protocol !== 'https:' || ['localhost', '127.0.0.1', '[::1]'].includes(link.hostname)) pairStatus.textContent += ' This address will not provide camera/motion access on a separate phone; use a phone-accessible HTTPS address.'
-        const qr = $('[data-role=pair-qr]')
-        qr.hidden = true
-        try {
-          await QRCode.toCanvas(qr, link.href, { width: 240, margin: 4, errorCorrectionLevel: 'M' })
-          if ($('[data-role=pair-code]').textContent === result.code) {
-            show()
-            pairing.open = true
-            qr.hidden = false
-            qr.focus({ preventScroll: true })
-            qr.scrollIntoView({ block: 'center' })
-          }
-        } catch { pairStatus.textContent += ' QR generation failed; enter the code manually.' }
-        finally { pairButton.disabled = false }
-      })
-    })
-    pairing.addEventListener('toggle', () => {
-      if (pairing.open && !paired && !$('[data-role=pair-code]').textContent) pairButton.click()
-    })
-    $('[data-action=unpair]').addEventListener('click', () => socket.emit('motion:unpair'))
-    socket.on('motion:paired', () => {
-      paired = true
-      $('[data-role=pair-qr]').hidden = true
-      $('[data-role=pair-code]').textContent = ''
-      $('[data-role=pair-link]').removeAttribute('href'); $('[data-role=pair-link]').textContent = ''
-      pairStatus.textContent = 'Phone paired. Enable player control here and on the phone when ready.'
-    })
-    socket.on('motion:state', state => { if (paired) { remote = state; remoteAt = performance.now() } })
-    socket.on('motion:stale', () => { remote = idle(); pairStatus.textContent = 'Phone input timed out — keep its page visible and awake.' })
-    socket.on('motion:ended', () => {
-      paired = false; remote = idle(); remoteAt = -Infinity
-      $('[data-role=pair-qr]').hidden = true
-      $('[data-role=pair-code]').textContent = ''
-      $('[data-role=pair-link]').removeAttribute('href'); $('[data-role=pair-link]').textContent = ''
-      pairStatus.textContent = 'Phone disconnected or code expired. Generate a code to pair again.'
-    })
-    socket.on('disconnect', stop)
-  }
+  socket?.on('disconnect', stop)
 
   const controlTimer = setInterval(() => {
     const now = performance.now()
@@ -400,7 +317,7 @@ module.exports = function setupCameraControls ({ apply, canPlay, onStart, onDone
       ? `Head: ${tracking.head ? 'visible' : 'missing'} · Mining arm: ${tracking.arm ? 'visible' : 'missing'} · Legs: ${tracking.legs ? 'visible' : 'missing'}${candidate.tracked && tracking.legs && !tracking.jumpReady ? ' · Recalibrate with feet visible for jumps' : ''}`
       : 'Waiting for camera landmarks. Green points indicate confident tracking.'
     const local = cameraFresh && candidate.tracked ? candidate : idle()
-    const other = paired && now - remoteAt < 350 ? remote : idle()
+    const other = link ? link.fresh(now) : idle()
     const face = cameraFresh && settings.facial ? faceState : { jump: false, use: false }
     const forward = Boolean(local.forward || other.forward)
     const state = {
@@ -426,7 +343,7 @@ module.exports = function setupCameraControls ({ apply, canPlay, onStart, onDone
       apply(state, dt * settings.lookSpeed)
     } else {
       apply(idle())
-      if (armed) { gestures.resetMotion(); faces.reset(); remote = idle(); candidate = idle(); faceState = { use: false, jump: false, score: 0 } }
+      if (armed) { gestures.resetMotion(); faces.reset(); candidate = idle(); faceState = { use: false, jump: false, score: 0 } }
     }
   }, 50)
   window.addEventListener('blur', reset)

@@ -44,6 +44,7 @@ const KEYFRAMES = [
 // second, for values that are copied out immediately.
 const _colorA = new THREE.Color()
 const _colorB = new THREE.Color()
+const _direction = new THREE.Vector3()
 
 function lerpHex (fromHex, toHex, frac) {
   return _colorA.set(fromHex).lerp(_colorB.set(toHex), frac)
@@ -58,10 +59,11 @@ function findSegment (t) {
 
 // Sun and moon ride opposite ends of one fixed circle around the player; the
 // small z nudge keeps the arc off the exact X axis so it doesn't ever look
-// like it's moving edge-on.
+// like it's moving edge-on. Returns scratch — consumed immediately by the
+// caller, never stored.
 function celestialDirection (fraction) {
   const theta = fraction * Math.PI * 2
-  return new THREE.Vector3(-Math.cos(theta), Math.sin(theta), 0.2).normalize()
+  return _direction.set(-Math.cos(theta), Math.sin(theta), 0.2).normalize()
 }
 
 // A big sphere around the camera, shaded top-to-bottom between two flat

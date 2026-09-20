@@ -40,7 +40,7 @@ const CHAT_HISTORY = 50
  * Touch devices get the same messages from on-screen buttons (see #touch in
  * index.html) and steer by dragging the canvas.
  */
-function setupInput ({ socket, viewer, camera, hud, inventoryUI, advancementsUI, canvas, hand, join, creative, placePrediction, pause }) {
+function setupInput ({ socket, viewer, camera, hud, inventoryUI, advancementsUI, canvas, hand, join, creative, placePrediction, pause, phoneLink }) {
   const held = Object.create(null)
   let locked = false
   let cameraControls = null
@@ -172,6 +172,7 @@ function setupInput ({ socket, viewer, camera, hud, inventoryUI, advancementsUI,
 
   cameraControls = setupCameraControls({
     socket,
+    phoneLink,
     mount: document.getElementById('pause'),
     canPlay: () => socket.connected && join.joined && !uiOpen() && !document.hidden && document.hasFocus(),
     onStart: () => { releaseAll(); pause.close() },

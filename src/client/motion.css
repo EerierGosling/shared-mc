@@ -117,23 +117,50 @@
   border-color: var(--slot-dark) var(--gui-lit) var(--gui-lit) var(--slot-dark);
 }
 
-/* Pairing: the code large enough to read across a room, the QR on white. */
-#camera-controls [data-role=pair-code] {
+/* Pairing: the code large enough to read across a room, the QR on white. The
+   one block (.phone-pair) is mounted on the join screen and inside the
+   motion panel, so it is styled standalone rather than under an id. */
+.phone-pair { margin-top: calc(2 * var(--u)); }
+.phone-pair > summary {
+  list-style: none; width: 100%; height: calc(20 * var(--u)); margin: 0;
+  display: flex; align-items: center; justify-content: center;
+}
+.phone-pair > summary::-webkit-details-marker { display: none; }
+.phone-pair[open] > summary { color: var(--mc-yellow); }
+.phone-pair > :not(summary) { margin-top: calc(2 * var(--u)); }
+.phone-pair p { margin: calc(2 * var(--u)) 0; }
+.phone-pair small { display: block; color: var(--mc-gray); font-size: calc(var(--px) * 6px); line-height: 1.4; }
+.phone-pair a { color: var(--mc-white); }
+.phone-pair .motion-buttons {
+  display: grid; grid-template-columns: 1fr 1fr; gap: calc(4 * var(--u)) calc(10 * var(--u));
+  margin: calc(4 * var(--u)) 0;
+}
+.phone-pair .motion-buttons > * { width: 100%; height: calc(20 * var(--u)); margin: 0; }
+.phone-pair [data-role=pair-code] {
   display: block; text-align: center;
   font-size: calc(var(--px) * 12px); font-weight: normal; letter-spacing: calc(1 * var(--u));
   user-select: all;
 }
-#camera-controls [data-role=pair-code]:empty { display: none; }
-#camera-controls [data-role=pair-link] { display: block; overflow-wrap: anywhere; font-size: calc(var(--px) * 6px); }
-#camera-controls [data-role=pair-qr] {
+.phone-pair [data-role=pair-code]:empty { display: none; }
+.phone-pair [data-role=pair-link] { display: block; overflow-wrap: anywhere; font-size: calc(var(--px) * 6px); }
+.phone-pair [data-role=pair-qr] {
   display: block; width: calc(120 * var(--u)); max-width: 100%; height: auto; margin: calc(2 * var(--u)) auto;
   image-rendering: pixelated;
   border-style: solid; border-width: var(--u);
   border-color: var(--slot-dark) var(--gui-lit) var(--gui-lit) var(--slot-dark);
 }
-#camera-controls [data-role=pair-qr][hidden] { display: none; }
-#camera-controls label.motion-field { display: block; }
-#camera-controls .motion-field .mc-text { margin-top: var(--u); }
+.phone-pair [data-role=pair-qr][hidden] { display: none; }
+.phone-pair label.motion-field { display: block; }
+.phone-pair .motion-field .mc-text { margin-top: var(--u); }
+/* On the light join panel the chat colours are unreadable — the same ink
+   switch the companion page makes inside its own panel. */
+.mc-panel .phone-pair { color: var(--ink); }
+.mc-panel .phone-pair small { color: #7f7f7f; }
+.mc-panel .phone-pair a { color: var(--ink); }
+/* The join screen's controller column is too narrow for two buttons a row,
+   and its flex gap already spaces the block from the rows around it. */
+#join-controls .phone-pair { margin-top: 0; }
+#join-controls .phone-pair .motion-buttons { grid-template-columns: 1fr; gap: calc(2 * var(--u)); }
 
 /* --- the camera feed in the HUD --------------------------------------------- */
 /* Left of the minimap, in its translucent frame: 64px tall, a 4:3 frame wide. */

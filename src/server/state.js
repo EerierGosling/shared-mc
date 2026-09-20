@@ -41,19 +41,23 @@ function eyeInWater (bot) {
 // mineflayer 4.39 sets bot.oxygenLevel from *every* entity_metadata packet
 // carrying air_supply, not only the bot's own, so a player or squid drowning
 // nearby overwrote it. Read the bot entity's own metadata instead, which
-// mineflayer keeps per entity.
+// mineflayer keeps per entity. The metadata index is fixed for a given
+// registry, so it is resolved once per bot rather than per tick.
 const MAX_AIR = 300
-function airSupply (bot) {
+function airIndex (bot) {
   const keys = bot.registry && bot.registry.entitiesByName.player
     ? bot.registry.entitiesByName.player.metadataKeys
     : null
-  const idx = keys ? keys.indexOf('air_supply') : 1
+  return keys ? keys.indexOf('air_supply') : 1
+}
+function airSupply (bot, idx) {
   const value = bot.entity.metadata ? bot.entity.metadata[idx] : undefined
   return Number.isFinite(value) ? value : MAX_AIR
 }
 
+const FACTORS = [1, 10, 100, 1000, 10000]
 const round = (n, places = 2) => {
-  const factor = Math.pow(10, places)
+  const factor = FACTORS[places] || Math.pow(10, places)
   return Math.round(n * factor) / factor
 }
 
@@ -70,6 +74,10 @@ class StatePusher {
     this.timer = null
     this.lastSerialized = null
     this.listeners = []
+    this.airIndex = 1
+    this.cursor = null // { key, targetBlock, placeTarget } last computed
+    this.worldDirty = true // a block changed since the cursor last raycast
+    this.sortedPlayers = null // cached while the tab list membership holds
   }
 
   // Chat and death lines used to be relayed from here; chat.js and respawn.js
@@ -77,6 +85,17 @@ class StatePusher {
   setBot (bot) {
     this.clearBot()
     this.bot = bot
+    this.airIndex = airIndex(bot)
+    // The cursor raycast is only redone once the world has actually changed:
+    // same aim over the same blocks hits the same block. A busy area just
+    // degrades to computing every tick, as before.
+    this._listen(bot, 'blockUpdate', () => { this.worldDirty = true })
+    this._listen(bot, 'chunkColumnLoad', () => { this.worldDirty = true })
+    this._listen(bot, 'chunkColumnUnload', () => { this.worldDirty = true })
+    // The tab list is re-sorted on membership changes only; ping updates
+    // arrive far more often and never reorder it.
+    this._listen(bot, 'playerJoined', () => { this.sortedPlayers = null })
+    this._listen(bot, 'playerLeft', () => { this.sortedPlayers = null })
   }
 
   clearBot () {
@@ -84,6 +103,10 @@ class StatePusher {
     this.listeners = []
     this.bot = null
     this.lastSerialized = null
+    this.airIndex = 1
+    this.cursor = null
+    this.worldDirty = true
+    this.sortedPlayers = null
   }
 
   _listen (emitter, event, fn) {
@@ -111,13 +134,25 @@ class StatePusher {
     this.socket.emit('state', snapshot)
   }
 
-  snapshot () {
-    const bot = this.bot
-    if (!bot || !bot.entity) return null
-
-    const hotbar = []
-    const slots = (bot.inventory && bot.inventory.slots) || []
-    for (let i = 0; i < 9; i++) hotbar.push(describeItem(slots[36 + i]))
+  /**
+   * What the crosshair is over and what a right-click would place. The
+   * raycast, the diggable check and the placement prediction are all
+   * deterministic given the bot's pose, its held item and an unchanged
+   * world, so the answer is reused until one of those moves. The snapshot
+   * rounds position to two decimals anyway, so the key may as well.
+   */
+  _cursor (bot) {
+    const p = bot.entity.position
+    const held = bot.heldItem
+    const key = [
+      round(p.x, 3), round(p.y, 3), round(p.z, 3),
+      round(bot.entity.yaw, 4), round(bot.entity.pitch, 4),
+      bot.entity.eyeHeight || 1.62,
+      bot.quickBarSlot,
+      held ? held.name : ''
+    ].join('|')
+    if (this.cursor && this.cursor.key === key && !this.worldDirty) return this.cursor
+    this.worldDirty = false
 
     let targetBlock = null
     let placeTarget = null
@@ -138,6 +173,39 @@ class StatePusher {
         placeTarget = null
       }
     }
+    this.cursor = { key, targetBlock, placeTarget }
+    return this.cursor
+  }
+
+  /**
+   * The Tab list: everyone the server reports, not just this site's visitors.
+   * Capped like vanilla's own overlay, and sorted so a ping tick does not
+   * reorder it. Membership only changes on playerJoined/playerLeft, which
+   * null the cache; a codepoint compare is fine for ASCII usernames and much
+   * cheaper than localeCompare.
+   */
+  _playerList (bot) {
+    if (!this.sortedPlayers) {
+      this.sortedPlayers = Object.values(bot.players || {})
+        .filter(p => p && p.username)
+        .sort((a, b) => a.username < b.username ? -1 : a.username > b.username ? 1 : 0)
+        .slice(0, MAX_LISTED_PLAYERS)
+    }
+    // Pings change under the same membership, so the payload is still mapped
+    // fresh each tick.
+    return this.sortedPlayers
+      .map(p => ({ username: p.username, ping: Number.isFinite(p.ping) ? p.ping : null }))
+  }
+
+  snapshot () {
+    const bot = this.bot
+    if (!bot || !bot.entity) return null
+
+    const hotbar = []
+    const slots = (bot.inventory && bot.inventory.slots) || []
+    for (let i = 0; i < 9; i++) hotbar.push(describeItem(slots[36 + i]))
+
+    const { targetBlock, placeTarget } = this._cursor(bot)
 
     return {
       username: bot.username,
@@ -145,7 +213,7 @@ class StatePusher {
       health: round(bot.health || 0, 1),
       food: bot.food,
       // 0-20, the 300-tick air supply scaled down by 15 like bot.oxygenLevel.
-      oxygen: Math.round(airSupply(bot) / 15),
+      oxygen: Math.round(airSupply(bot, this.airIndex) / 15),
       eyeInWater: eyeInWater(bot),
       xpLevel: bot.experience ? bot.experience.level : 0,
       xpProgress: bot.experience ? round(bot.experience.progress || 0, 3) : 0,
@@ -171,21 +239,12 @@ class StatePusher {
       gameMode: bot.game ? bot.game.gameMode : null,
       dimension: bot.game ? bot.game.dimension : null,
       playerCount: Object.keys(bot.players || {}).length,
-      players: playerList(bot)
+      players: this._playerList(bot)
     }
   }
 }
 
-// The Tab list: everyone the server reports, not just this site's visitors.
-// Capped like vanilla's own overlay, and sorted so a ping tick does not
-// reorder it.
+// The Tab list is capped like vanilla's own overlay.
 const MAX_LISTED_PLAYERS = 80
-function playerList (bot) {
-  return Object.values(bot.players || {})
-    .filter(p => p && p.username)
-    .sort((a, b) => a.username.localeCompare(b.username))
-    .slice(0, MAX_LISTED_PLAYERS)
-    .map(p => ({ username: p.username, ping: Number.isFinite(p.ping) ? p.ping : null }))
-}
 
 module.exports = StatePusher

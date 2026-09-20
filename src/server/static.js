@@ -54,7 +54,13 @@ function precompressed (dir, options = {}) {
   const fallback = express.static(dir, options)
   return (req, res, next) => {
     if (req.method !== 'GET' && req.method !== 'HEAD') return fallback(req, res, next)
-    const rel = decodeURIComponent(req.path)
+    // Malformed %-encoding must not throw inside middleware.
+    let rel
+    try {
+      rel = decodeURIComponent(req.path)
+    } catch (err) {
+      return fallback(req, res, next)
+    }
     const ext = path.extname(rel)
     if (!COMPRESSIBLE.has(ext)) return fallback(req, res, next)
     const file = path.join(dir, rel)
@@ -63,16 +69,25 @@ function precompressed (dir, options = {}) {
     const candidates = []
     if (/\bbr\b/.test(accepts)) candidates.push(['br', file + '.br'])
     if (/\bgzip\b/.test(accepts)) candidates.push(['gzip', file + '.gz'])
-    for (const [encoding, candidate] of candidates) {
-      if (!fs.existsSync(candidate)) continue
+    // sendFile stats the file anyway, so probe by sending rather than with a
+    // separate existsSync per candidate per request; a miss just moves to the
+    // next encoding or to the plain file.
+    const attempt = i => {
+      if (i >= candidates.length) {
+        res.removeHeader('Content-Encoding')
+        return fallback(req, res, next)
+      }
+      const [encoding, candidate] = candidates[i]
       res.set('Content-Type', TYPES[ext])
       res.set('Content-Encoding', encoding)
       res.set('Vary', 'Accept-Encoding')
-      return res.sendFile(candidate, { maxAge: options.maxAge, immutable: options.immutable }, err => {
-        if (err) next(err)
+      res.sendFile(candidate, { maxAge: options.maxAge, immutable: options.immutable }, err => {
+        if (!err) return
+        if (res.headersSent) return next(err)
+        attempt(i + 1)
       })
     }
-    fallback(req, res, next)
+    attempt(0)
   }
 }
 

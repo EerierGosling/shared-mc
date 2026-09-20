@@ -916,7 +916,10 @@
         <div id="join-controls">
           <p class="section-label join-label">Controller</p>
           <a id="join-controller" class="mode-row" href="/controller" aria-describedby="join-controller-hint"><span><b>Use this device as a controller</b></span></a>
-          <small id="join-controller-hint">Pair with a game on another screen using its pairing code. No extra player needed. Motion controls for this screen are in the game menu.</small>
+          <!-- phone-pairing.js fills this with the QR pairing block, so a phone
+               can be connected before the game is even joined. -->
+          <div id="join-phone"></div>
+          <small id="join-controller-hint">Connect a phone to mine for this screen, or use this device as a controller for a game on another screen. Pairing never creates another player.</small>
         </div>
       </section>
       <section id="join-right">

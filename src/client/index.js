@@ -20,6 +20,7 @@ const { createSky, applySkyForTime, setSubmerged, updateWaterFog } = require('./
 const { Entities } = require('./entities')
 const { Hand } = require('./hand')
 const { JoinScreen } = require('./join')
+const { PhoneLink, buildPairingUI } = require('./phone-pairing')
 const PauseMenu = require('./pause')
 const SkinPainter = require('./skins')
 const icons = require('./icons')
@@ -34,6 +35,24 @@ const viewer = new Viewer(renderer)
 // same real mob models but falls back to a body+head shape instead of a flat
 // box for the mobs prismarine-viewer never got geometry for (see entities.js).
 viewer.entities = new Entities(viewer.scene, () => Object.values(viewer.world.sectionMeshs))
+// Upstream's setFirstPersonCamera starts a new TWEEN per position packet —
+// twenty tween allocations a second on a moving bot, the same churn
+// entities.js dropped TWEEN for. Same fix here: a retargeted lerp stepped
+// from the render loop, over the same 50ms window.
+const CAMERA_SMOOTH_MS = 50
+const camLerp = { at: 0 }
+viewer.setFirstPersonCamera = (pos, yaw, pitch) => {
+  if (pos) {
+    camLerp.x0 = viewer.camera.position.x
+    camLerp.y0 = viewer.camera.position.y
+    camLerp.z0 = viewer.camera.position.z
+    camLerp.x1 = pos.x
+    camLerp.y1 = pos.y + viewer.playerHeight - (viewer.isSneaking ? 0.3 : 0)
+    camLerp.z1 = pos.z
+    camLerp.at = performance.now()
+  }
+  viewer.camera.rotation.set(pitch, yaw, 0, 'ZYX')
+}
 // Debug hook: lets a devtools console or a headless probe poke the scene.
 window.__viewer = viewer
 // Websocket first: the default polling-then-upgrade dance never completes
@@ -74,6 +93,15 @@ const join = new JoinScreen(socket, identity => {
   pause.setServer(identity.server)
 })
 
+// A phone can pair from the join screen: the code is minted on this socket
+// before login and stays valid through it, so the phone is connected by the
+// time the game starts. Motion Controls renders the same link in game.
+const phoneLink = new PhoneLink(socket)
+document.getElementById('join-phone').append(buildPairingUI(phoneLink, {
+  title: 'Connect a phone',
+  pairedNote: 'Phone paired. Join the game, then enable player control under Motion Controls in the game menu.'
+}))
+
 // Escape's game menu. Quitting is a reload: the socket drops, the server
 // tears the session down (or just this rider, in a road trip), and the page
 // comes back at the join screen.
@@ -84,7 +112,7 @@ const pause = new PauseMenu({
   onAdvancements: () => advancementsUI.open()
 })
 
-const input = setupInput({ socket, viewer, camera, hud, inventoryUI, advancementsUI, canvas, hand, join, creative, placePrediction, pause })
+const input = setupInput({ socket, viewer, camera, hud, inventoryUI, advancementsUI, canvas, hand, join, creative, placePrediction, pause, phoneLink })
 
 const highlight = new THREE.LineSegments(
   new THREE.EdgesGeometry(new THREE.BoxGeometry(1.002, 1.002, 1.002)),
@@ -262,6 +290,15 @@ function animate () {
   const dt = (now - lastFrameTime) / 1000
   lastFrameTime = now
   viewer.update()
+  if (camLerp.at) {
+    const t = Math.min(1, (now - camLerp.at) / CAMERA_SMOOTH_MS)
+    viewer.camera.position.set(
+      camLerp.x0 + (camLerp.x1 - camLerp.x0) * t,
+      camLerp.y0 + (camLerp.y1 - camLerp.y0) * t,
+      camLerp.z0 + (camLerp.z1 - camLerp.z0) * t
+    )
+    if (t === 1) camLerp.at = 0
+  }
   breaking.update()
   particles.update(dt, renderer)
   viewer.entities.animate(dt)

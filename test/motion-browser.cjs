@@ -57,33 +57,27 @@ async function main () {
     assert.equal(new URL(host.url()).pathname, '/controller')
     assert.equal(joined.size, 0, 'Opening the controller does not join a player')
     await host.getByRole('link', { name: 'Back to game' }).click()
-    await host.getByRole('button', { name: /Collaborative/ }).click()
-    await host.locator('#join-button').click()
-    await host.waitForFunction(() => document.getElementById('join').classList.contains('open') === false)
-    assert.equal(await host.locator('#camera-controls').isVisible(), false, 'Joining does not open motion controls')
-    // The game menu is the only way in; Escape needs pointer lock, so press its button directly.
-    await host.evaluate(() => document.getElementById('pause-motion').click())
-    await host.locator('#camera-controls').waitFor({ state: 'visible' })
-    assert.match(await host.locator('[data-role=mode]').textContent(), /Practice mode/)
-    // Opening the pairing section generates a code by itself.
-    await host.locator('[data-role=pairing] > summary').click()
-    await host.locator('[data-role=pair-qr]').waitFor({ state: 'visible' })
+    // The phone can be paired on the join screen, before any mode is picked:
+    // the code is minted on the same socket that goes on to join.
+    await host.locator('#join-controls [data-role=pairing] > summary').click()
+    await host.locator('#join-controls [data-role=pair-qr]').waitFor({ state: 'visible' })
     // Explicit generation must also reveal and focus the QR, even if the
     // section is collapsed while the request is pending.
-    await host.locator('[data-role=pairing]').evaluate(section => {
+    await host.locator('#join-controls [data-role=pairing]').evaluate(section => {
       section.querySelector('[data-action=pair]').click()
       section.open = false
     })
     await host.waitForFunction(() => {
-      const qr = document.querySelector('[data-role=pair-qr]')
-      return document.querySelector('[data-role=pairing]').open && !qr.hidden && document.activeElement === qr && !document.querySelector('[data-action=pair]').disabled
+      const section = document.querySelector('#join-controls [data-role=pairing]')
+      const qr = section.querySelector('[data-role=pair-qr]')
+      return section.open && !qr.hidden && document.activeElement === qr && !section.querySelector('[data-action=pair]').disabled
     })
-    const code = await host.locator('[data-role=pair-code]').textContent()
+    const code = await host.locator('#join-controls [data-role=pair-code]').textContent()
     assert.match(code, /^[A-HJ-NP-Z2-9]{6}$/)
-    const link = await host.locator('[data-role=pair-link]').getAttribute('href')
+    const link = await host.locator('#join-controls [data-role=pair-link]').getAttribute('href')
     assert.equal(new URL(link).hash, `#${code}`)
     assert.equal(new URL(link).pathname, '/p')
-    assert.ok(await host.locator('[data-role=pair-qr]').evaluate(canvas => canvas.width >= 240 && canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data.some((value, i) => i % 4 !== 3 && value === 0)))
+    assert.ok(await host.locator('#join-controls [data-role=pair-qr]').evaluate(canvas => canvas.width >= 240 && canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data.some((value, i) => i % 4 !== 3 && value === 0)))
     await host.screenshot({ path: '/private/tmp/shared-mc-pairing.png' })
 
     const phoneContext = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true })
@@ -94,8 +88,19 @@ async function main () {
     await phone.locator('#camera-controls').waitFor({ state: 'visible' })
     assert.equal(await phone.locator('video, [data-action=start], [data-action=calibrate], [data-setting=facial]').count(), 0, 'Phone offers only accelerometer controls')
     assert.equal(await phone.locator('[data-setting]').count(), 2, 'Phone exposes only mining sensitivity and hold')
-    await host.locator('[data-role=pair-qr]').waitFor({ state: 'hidden' })
-    assert.match(await host.locator('[data-role=pair-status]').textContent(), /Phone paired/)
+    await host.locator('#join-controls [data-role=pair-qr]').waitFor({ state: 'hidden' })
+    assert.match(await host.locator('#join-controls [data-role=pair-status]').textContent(), /Phone paired/)
+    await host.getByRole('button', { name: /Collaborative/ }).click()
+    await host.locator('#join-button').click()
+    await host.waitForFunction(() => document.getElementById('join').classList.contains('open') === false)
+    assert.equal(await host.locator('#camera-controls').isVisible(), false, 'Joining does not open motion controls')
+    // The game menu is the only way in; Escape needs pointer lock, so press its button directly.
+    await host.evaluate(() => document.getElementById('pause-motion').click())
+    await host.locator('#camera-controls').waitFor({ state: 'visible' })
+    assert.match(await host.locator('[data-role=mode]').textContent(), /Practice mode/)
+    // The pairing made on the join screen is the same one shown in game.
+    await host.locator('#camera-controls [data-role=pairing]').evaluate(section => { section.open = true })
+    assert.match(await host.locator('#camera-controls [data-role=pair-status]').textContent(), /Phone paired/)
     await host.locator('[data-action=arm]').click()
     await phone.locator('[data-action=motion]').click()
     assert.match(await phone.locator('[data-role=mode]').textContent(), /Player control enabled/)
@@ -148,7 +153,7 @@ async function main () {
     assert.equal(await phone.evaluate(() => JSON.parse(localStorage.getItem('motion-settings-v1')).phoneThreshold), 1.2)
     await phone.screenshot({ path: '/private/tmp/shared-mc-phone.png', fullPage: true })
     await phone.locator('#pair-disconnect').click()
-    await host.waitForFunction(() => document.querySelector('[data-role=pair-status]').textContent.includes('disconnected'))
+    await host.waitForFunction(() => document.querySelector('#camera-controls [data-role=pair-status]').textContent.includes('disconnected'))
 
     // Exercise the camera pipeline using deterministic landmark output. This
     // validates calibration and cleanup; hardware/model accuracy is separate.

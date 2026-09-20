@@ -16,6 +16,15 @@ const POSITION_MS = 50
 // pace WorldView paces its own initial load.
 const CATCH_UP_SLICE = 5
 
+// Position and angle fields go on the wire at 20 Hz per session. JSON prints
+// doubles at up to 17 digits, and nothing past a millimetre or a twentieth of
+// a degree is visible to anyone, so the frequent packets carry three
+// decimals — roughly a third fewer bytes on the busiest messages.
+const round3 = n => Math.round(n * 1000) / 1000
+// payload.pos is the entity's live Vec3; copy rather than round in place,
+// which would corrupt the server-side entity state it belongs to.
+const roundedPos = p => ({ x: round3(p.x), y: round3(p.y), z: round3(p.z) })
+
 /**
  * The emitter WorldView writes to. Everything passes straight through to the
  * session except 'entity', which WorldView fires once per entityMoved: on a
@@ -36,6 +45,9 @@ function createStreamEmitter (target) {
       counters.chunkBytes += payload.chunk.length
     }
     if (event !== 'entity') return target.emit(event, payload)
+    if (payload.pos) payload.pos = roundedPos(payload.pos)
+    if (payload.yaw !== undefined) payload.yaw = round3(payload.yaw)
+    if (payload.pitch !== undefined) payload.pitch = round3(payload.pitch)
     const current = pending.get(payload.id)
     // A spawn or a removal starts a fresh record, so a delete followed by a
     // respawn of the same id keeps its order; plain moves fold into it.
@@ -66,7 +78,7 @@ function createStreamEmitter (target) {
 const columnKey = (x, z) => `${x},${z}`
 
 function entitySpawn (e) {
-  const record = { id: e.id, name: e.name, pos: e.position, width: e.width, height: e.height, username: e.username }
+  const record = { id: e.id, name: e.name, pos: roundedPos(e.position), width: e.width, height: e.height, username: e.username }
   if (e.name === 'item') {
     try {
       const item = e.getDroppedItem && e.getDroppedItem()
@@ -180,9 +192,9 @@ function attachWorldView (bot, target, viewDistance) {
   bot.on('itemDrop', sendDroppedItem)
 
   const positionPacket = () => ({
-    pos: bot.entity.position,
-    yaw: bot.entity.yaw,
-    pitch: bot.entity.pitch,
+    pos: roundedPos(bot.entity.position),
+    yaw: round3(bot.entity.yaw),
+    pitch: round3(bot.entity.pitch),
     addMesh: true
   })
   const sendPosition = () => {

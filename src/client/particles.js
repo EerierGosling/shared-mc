@@ -21,6 +21,10 @@ const FACE_OFFSETS = [[0, -1, 0], [0, 1, 0], [0, 0, -1], [0, 0, 1], [-1, 0, 0], 
 const GRASS_TINT = [145 / 255, 189 / 255, 89 / 255]
 const FOLIAGE_TINT = [119 / 255, 171 / 255, 47 / 255]
 
+// Scratch for the per-frame point-size uniform, which otherwise allocated a
+// Vector2 every frame.
+const _size = new THREE.Vector2()
+
 const VERTEX = `
 attribute vec4 uvRect;
 attribute float size;
@@ -66,6 +70,10 @@ class BlockParticles {
     this.viewer = viewer
     this.live = []
     this.accumulator = 0
+    // block name -> its particle texture rect; finding one walks the whole
+    // resolved model (every element, every face), so it is done once per
+    // name rather than per chip.
+    this.textures = new Map()
 
     const geometry = new THREE.BufferGeometry()
     this.positions = new Float32Array(CAPACITY * 3)
@@ -142,6 +150,16 @@ class BlockParticles {
   }
 
   _texture (name) {
+    const cached = this.textures.get(name)
+    if (cached !== undefined) return cached
+    const texture = this._findTexture(name)
+    // Only cache once the block models have loaded: a null before then is
+    // "not yet", not "none", and must not be remembered.
+    if (texture || icons.blockState(name)) this.textures.set(name, texture)
+    return texture
+  }
+
+  _findTexture (name) {
     const state = icons.blockState(name)
     if (!state) return null
     let entry = null
@@ -246,7 +264,7 @@ class BlockParticles {
     if (this.material.uniforms.map.value !== worldMap) this.material.uniforms.map.value = worldMap
     // Pixels per block at unit depth: the point size is world-sized.
     const camera = viewer.camera
-    const height = renderer.getSize(new THREE.Vector2()).y * renderer.getPixelRatio()
+    const height = renderer.getSize(_size).y * renderer.getPixelRatio()
     this.material.uniforms.scale.value = height / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2))
     // Vanilla draws chips at 0.6 of full light; follow the sky so they do not
     // glow at night. The world's Lambert gets ambient plus a sun term.
