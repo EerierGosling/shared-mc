@@ -77,7 +77,7 @@ expressions on some cameras.
 Recommended hybrid setup: mount the computer camera for head/arm/body input;
 use the phone for mining: hold it upright with the screen facing you, pause
 briefly, then thrust forward. Camera knee lifts still control walking. On the
-phone, turn on **Phone Mining** (no camera required) and allow motion permission
+phone, tap **Start Mining** (no camera required) and allow motion permission
 if prompted. This enables phone input; enable player control on the game screen
 when ready. The live measurements show acceleration and warn if no samples
 arrive. Mining requires a forward thrust followed by braking; sideways shakes
@@ -86,15 +86,11 @@ through brief pauses between strokes. Resting for about 350 ms stops mining.
 There is a gravity-filter fallback for devices that only report acceleration
 including gravity.
 
-Alternatively, mount the phone to use its camera as the sole tracker and leave
-accelerometer mining off. A phone moving with your body is a poor stationary
-camera: do not expect simultaneous handheld full-body camera tracking and
-accelerometer mining to be reliable.
+The game menu has two tracking options: **Camera** for body tracking and
+**Phone** for QR pairing. The phone controller uses only accelerometer mining;
+it has Start/Pause, Stop, and mining sensitivity controls, with no camera setup.
+Camera walking and phone mining can run together.
 
-The desktop merges camera and phone actions. Phone acceleration only mines;
-camera gestures can walk, jump, and mine. When both cameras track gestures,
-releasing one source does not cancel the other. Head look from both sources
-adds together, so normally use just one camera for steering.
 The receiving game browser's look-speed slider controls final turn speed.
 
 ## Tune sensitivity

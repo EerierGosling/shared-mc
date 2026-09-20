@@ -1,6 +1,6 @@
 'use strict'
 const io = require('socket.io-client')
-const setupCameraControls = require('./camera-controls')
+const setupPhoneControls = require('./phone-controls')
 const socket = io({ transports: ['websocket', 'polling'] })
 const status = document.getElementById('pair-status')
 const code = document.getElementById('pair-code')
@@ -29,12 +29,11 @@ function releaseWake () {
   wakeLock?.release().catch(() => {})
   wakeLock = null
 }
-const controls = setupCameraControls({
-  companion: true,
-  socket,
+const controls = setupPhoneControls({
   mount: document.getElementById('motion-mount'),
   canPlay: () => paired && socket.connected,
   onStart: () => { if (paired) keepAwake() },
+  onStop: releaseWake,
   apply: state => {
     if (paired && socket.connected) socket.volatile.emit('motion:state', state)
   }
@@ -59,7 +58,7 @@ function pair () {
     }
     paired = true
     code.value = ''
-    status.textContent = 'Paired. Tap Phone Mining to allow motion access and start tracking. Enable Player Control on the game screen when ready.'
+    status.textContent = 'Paired. Tap Start Mining to allow motion access and start tracking. Enable Player Control on the game screen when ready.'
     disconnect.hidden = false
     show.hidden = false
     controls.show()
