@@ -38,7 +38,12 @@ class MotionPairing {
       if (typeof reply !== 'function') return
       if (!allowed() || !this.isPlayer(socket.id)) return reply({ error: 'Join the game first, or wait a second and retry.' })
       this.remove(socket)
-      const code = randomBytes(6).toString('hex').toUpperCase()
+      // Six readable characters; omit ambiguous I, O, 0 and 1.
+      const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
+      let code
+      do {
+        code = Array.from(randomBytes(6), byte => alphabet[byte % alphabet.length]).join('')
+      } while (this.codes.has(code))
       const entry = { host: socket, code, expires: this.now() + 300000, phone: null, last: 0, released: true, lastPacket: -Infinity }
       this.hosts.set(socket.id, entry)
       this.codes.set(code, entry)

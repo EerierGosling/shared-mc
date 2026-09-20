@@ -22,7 +22,7 @@ async function main () {
   const bundle = prefix => fs.readdirSync(path.join(root, 'dist')).find(name => new RegExp(`^${prefix}\\.[a-f0-9]+\\.js$`).test(name)) || `${prefix}.js`
   app.get('/', (req, res) => res.type('html').send(fs.readFileSync(path.join(root, 'src/client/index.html'), 'utf8')
     .replace('/dist/bundle.js', `/dist/${bundle('bundle')}`)))
-  app.get('/controller', (req, res) => res.type('html').send(fs.readFileSync(path.join(root, 'src/client/controller.html'), 'utf8')
+  app.get(['/controller', '/p'], (req, res) => res.type('html').send(fs.readFileSync(path.join(root, 'src/client/controller.html'), 'utf8')
     .replace('/dist/controller.js', `/dist/${bundle('controller')}`)))
   app.get('/motion.css', (req, res) => res.sendFile(path.join(root, 'src/client/motion.css')))
   app.use('/dist', express.static(path.join(root, 'dist')))
@@ -66,9 +66,10 @@ async function main () {
     assert.match(await host.locator('[data-role=mode]').textContent(), /Practice mode/)
     await host.locator('[data-role=pair-qr]').waitFor({ state: 'visible' })
     const code = await host.locator('[data-role=pair-code]').textContent()
-    assert.match(code, /^[A-F0-9]{12}$/)
+    assert.match(code, /^[A-HJ-NP-Z2-9]{6}$/)
     const link = await host.locator('[data-role=pair-link]').getAttribute('href')
     assert.equal(new URL(link).hash, `#${code}`)
+    assert.equal(new URL(link).pathname, '/p')
     assert.ok(await host.locator('[data-role=pair-qr]').evaluate(canvas => canvas.width >= 240 && canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data.some((value, i) => i % 4 !== 3 && value === 0)))
     await host.screenshot({ path: '/private/tmp/shared-mc-pairing.png' })
 
@@ -161,14 +162,14 @@ async function main () {
     await host.locator('[data-role=pairing] > summary').click()
     await host.locator('[data-role=pair-qr]').waitFor({ state: 'visible', timeout: 7000 })
     const manualCode = await host.locator('[data-role=pair-code]').textContent()
-    assert.match(manualCode, /^[A-F0-9]{12}$/)
+    assert.match(manualCode, /^[A-HJ-NP-Z2-9]{6}$/)
     await host.locator('[data-action=pair]').click()
     await host.waitForFunction(previous => {
       const code = document.querySelector('[data-role=pair-code]').textContent
       return code && code !== previous && !document.querySelector('[data-role=pair-qr]').hidden
     }, manualCode)
     assert.ok(!(await host.locator('[data-role=pair-status]').textContent()).includes('retry'))
-    assert.match(await host.locator('[data-role=pair-code]').textContent(), /^[A-F0-9]{12}$/)
+    assert.match(await host.locator('[data-role=pair-code]').textContent(), /^[A-HJ-NP-Z2-9]{6}$/)
     assert.deepEqual(errors, [])
     console.log('Browser checks passed: opening selection, QR generation, pairing, phone mining without walking, stop/unpair, saved settings, calibration and camera cleanup.')
   } finally {

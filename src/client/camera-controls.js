@@ -337,7 +337,7 @@ module.exports = function setupCameraControls ({ apply, canPlay, onStart, socket
       if (!socket.connected) { pairStatus.textContent = 'Connect to the game first.'; return }
       let link
       try {
-        link = new URL('/controller', $('[data-role=pair-origin]').value)
+        link = new URL('/p', $('[data-role=pair-origin]').value)
         if (!['https:', 'http:'].includes(link.protocol) || link.username || link.password) throw new Error('address')
       } catch { pairStatus.textContent = 'Enter a valid HTTPS address for this game server.'; return }
       pairButton.disabled = true
@@ -353,7 +353,7 @@ module.exports = function setupCameraControls ({ apply, canPlay, onStart, socket
       }
       lastPairRequest = performance.now()
       socket.timeout(5000).emit('motion:create', async (error, result) => {
-        if (error || result?.error || !/^[A-F0-9]{12}$/.test(result?.code || '')) {
+        if (error || result?.error || !/^(?:[A-HJ-NP-Z2-9]{6}|[A-F0-9]{12})$/.test(result?.code || '')) {
           pairButton.disabled = false
           pairStatus.textContent = result?.error || 'Pairing request failed or timed out. Retry.'
           pairStatus.scrollIntoView({ block: 'nearest' })
@@ -362,7 +362,7 @@ module.exports = function setupCameraControls ({ apply, canPlay, onStart, socket
         $('[data-role=pair-code]').textContent = result.code
         link.hash = result.code
         const anchor = $('[data-role=pair-link]')
-        anchor.href = link.href; anchor.textContent = link.href
+        anchor.href = link.href; anchor.textContent = 'Open phone controller'
         pairStatus.textContent = 'Scan the QR code, enter the code, or open the link on your phone. Expires in five minutes.'
         if (link.protocol !== 'https:' || ['localhost', '127.0.0.1', '[::1]'].includes(link.hostname)) pairStatus.textContent += ' This address will not provide camera/motion access on a separate phone; use a phone-accessible HTTPS address.'
         const qr = $('[data-role=pair-qr]')

@@ -68,7 +68,7 @@ app.get(['/', '/index.html'], (req, res) => {
 })
 const controllerPage = fs.readFileSync(path.join(clientDir, 'controller.html'), 'utf8')
   .replace('/dist/controller.js', assets.controller)
-app.get('/controller', (req, res) => {
+app.get(['/controller', '/p'], (req, res) => {
   res.set('Content-Type', 'text/html; charset=utf-8')
   res.set('Cache-Control', 'no-cache')
   res.send(controllerPage)

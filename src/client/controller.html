@@ -13,7 +13,7 @@
     <p>On the game screen, open Motion controls → Pair a phone. Scan its QR code or enter the pairing code below.</p>
     <form id="pair-form">
       <label for="pair-code">Pairing code</label><br>
-      <input id="pair-code" type="text" maxlength="20" autocomplete="off" autocapitalize="characters" spellcheck="false" required pattern="[A-Fa-f0-9\s-]{12,20}" placeholder="12-character code">
+      <input id="pair-code" type="text" maxlength="20" autocomplete="off" autocapitalize="characters" spellcheck="false" required pattern="[A-Za-z0-9\s\-]{6,20}" placeholder="6-character code">
       <button id="pair-connect" type="submit">Connect to game</button>
     </form>
     <p id="pair-status" role="status">Connecting to the site…</p>

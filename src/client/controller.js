@@ -11,7 +11,7 @@ let paired = false
 let wakeLock = null
 let wakeGeneration = 0
 const hashCode = window.location.hash.slice(1)
-let autoPair = /^[a-f0-9]{12}$/i.test(hashCode)
+let autoPair = /^(?:[a-hj-np-z2-9]{6}|[a-f0-9]{12})$/i.test(hashCode)
 if (autoPair) code.value = hashCode.toUpperCase()
 // Keep the single-use token out of browser history after the page has read it.
 history.replaceState(null, '', window.location.pathname)

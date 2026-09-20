@@ -29,8 +29,8 @@ const packet = { forward: true, jump: true, digging: false, use: false, dx: 0.4,
 test('pairing sends controls only to the owning player, and consumes code', t => {
   const { manager, host, phone, other } = setup(t)
   const { code } = host.request('motion:create')
-  assert.match(code, /^[A-F0-9]{12}$/)
-  assert.deepEqual(phone.request('motion:pair', { code }), { ok: true })
+  assert.match(code, /^[A-HJ-NP-Z2-9]{6}$/)
+  assert.deepEqual(phone.request('motion:pair', { code: `${code.slice(0, 3)}-${code.slice(3)}`.toLowerCase() }), { ok: true })
   phone.receive('motion:state', packet)
   assert.deepEqual(host.sent.at(-1), { event: 'motion:state', payload: packet })
   assert.equal(other.sent.length, 0)
