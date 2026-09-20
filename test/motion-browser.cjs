@@ -4,6 +4,7 @@
 // Uses a local fake game session and synthetic camera/sensor data, never Minecraft.
 const assert = require('node:assert/strict')
 const path = require('node:path')
+const fs = require('node:fs')
 const http = require('node:http')
 const express = require('express')
 const { Server } = require('socket.io')
@@ -18,8 +19,11 @@ async function main () {
   const packets = []
   const pairing = new MotionPairing(id => joined.has(id))
   const root = path.resolve(__dirname, '..')
-  app.get('/', (req, res) => res.sendFile(path.join(root, 'src/client/index.html')))
-  app.get('/controller', (req, res) => res.sendFile(path.join(root, 'src/client/controller.html')))
+  const bundle = prefix => fs.readdirSync(path.join(root, 'dist')).find(name => new RegExp(`^${prefix}\\.[a-f0-9]+\\.js$`).test(name)) || `${prefix}.js`
+  app.get('/', (req, res) => res.type('html').send(fs.readFileSync(path.join(root, 'src/client/index.html'), 'utf8')
+    .replace('/dist/bundle.js', `/dist/${bundle('bundle')}`)))
+  app.get('/controller', (req, res) => res.type('html').send(fs.readFileSync(path.join(root, 'src/client/controller.html'), 'utf8')
+    .replace('/dist/controller.js', `/dist/${bundle('controller')}`)))
   app.get('/motion.css', (req, res) => res.sendFile(path.join(root, 'src/client/motion.css')))
   app.use('/dist', express.static(path.join(root, 'dist')))
   app.use('/fonts', express.static(path.join(root, 'src/client/fonts')))

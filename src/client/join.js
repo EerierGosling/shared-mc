@@ -115,6 +115,16 @@ class JoinScreen {
       this.renderedSkins = true
     }
     this.refreshHint()
+    // Why the last session ended, left by index.js before it reloaded the
+    // page; shown once, in the same slot a refused join uses.
+    if (this.notice === undefined) {
+      this.notice = null
+      try {
+        this.notice = window.sessionStorage.getItem('join:notice') || null
+        window.sessionStorage.removeItem('join:notice')
+      } catch (err) { /* no storage; nothing to show */ }
+      this.refreshHint()
+    }
   }
 
   renderModes () {
@@ -166,6 +176,7 @@ class JoinScreen {
 
   pick (mode) {
     this.mode = mode
+    this.notice = null
     this.renderModes()
     // Only your own bot needs a name and a face; the shared one already has both.
     this.identity.classList.toggle('open', mode === 'solo')
@@ -178,8 +189,10 @@ class JoinScreen {
   refreshHint () {
     if (!this.options) return
     if (!this.mode) {
-      this.error.textContent = 'Choose how you want to play.'
-      this.error.classList.remove('bad')
+      // Stays until a mode is picked, so a join:options refresh from someone
+      // else joining does not wipe it before it has been read.
+      this.error.textContent = this.notice || 'Choose how you want to play.'
+      this.error.classList.toggle('bad', Boolean(this.notice))
       this.button.disabled = true
       return
     }
