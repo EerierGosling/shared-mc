@@ -114,6 +114,8 @@ class StatePusher {
           position: { x: block.position.x, y: block.position.y, z: block.position.z },
           name: block.name,
           displayName: block.displayName,
+          // Which side the crosshair is on; the crack particles fly off it.
+          face: block.face,
           diggable: bot.canDigBlock(block)
         }
         placeTarget = predictPlacement(bot, block)

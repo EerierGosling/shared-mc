@@ -294,7 +294,8 @@ class Controller {
         // after the click, which reads as lag.
         let digMs = 1000
         try { digMs = this.bot.digTime(block) } catch (err) {}
-        this.emitter.emit('dig:start', { position: block.position, ms: digMs })
+        // The name picks the chip texture and the face is where they fly off.
+        this.emitter.emit('dig:start', { position: block.position, ms: digMs, name: block.name, face: block.face })
         // Vanilla resets the dig the moment the crosshair leaves the block;
         // mineflayer would finish the one it started, so a player sweeping
         // across a wall would break blocks they had already moved off. Abort
@@ -306,14 +307,18 @@ class Controller {
             this.bot.stopDigging()
           } catch (err) {}
         }, DIG_WATCH_MS)
+        let broken = false
         try {
           // 'ignore' keeps the bot's head where the browser pointed it.
           await this.bot.dig(block, 'ignore')
+          broken = true
         } catch (err) {
           await sleep(100)
         } finally {
           clearInterval(watcher)
-          this.emitter.emit('dig:stop')
+          // `broken` is what separates a finished dig from an interrupted
+          // one: only the former gets the burst of chips.
+          this.emitter.emit('dig:stop', { broken, position: block.position, name: block.name })
         }
       }
     } finally {

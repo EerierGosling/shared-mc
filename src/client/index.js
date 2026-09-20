@@ -12,6 +12,7 @@ const CreativeUI = require('./creative')
 const BlockLights = require('./lights')
 const Minimap = require('./minimap')
 const BreakingAnimation = require('./breaking')
+const BlockParticles = require('./particles')
 const PlacePrediction = require('./place')
 const setupInput = require('./input')
 const { createSky, applySkyForTime, setSubmerged, updateWaterFog } = require('./sky')
@@ -46,7 +47,8 @@ const inventoryUI = new InventoryUI(socket)
 const creative = new CreativeUI(socket)
 creative.onState = state => hud.setCreative(state)
 const minimap = new Minimap(viewer.entities)
-const breaking = new BreakingAnimation(viewer.scene)
+const particles = new BlockParticles(viewer)
+const breaking = new BreakingAnimation(viewer.scene, particles)
 const placePrediction = new PlacePrediction(viewer, socket)
 
 // First-person hand viewmodel: its own scene and lights, drawn over the world
@@ -156,7 +158,7 @@ socket.on('position', ({ pos, yaw, pitch }) => {
 })
 
 socket.on('dig:start', payload => breaking.start(payload))
-socket.on('dig:stop', () => breaking.stop())
+socket.on('dig:stop', payload => breaking.stop(payload))
 
 socket.on('state', state => {
   hud.setState(state)
@@ -176,6 +178,7 @@ socket.on('state', state => {
     const { x, y, z } = state.targetBlock.position
     highlight.position.set(x + 0.5, y + 0.5, z + 0.5)
     highlight.visible = true
+    breaking.setTarget(state.targetBlock)
   } else {
     highlight.visible = false
   }
@@ -216,6 +219,7 @@ function animate () {
   lastFrameTime = now
   viewer.update()
   breaking.update()
+  particles.update(dt, renderer)
   viewer.entities.animate(dt)
   minimap.setYaw(camera.yaw)
   // The minimap looks down from well above the water, so it takes its pass
