@@ -1,10 +1,17 @@
 'use strict'
-// First-person hand viewmodel. Just the right-arm cube from prismarine-viewer's
+// First-person hand viewmodel. The right-arm cube from prismarine-viewer's
 // bundled player model (viewer/lib/entity/entities.json, player.geometry.default
 // .bones.rightArm) — built as a standalone unskinned mesh rather than through
 // Entity.js/skinning, since all we want is one cube we can swing as a plain
 // pivot rotation. The face UV math below is copied from that file's addCube(),
 // which lays out Minecraft's classic six-face "cross" skin unwrap.
+//
+// There are two hands, but only one shows at rest: the familiar right hand,
+// holding the item and throwing the mining punch (swing()). The left is the
+// very same arm and rest pose reflected across the screen's centre by a parent
+// group scaled -1 on X (see the Hand constructor), and it stays hidden until a
+// block is placed — push() puts both hands out together for that one motion,
+// then the left retracts again.
 //
 // The mesh is parented directly to the camera, so its position/rotation are
 // always in camera-local space (-Z forward, +X right, +Y up) no matter how the
@@ -124,9 +131,26 @@ const ARM_BOTTOM = [
   -HAND_X * Math.sin(ARM_TWIST) + HAND_Z * Math.cos(ARM_TWIST)
 ]
 const SWING_ROTATION = [1.3, -0.1, -0.2]
-// 3x the original swing speed.
-const SWING_MS = 35
-const RETURN_MS = 65
+// One full strike-and-return every SWING_MS + RETURN_MS, which is how often
+// startSwinging()'s timer throws the next punch while mining is held. ~250 ms
+// (≈4/s) matches vanilla's mining cadence; a quick out, a slower ease back.
+// Cranking these down (an earlier pass ran the whole cycle in 100 ms) reads as
+// a frantic twitch rather than a swing.
+const SWING_MS = 100
+const RETURN_MS = 150
+
+// Placing is a two-handed jab toward the crosshair: the left hand (hidden the
+// rest of the time) is put out alongside the right for one forward thrust and
+// then retracts. The pivot moves in (toward screen centre), up a touch and
+// forward (-Z), with extra shoulder pitch to extend the forearm. It is authored
+// in the right hand's local space; the left mirrors it for free (its pivot lives
+// under a -1 X scale), so both hands converge symmetrically. The whole thrust
+// fits inside USE_REPEAT_MS (input.js, 200 ms) so hold-to-place reads as one
+// clean jab per block rather than the left hand flickering mid-motion.
+const PUSH_POSITION = [0.28, -0.36, -0.8]
+const PUSH_ROTATION = [REST_ROTATION[0] + 0.35, REST_ROTATION[1], REST_ROTATION[2]]
+const PUSH_MS = 75
+const PUSH_RETURN_MS = 120
 
 // The scene's directional light is fixed in world space (see index.js), so a
 // mesh lit by it goes flat or blows out depending purely on which way the
@@ -147,7 +171,12 @@ const RETURN_MS = 65
 // into a wall the player stands against, the way vanilla draws it.
 class Hand {
   constructor () {
-    const material = new THREE.MeshLambertMaterial({ transparent: true, alphaTest: 0.1 })
+    // DoubleSide is what lets the left arm show at all: it hangs under a group
+    // scaled -1 on X (this.mirror), which reverses its triangle winding, and
+    // with the default FrontSide every reflected face would be culled. Lambert
+    // flips the normal per-face for back-facing fragments, so the reflected arm
+    // still lights the right way.
+    const material = new THREE.MeshLambertMaterial({ transparent: true, alphaTest: 0.1, side: THREE.DoubleSide })
     new THREE.TextureLoader().load(TEXTURE_URL, texture => {
       texture.magFilter = THREE.NearestFilter
       texture.minFilter = THREE.NearestFilter
@@ -156,18 +185,39 @@ class Hand {
       material.needsUpdate = true
     })
 
-    const mesh = new THREE.Mesh(buildArmGeometry(), material)
-    mesh.rotation.y = ARM_TWIST
+    // One arm geometry and one material, shared by both hands.
+    const geometry = buildArmGeometry()
 
-    this.pivot = new THREE.Group()
-    this.pivot.position.set(...REST_POSITION)
-    this.pivot.rotation.set(...REST_ROTATION)
-    this.arm = mesh
-    this.pivot.scale.setScalar(SCALE)
-    this.pivot.add(mesh)
+    // Right (main) hand: holds the block and throws the mining punch.
+    this.right = new THREE.Mesh(geometry, material)
+    this.right.rotation.y = ARM_TWIST
+    this.rightPivot = new THREE.Group()
+    this.rightPivot.position.set(...REST_POSITION)
+    this.rightPivot.rotation.set(...REST_ROTATION)
+    this.rightPivot.scale.setScalar(SCALE)
+    this.rightPivot.add(this.right)
     this.item = new THREE.Group()
-    this.pivot.add(this.item)
+    this.rightPivot.add(this.item)
     this.itemName = null
+
+    // Left hand: the same arm and the same rest pose, reflected across the
+    // screen's vertical centre by a parent scaled -1 on X. Building it as a
+    // reflection — rather than as its own mirrored geometry and hand-derived
+    // Euler angles — is what makes the two-handed place cheap: any pose copied
+    // verbatim from the right pivot comes out symmetric for free (see push()).
+    this.left = new THREE.Mesh(geometry, material)
+    this.left.rotation.y = ARM_TWIST
+    this.leftPivot = new THREE.Group()
+    this.leftPivot.position.set(...REST_POSITION)
+    this.leftPivot.rotation.set(...REST_ROTATION)
+    this.leftPivot.scale.setScalar(SCALE)
+    this.leftPivot.add(this.left)
+    this.mirror = new THREE.Group()
+    this.mirror.scale.x = -1
+    this.mirror.add(this.leftPivot)
+    // The left hand is only put out for a placement (push()); the rest of the
+    // time the view is the familiar single right hand.
+    this.left.visible = false
 
     this.light = new THREE.DirectionalLight(0xffffff, 0.9)
     this.light.position.set(1, 1.5, 0.5)
@@ -181,17 +231,19 @@ class Hand {
     // forward, +X right, +Y up) exactly as if parented to the camera.
     this.root = new THREE.Group()
     this.root.matrixAutoUpdate = false
-    this.root.add(this.pivot, this.light, this.light.target, this.fill)
+    this.root.add(this.rightPivot, this.mirror, this.light, this.light.target, this.fill)
     this.scene = new THREE.Scene()
     this.scene.add(this.root)
 
+    this.shown = false
     this.swinging = false
-    this.repeatTimer = null
+    this.pushing = false
+    this.looping = false
   }
 
   /** Draw over the finished world frame. Assumes renderer.autoClear is off. */
   render (renderer, camera) {
-    if (!this.pivot.visible) return
+    if (!this.shown) return
     if (this.itemName && !this.item.children.length) {
       const model = createItem(this.itemName)
       if (model) {
@@ -199,7 +251,11 @@ class Hand {
           // Half the previous 0.48, anchored where the arm's hand was.
           model.scale.setScalar(0.24)
           this.item.position.set(...ARM_BOTTOM)
-          this.item.rotation.set(-0.25, -0.45, 0)
+          // Z here is the block's own face-on spin, before the pivot's
+          // rotation carries it into view — positive is counter-clockwise
+          // as held up and looked at, same convention as ARM_TWIST. 90°
+          // CCW from where it sat (Z=0).
+          this.item.rotation.set(-0.25, -0.45, Math.PI / 2)
         } else {
           model.scale.setScalar(0.75)
           this.item.position.set(...ARM_BOTTOM)
@@ -223,10 +279,14 @@ class Hand {
     renderer.render(this.scene, camera)
     if (showingItem) {
       this.item.visible = true
-      this.arm.visible = false
+      const rightWas = this.right.visible
+      const leftWas = this.left.visible
+      this.right.visible = false
+      this.left.visible = false
       renderer.clearDepth()
       renderer.render(this.scene, camera)
-      this.arm.visible = true
+      this.right.visible = rightWas
+      this.left.visible = leftWas
     }
   }
 
@@ -237,41 +297,90 @@ class Hand {
     disposeItem(this.item)
   }
 
-  // Nothing to hold before a bot is joined; the arm would float over the
+  // Nothing to hold before a bot is joined; the arms would float over the
   // join screen.
   setVisible (visible) {
-    this.pivot.visible = visible
+    this.shown = visible
   }
 
-  // Punch-and-return. Calls while a swing is already in flight are dropped, so
-  // startSwinging()'s repeat interval can just fire on a steady clock without
-  // stacking tweens on top of each other.
+  // Punch-and-return, right hand only (mining/attack). Calls while a swing is
+  // already in flight are dropped, so a stray one-shot swing() can't stack a
+  // second tween on top of the held mining loop.
   swing () {
     if (this.swinging) return
     this.swinging = true
-    new TWEEN.Tween(this.pivot.rotation)
+    new TWEEN.Tween(this.rightPivot.rotation)
       .to({ x: SWING_ROTATION[0], y: SWING_ROTATION[1], z: SWING_ROTATION[2] }, SWING_MS)
       .easing(TWEEN.Easing.Quadratic.Out)
       .chain(
-        new TWEEN.Tween(this.pivot.rotation)
+        new TWEEN.Tween(this.rightPivot.rotation)
           .to({ x: REST_ROTATION[0], y: REST_ROTATION[1], z: REST_ROTATION[2] }, RETURN_MS)
           .easing(TWEEN.Easing.Quadratic.In)
-          .onComplete(() => { this.swinging = false })
+          .onComplete(() => {
+            this.swinging = false
+            // Kick the next thrust off this one's completion rather than a
+            // parallel timer. A setInterval equal to the swing duration races
+            // the tween's own onComplete (stepped a frame later than the timer
+            // fires) and drops every other thrust, halving and stuttering the
+            // rate. Chaining guarantees back-to-back thrusts with no gap.
+            if (this.looping) this.swing()
+          })
+      )
+      .start()
+  }
+
+  // Placing: a single two-handed thrust toward the crosshair and back — one shot
+  // per placement, not the held punch loop mining uses. Only the right pivot is
+  // tweened (position and shoulder pitch together); the left copies it every
+  // frame, so the reflection stays exact through the whole motion. Overlapping
+  // calls are dropped, so hold-to-place fires a clean push per block rather than
+  // stacking tweens.
+  push () {
+    if (this.pushing) return
+    this.pushing = true
+    // Put the second hand out for the motion; retract it when the thrust returns.
+    this.left.visible = true
+    const sync = () => {
+      this.leftPivot.position.copy(this.rightPivot.position)
+      this.leftPivot.rotation.copy(this.rightPivot.rotation)
+    }
+    new TWEEN.Tween(this.rightPivot.position)
+      .to({ x: PUSH_POSITION[0], y: PUSH_POSITION[1], z: PUSH_POSITION[2] }, PUSH_MS)
+      .easing(TWEEN.Easing.Quadratic.Out)
+      .onUpdate(sync)
+      .chain(
+        new TWEEN.Tween(this.rightPivot.position)
+          .to({ x: REST_POSITION[0], y: REST_POSITION[1], z: REST_POSITION[2] }, PUSH_RETURN_MS)
+          .easing(TWEEN.Easing.Quadratic.In)
+          .onUpdate(sync)
+      )
+      .start()
+    new TWEEN.Tween(this.rightPivot.rotation)
+      .to({ x: PUSH_ROTATION[0], y: PUSH_ROTATION[1], z: PUSH_ROTATION[2] }, PUSH_MS)
+      .easing(TWEEN.Easing.Quadratic.Out)
+      .onUpdate(sync)
+      .chain(
+        new TWEEN.Tween(this.rightPivot.rotation)
+          .to({ x: REST_ROTATION[0], y: REST_ROTATION[1], z: REST_ROTATION[2] }, PUSH_RETURN_MS)
+          .easing(TWEEN.Easing.Quadratic.In)
+          .onUpdate(sync)
+          .onComplete(() => { this.pushing = false; this.left.visible = false })
       )
       .start()
   }
 
   // Keeps punching for as long as a dig/attack is held down, the way vanilla
-  // keeps swinging the arm while mining rather than throwing one punch.
+  // keeps swinging the arm while mining rather than throwing one punch. The
+  // in-flight swing loops itself; stopSwinging just lets the current one finish
+  // its return and settle at rest.
   startSwinging () {
-    if (this.repeatTimer) return
+    if (this.looping) return
+    this.looping = true
     this.swing()
-    this.repeatTimer = setInterval(() => this.swing(), SWING_MS + RETURN_MS)
   }
 
   stopSwinging () {
-    clearInterval(this.repeatTimer)
-    this.repeatTimer = null
+    this.looping = false
   }
 }
 

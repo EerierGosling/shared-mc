@@ -8,7 +8,7 @@ test('saved old defaults upgrade once while custom values survive', t => {
   global.localStorage = { getItem: () => stored, setItem: (key, value) => { stored = value } }
   t.after(() => { if (original === undefined) delete global.localStorage; else global.localStorage = original })
   const settings = load()
-  assert.equal(settings.stepThreshold, 0.08)
+  assert.equal(settings.stepThreshold, 0.06)
   assert.equal(settings.swingThreshold, 3.5)
   assert.equal(settings.phoneThreshold, 0.1)
   assert.equal(settings.lookSpeed, 1.7)

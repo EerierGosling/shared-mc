@@ -3,7 +3,7 @@ const FIELDS = {
   lookSpeed: ['Look speed', 0.2, 3, 0.1, 1],
   deadzone: ['Head dead zone', 0.02, 0.3, 0.01, 0.08],
   smoothing: ['Head smoothing', 0, 0.9, 0.05, 0.45],
-  stepThreshold: ['Knee lift threshold', 0.04, 0.4, 0.01, 0.08],
+  stepThreshold: ['Leg lift threshold', 0.04, 0.4, 0.01, 0.06],
   swingThreshold: ['Arm speed threshold', 0.5, 6, 0.1, 3.5],
   jumpThreshold: ['Jump height threshold', 0.08, 0.4, 0.01, 0.18],
   walkHold: ['Walking stop delay (ms)', 250, 1000, 50, 650],
@@ -36,10 +36,13 @@ function load () {
     }
     if (data && (data.defaultsVersion || 0) < 3 && data.phoneThreshold === 2) data.phoneThreshold = DEFAULTS.phoneThreshold
     if (data && (data.defaultsVersion || 0) < 4 && data.phoneThreshold === 1.2) data.phoneThreshold = DEFAULTS.phoneThreshold
+    // v5 combines the ankles into the step signal and drops the knee-only
+    // default, so anyone still on the old untuned 0.08 gets the gentler value.
+    if (data && (data.defaultsVersion || 0) < 5 && data.stepThreshold === 0.08) data.stepThreshold = DEFAULTS.stepThreshold
     const settings = normalize(data)
     save(settings)
     return settings
   } catch { return { ...DEFAULTS } }
 }
-function save (settings) { try { localStorage.setItem('motion-settings-v1', JSON.stringify({ ...normalize(settings), defaultsVersion: 4 })) } catch {} }
+function save (settings) { try { localStorage.setItem('motion-settings-v1', JSON.stringify({ ...normalize(settings), defaultsVersion: 5 })) } catch {} }
 module.exports = { FIELDS, DEFAULTS, normalize, load, save }
