@@ -69,6 +69,7 @@ const join = new JoinScreen(socket, identity => {
   hud.setStatus('connecting', `joining as ${identity.username}…`)
   hand.setVisible(true)
   pause.setServer(identity.server)
+  if (join.controlMode !== 'standard') input.showMotion(join.controlMode !== 'camera')
 })
 
 // Escape's game menu. Quitting is a reload: the socket drops, the server

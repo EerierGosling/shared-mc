@@ -36,3 +36,22 @@ npm run dev               # builds the client bundle, then starts the server
 | `T` / `Enter` | chat |
 | `Q` | drop held stack |
 | `G` | pathfind to the block in the crosshair |
+
+### Motion controls
+
+Choose **Camera gestures**, **Camera + paired phone steps**, or **Paired phone
+controller** on the opening screen. Setup starts in practice mode: allow the
+camera, calibrate, test gestures, then enable player control. Reopen settings
+from **Game menu → Motion controls & phone**.
+
+- Head movement steers; arm swings mine; walking in place moves forward with autojump.
+- Physical jumps jump; optional facial actions map smiles to use/place and an open mouth to jump.
+- Pair a phone by scanning the generated QR code (or entering a single-use code).
+  Use desktop camera tracking plus phone accelerometer steps, or a mounted phone camera.
+- Saved sensitivity sliders, presets, live measurements, and practice mode help tune detection.
+- Use a phone-accessible HTTPS address. `localhost` on a phone does not reach your desktop.
+
+See the [setup and tuning guide](docs/motion-controls.md) for QR pairing,
+calibration, sensitivity adjustments, troubleshooting, and training guidance.
+
+Run `npm test` and `npm run build` to verify the implementation.

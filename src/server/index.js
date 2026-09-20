@@ -8,6 +8,7 @@ const mc = require('minecraft-protocol')
 
 const config = require('./config')
 const Sessions = require('./sessions')
+const { MotionPairing } = require('./motion-pairing')
 
 const app = express()
 const server = http.createServer(app)
@@ -31,6 +32,8 @@ app.use(compression())
 // folder we need for /textures, /blocksStates and /worker.js, so our page is
 // registered first and our bundle lives under /dist to avoid any collision.
 const clientDir = path.join(__dirname, '..', 'client')
+app.get('/controller', (req, res) => res.sendFile(path.join(clientDir, 'controller.html')))
+app.get('/motion.css', (req, res) => res.sendFile(path.join(clientDir, 'motion.css')))
 const distDir = path.join(__dirname, '..', '..', 'dist')
 const viewerPublic = path.join(path.dirname(require.resolve('prismarine-viewer/package.json')), 'public')
 
@@ -99,6 +102,7 @@ if (assetVersion) require('./icons')(app, viewerPublic, assetVersion)
 // Two ways to play: ride the shared bot with everyone else, or drive one of
 // your own. Sessions owns both; nothing crosses between them but the roster.
 const sessions = new Sessions(config, io)
+const motionPairing = new MotionPairing(id => sessions.modeBySocket.has(id))
 sessions.onChange = () => broadcastRoster()
 
 function broadcastRoster () {
@@ -110,6 +114,7 @@ function broadcastRoster () {
 }
 
 io.on('connection', socket => {
+  motionPairing.register(socket)
   // No bot yet: the visitor picks a mode first, and only a vetted join creates
   // a login on the Minecraft server.
   socket.emit('join:options', sessions.options())
@@ -185,6 +190,7 @@ server.listen(config.web.port, () => {
 
 const shutdown = () => {
   console.log('shutting down')
+  motionPairing.destroy()
   sessions.destroyAll()
   server.close(() => process.exit(0))
   setTimeout(() => process.exit(0), 2000).unref()

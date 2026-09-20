@@ -106,4 +106,10 @@ const workerConfig = {
   devtool: 'source-map'
 }
 
-module.exports = [clientConfig, workerConfig]
+const controllerConfig = {
+  ...clientConfig,
+  entry: './src/client/controller.js',
+  output: { path: path.resolve(__dirname, 'dist'), filename: 'controller.js' }
+}
+
+module.exports = [clientConfig, workerConfig, controllerConfig]
