@@ -1,12 +1,16 @@
 # shared-mc
-Minecraft in the browser!
+Play Minecraft in the browser! Works with any offline mode servers, but also has an instance running at `mc.manitej.com` that you can join from a normal client.
+
+Optional: 
+- '~~collaborative~~ chaos mode; control the same player with as a bajillion other people at the same time
+- grass touching mode; punch trees irl with motion-tracking and phone pairing
 
 ## Running it
 
 ```bash
-cp .env.example .env      # point MC_HOST/MC_PORT at your server
-npm ci                    # npm install instead would drift off the lockfile
-npm run dev               # builds the client bundle, then starts the server
+cp .env.example .env      # point MC_HOST/MC_PORT at the server you want to be prefilled + your deepgram api key for voice to text
+npm ci                   
+npm run dev              
 # open http://localhost:3000
 ```
 
@@ -23,41 +27,3 @@ npm run dev               # builds the client bundle, then starts the server
 | `VIEW_DISTANCE` | `6` | chunk radius streamed per browser |
 | `REACH` | `5` | block reach for dig/place/interact |
 | `DEEPGRAM_API_KEY` | unset | enables the push-to-talk button on touch devices |
-
-## Controls
-
-| | |
-|---|---|
-| click | capture the mouse (Esc releases) |
-| `WASD` / `Space` / `Shift` / `Ctrl` | move / jump / sneak / sprint |
-| left mouse | mine the block in the crosshair, or attack the entity in it |
-| right mouse | use, place, or open the container in the crosshair |
-| `1`–`9` | hotbar |
-| `E` | inventory (and open containers) |
-| `T` / `Enter` | chat |
-| `Q` | drop held stack |
-| `G` | pathfind to the block in the crosshair |
-
-On a touch device the same actions are on-screen buttons. With
-`DEEPGRAM_API_KEY` set there is also **talk**: hold it, speak, let go, and the
-words are sent as your chat line. Solo players each have their own line to the
-transcriber; on a road trip every rider's lines queue and go out one per second
-through the shared bot.
-
-### Motion controls
-
-Open **Game menu → Motion Controls** once in the game. Setup starts in
-practice mode: allow the camera, calibrate, test gestures, then enable player
-control.
-
-- Head movement steers; arm swings mine; walking in place moves forward with autojump.
-- Physical jumps jump; optional facial actions map smiles to use/place and an open mouth to jump.
-- Pair a phone by scanning the generated QR code (or entering a single-use code).
-  Choose Camera for body tracking and Phone for pairing an accelerometer-only mining controller.
-- Saved sensitivity sliders, presets, live measurements, and practice mode help tune detection.
-- Use a phone-accessible HTTPS address. `localhost` on a phone does not reach your desktop.
-
-See the [setup and tuning guide](docs/motion-controls.md) for QR pairing,
-calibration, sensitivity adjustments, troubleshooting, and training guidance.
-
-Run `npm test` and `npm run build` to verify the implementation.
