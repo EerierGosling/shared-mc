@@ -29,4 +29,5 @@ npm run dev
 | `PORT` | `3000` | web server |
 | `VIEW_DISTANCE` | `6` | chunk radius streamed per browser |
 | `REACH` | `5` | block reach for dig/place/interact |
+| `REPO_URL` | this repo on GitHub | where the title screen's build hash links to |
 | `DEEPGRAM_API_KEY` | unset | enables push to talk: hold V on a keyboard, the mic button on touch |

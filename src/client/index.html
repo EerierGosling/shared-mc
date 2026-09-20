@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Shared Minecraft</title>
+<title>Minecraft (HackMIT Edition)</title>
 <!-- The GUI scale, palette and vanilla widgets, shared with /controller. -->
 <link rel="stylesheet" href="/ui.css">
 <link rel="stylesheet" href="/motion.css">
@@ -386,83 +386,183 @@
   }
 
   /* --- join screen ---------------------------------------------------------- */
-  /* The dirt tile is also what hides the empty sky before any chunk lands. */
+  /* Vanilla's title screen: the logo up top, the splash off its corner, a
+     stack of 200x20 buttons from a quarter of the way down, version text in
+     the bottom corners. Picking a mode swaps the button stack for a world-
+     select style panel (server, name, skin) in the same place. The backdrop
+     is a blurred screenshot of this very page: minecraft-assets ships the
+     panorama as 1x1 placeholders. It also hides the empty sky before the
+     first chunk lands. */
   #join {
-    inset: 0; display: none; align-items: center; justify-content: center;
-    padding: calc(4 * var(--u));
+    /* Its own GUI scale, bigger than the game's: this screen is read from
+       across a room at a demo table. Vanilla's title screen sits on a window
+       about 480 texels wide and 280 tall (measured off the real thing), so
+       one texel is that fraction of the viewport, whole pixels, never below
+       the game's 2. With a mode picked the panel needs the room, so the
+       window is taken as 640 by 360 texels instead, as the console editions
+       do; browsers without round() get the unrounded value. */
+    --u: max(2px, min(100vw / 480, 100vh / 280));
+    --u: round(max(2px, min(100vw / 480, 100vh / 280)), 1px);
+    font-size: calc(8 * var(--u));
+    inset: 0; display: none; flex-direction: column; align-items: center;
+    padding: calc(30 * var(--u)) calc(4 * var(--u)) calc(2 * var(--u));
+    overflow-y: auto; overflow-x: hidden;
     pointer-events: auto;
+    background:
+      linear-gradient(rgba(0, 0, 0, 0.35), rgba(0, 0, 0, 0.55)),
+      #5a7fb4 url('/title/panorama.jpg') center / cover no-repeat;
   }
   #join.open { display: flex; }
-  /* Two columns: where and how on the left, who on the right, one footer. */
-  #join-panel {
+  #join[data-mode] {
+    --u: max(2px, min(100vw / 640, 100vh / 360));
+    --u: round(max(2px, min(100vw / 640, 100vh / 360)), 1px);
+  }
+  /* The shared widgets size their text off the game's scale; ours here. */
+  #join .mc-text { font-size: calc(8 * var(--u)); }
+  #join .section-label { font-size: calc(6 * var(--u)); }
+  #join-panel { display: contents; }
+
+  /* --- logo ----------------------------------------------------------------- */
+  /* gui/title/minecraft.png is a 256x64 sheet with the 256x44 logo at its
+     origin, and the edition line sits 37 texels down, 88 in, in vanilla. */
+  #join-title {
+    position: relative; flex: none;
+    width: calc(256 * var(--u)); max-width: 100%;
+    height: calc(44 * var(--u));
+    margin: 0 0 calc(4 * var(--u));
+  }
+  #join-logo {
+    margin: 0; width: 100%; height: 100%;
+    background: url('/assets/gui/title/minecraft.png') 0 0 / calc(256 * var(--u)) calc(64 * var(--u)) no-repeat;
+    image-rendering: pixelated;
+    font-size: 0; color: transparent;
+  }
+  #join-edition {
+    position: absolute; left: 0; right: 0; top: calc(37 * var(--u));
+    margin: 0; text-align: center;
+    font-size: calc(9 * var(--u)); letter-spacing: var(--u);
+    text-transform: uppercase; color: #dcdcdc;
+    text-shadow:
+      var(--u) 0 0 #1c1c1c, calc(-1 * var(--u)) 0 0 #1c1c1c,
+      0 var(--u) 0 #1c1c1c, 0 calc(-1 * var(--u)) 0 #1c1c1c,
+      var(--u) var(--u) 0 #1c1c1c, calc(2 * var(--u)) calc(2 * var(--u)) 0 #1c1c1c;
+  }
+  /* The splash hangs off the logo's right end, tilted 20 degrees and
+     breathing, in chat yellow. */
+  #join-splash {
+    position: absolute; left: calc(100% - 5 * var(--u)); top: calc(39 * var(--u));
+    margin: 0; white-space: nowrap;
+    color: var(--mc-yellow);
+    font-size: calc(9 * var(--u));
+    text-shadow: var(--u) var(--u) 0 #3f3f00;
+    --splash-x: -50%;
+    transform-origin: center;
+    transform: translate(var(--splash-x), -50%) rotate(-20deg);
+    animation: splash-breathe 1s ease-in-out infinite alternate;
+    pointer-events: none;
+  }
+  #join-splash:empty { display: none; }
+  @keyframes splash-breathe {
+    from { transform: translate(var(--splash-x), -50%) rotate(-20deg) scale(1); }
+    to { transform: translate(var(--splash-x), -50%) rotate(-20deg) scale(0.92); }
+  }
+
+  /* --- the button stack ----------------------------------------------------- */
+  /* Buttons start at height/4 + 48 in vanilla; the logo block above is 88u,
+     so this margin lands the first button there on any screen tall enough. */
+  #join-menu {
+    display: flex; flex-direction: column; align-items: center; gap: calc(4 * var(--u));
+    margin-top: max(calc(4 * var(--u)), calc(25vh - 40 * var(--u)));
+  }
+  #join[data-mode] #join-menu { display: none; }
+  #join-modes { display: flex; flex-direction: column; gap: calc(4 * var(--u)); }
+  #join-menu .mc-button {
+    position: relative; margin: 0;
+    display: flex; align-items: center; justify-content: center;
+    text-decoration: none;
+  }
+  /* Who is already in, or how many fit, tucked into the button's right end. */
+  #join-menu .chip {
+    position: absolute; right: calc(4 * var(--u)); top: 50%; transform: translateY(-50%);
+    font-style: normal; font-size: calc(6 * var(--u)); color: var(--mc-yellow);
+    text-shadow: var(--u) var(--u) 0 var(--shadow);
+  }
+  #join-menu .mc-button:disabled .chip { color: var(--mc-red); }
+  /* The Realms slot: the third button, one gap further down like vanilla's. */
+  #join-controller { margin-top: calc(8 * var(--u)) !important; }
+  /* Why the last session ended, under the buttons where the eye lands next. */
+  #join-notice {
+    margin: calc(4 * var(--u)) 0 0; min-height: 1.25em;
+    font-size: calc(7 * var(--u)); color: var(--mc-red);
+    text-shadow: var(--u) var(--u) 0 var(--shadow);
+    text-align: center;
+  }
+  #join-notice:empty { display: none; }
+
+  /* --- the setup panel ------------------------------------------------------ */
+  /* Console edition's world panel: what you picked up top, the fields below,
+     Back and Play as vanilla's paired 98-wide buttons. */
+  #join-setup {
+    display: none;
     padding: calc(5 * var(--u)) calc(6 * var(--u));
     width: calc(300 * var(--u)); max-width: 100%;
-    max-height: 100%; overflow-y: auto;
-    display: grid;
+    margin-top: max(calc(4 * var(--u)), calc(25vh - 60 * var(--u)));
     grid-template-columns: minmax(0, 1fr) calc(104 * var(--u));
     grid-template-areas: "head head" "left right" "foot foot";
     column-gap: calc(8 * var(--u)); row-gap: calc(4 * var(--u));
   }
+  #join[data-mode] #join-setup { display: grid; }
+  /* Your own bot adds a third column, name and face, so the panel stays
+     short enough to sit under the logo. */
+  #join[data-mode="solo"] #join-setup {
+    width: calc(340 * var(--u));
+    grid-template-columns: minmax(0, 1fr) calc(104 * var(--u)) calc(76 * var(--u));
+    grid-template-areas: "head head head" "left right who" "foot foot foot";
+  }
   #join-head {
     grid-area: head;
-    display: flex; align-items: baseline; justify-content: space-between; gap: calc(4 * var(--u));
+    display: flex; align-items: center; gap: calc(3 * var(--u));
     border-bottom: var(--u) solid var(--slot);
     padding-bottom: calc(3 * var(--u));
   }
-  #join-panel h1 {
-    margin: 0;
-    font-size: calc(var(--px) * 12px); font-weight: normal;
+  #join-head .badge {
+    flex: none; width: calc(16 * var(--u)); height: calc(16 * var(--u));
+    background: var(--slot);
+    border-style: solid; border-width: var(--u);
+    border-color: var(--slot-dark) var(--gui-lit) var(--gui-lit) var(--slot-dark);
   }
-  /* Which build is serving, so a bug report can say which. */
-  #join-build { margin: 0; font-size: calc(var(--px) * 6px); color: #7f7f7f; }
-  #join-build:empty { display: none; }
+  #join-head span { display: flex; flex-direction: column; gap: calc(0.5 * var(--u)); min-width: 0; }
+  #join-mode-title { margin: 0; font-size: calc(9 * var(--u)); font-weight: normal; }
+  #join-mode-blurb { margin: 0; font-size: calc(6 * var(--u)); color: #555; line-height: 1.4; }
   #join-left { grid-area: left; display: flex; flex-direction: column; gap: calc(2 * var(--u)); min-width: 0; }
   #join-right { grid-area: right; display: flex; flex-direction: column; gap: calc(2 * var(--u)); min-width: 0; }
   #join-foot {
     grid-area: foot;
-    display: flex; align-items: center; justify-content: space-between; gap: calc(4 * var(--u));
+    display: flex; flex-direction: column; align-items: center; gap: calc(3 * var(--u));
     border-top: var(--u) solid var(--slot);
     padding-top: calc(4 * var(--u));
   }
+  #join-foot div { display: flex; gap: calc(4 * var(--u)); }
+  #join-foot .mc-button { margin: 0; width: calc(98 * var(--u)); }
   /* The id outweighs .section-label's own margin in ui.css. */
-  #join-panel .join-label { margin: calc(2 * var(--u)) 0 0; }
-  #join-panel .join-label:first-child { margin-top: 0; }
+  #join-setup .join-label { margin: calc(2 * var(--u)) 0 0; }
+  #join-setup .join-label:first-child { margin-top: 0; }
   /* Which server to play on: host and port side by side, like the server-list
      "Direct Connect" screen. The configured default is only the placeholder. */
   #join-server { display: flex; gap: calc(2 * var(--u)); }
   #join-host { flex: 1; min-width: 0; }
   #join-port { width: calc(36 * var(--u)); flex: none; text-align: center; }
-  /* Minecraft's world-select list: stacked rows, selection is a white outline. */
-  #join-modes { display: flex; flex-direction: column; gap: var(--u); }
-  .mode-row {
-    display: flex; align-items: center; gap: calc(3 * var(--u));
-    width: 100%; text-align: left; cursor: pointer; font: inherit;
-    padding: calc(2 * var(--u)) calc(3 * var(--u));
-    color: var(--mc-white); background: #2e2e2e;
-    border: calc(1 * var(--u)) solid #101010;
-  }
-  .mode-row:hover:not(:disabled) { background: #43434f; }
-  .mode-row.selected { border-color: var(--mc-white); background: #43434f; }
-  .mode-row.full { color: #7f7f7f; cursor: default; }
-  .mode-row .badge { width: calc(16 * var(--u)); height: calc(16 * var(--u)); }
-  .mode-row span { display: flex; flex-direction: column; gap: calc(0.5 * var(--u)); flex: 1; min-width: 0; }
-  .mode-row b { font-weight: normal; font-size: calc(var(--px) * 9px); }
-  .mode-row small { font-size: calc(var(--px) * 6px); color: #a0a0a0; line-height: 1.4; }
-  .mode-row.selected small { color: #c6c6c6; }
-  /* Occupancy, at the row's right edge: who is already in, or how many fit. */
-  .mode-row .chip {
-    flex: none; align-self: flex-start;
-    font-size: calc(var(--px) * 6px); color: var(--mc-yellow);
+  /* --- the corners ---------------------------------------------------------- */
+  /* Vanilla writes the version bottom-left and the copyright bottom-right.
+     The build hash is the version here, so a bug report can say which. */
+  #join-corners {
+    width: 100%; margin: auto 0 0; padding-top: calc(6 * var(--u));
+    display: flex; justify-content: space-between; gap: calc(4 * var(--u));
+    font-size: calc(7 * var(--u)); color: var(--mc-white);
     text-shadow: var(--u) var(--u) 0 var(--shadow);
   }
-  .mode-row.full .chip { color: var(--mc-red); }
-  /* The way to make this device someone else's controller instead. */
-  #join-controls { display: flex; flex-direction: column; gap: var(--u); min-width: 0; }
-  #join-controls .join-label { margin-bottom: 0; }
-  #join-controls .mode-row b { font-size: calc(var(--px) * 8px); }
-  #join-controls a.mode-row { text-decoration: none; }
-  #join-controls a.mode-row:focus-visible { outline: var(--u) solid var(--mc-white); outline-offset: var(--u); }
-  #join-controls small { font-size: calc(var(--px) * 6px); color: #7f7f7f; line-height: 1.4; margin: var(--u) 0; }
+  #join-corners p { margin: 0; }
+  #join-corners a { color: var(--mc-yellow); }
 
   /* The right column: a player figure in the skin about to be worn, then the
      name and the other faces once a solo character is being made. */
@@ -473,6 +573,8 @@
     border-style: solid; border-width: var(--u);
     border-color: var(--slot-dark) var(--gui-lit) var(--gui-lit) var(--slot-dark);
   }
+  /* Two texels per skin pixel here: the panel has to fit under the logo. */
+  #join-figure .doll { --t: calc(2 * var(--u)); }
   /* Front view of a 64x64 skin, 16x32 texels, at --t per texel: head, torso,
      arms and legs cut out of the sheet by background-position, the second
      layer (hat, jacket, sleeves) drawn over each at the same size. */
@@ -499,23 +601,21 @@
   .doll .d-pants-r { left: calc(4 * var(--t)); top: calc(20 * var(--t)); width: calc(4 * var(--t)); height: calc(12 * var(--t)); background-position: calc(-4 * var(--t)) calc(-36 * var(--t)); }
   .doll .d-leg-l { left: calc(8 * var(--t)); top: calc(20 * var(--t)); width: calc(4 * var(--t)); height: calc(12 * var(--t)); background-position: calc(-20 * var(--t)) calc(-52 * var(--t)); }
   .doll .d-pants-l { left: calc(8 * var(--t)); top: calc(20 * var(--t)); width: calc(4 * var(--t)); height: calc(12 * var(--t)); background-position: calc(-4 * var(--t)) calc(-52 * var(--t)); }
-  /* Nobody chosen yet: the doll waits in the dark. */
-  #join:not([data-mode]) .doll { opacity: 0.35; }
 
   /* Name and skin only matter for your own bot, so they stay hidden until then. */
-  #join-identity { display: none; flex-direction: column; gap: calc(2 * var(--u)); }
+  #join-identity { display: none; grid-area: who; flex-direction: column; gap: calc(2 * var(--u)); min-width: 0; }
   #join[data-mode="solo"] #join-identity { display: flex; }
-  /* Nine faces, three by three, each the 8x8 head of its sheet at 30 texels. */
+  /* Nine faces, three by three, each the 8x8 head of its sheet at 24 texels. */
   #join-skins {
-    display: grid; grid-template-columns: repeat(3, calc(30 * var(--u)));
+    display: grid; grid-template-columns: repeat(3, calc(24 * var(--u)));
     justify-content: space-between;
     gap: calc(2 * var(--u));
   }
   .skin {
-    width: calc(30 * var(--u)); height: calc(30 * var(--u));
+    width: calc(24 * var(--u)); height: calc(24 * var(--u));
     padding: 0; cursor: pointer;
-    background-size: calc(240 * var(--u)) calc(240 * var(--u));
-    background-position: calc(-30 * var(--u)) calc(-30 * var(--u));
+    background-size: calc(192 * var(--u)) calc(192 * var(--u));
+    background-position: calc(-24 * var(--u)) calc(-24 * var(--u));
     background-color: var(--slot);
     border-style: solid; border-width: var(--u);
     border-color: var(--slot-dark) var(--gui-lit) var(--gui-lit) var(--slot-dark);
@@ -523,20 +623,30 @@
   }
   .skin:hover { background-color: #c5c5c5; }
   .skin.selected { border-color: var(--mc-white); background-color: #fff; }
-  #join-error { margin: 0; flex: 1; min-width: 0; font-size: calc(var(--px) * 7px); color: #555; }
+  #join-error { margin: 0; min-width: 0; font-size: calc(7 * var(--u)); color: #555; text-align: center; }
   #join-error.bad { color: var(--ink-red); }
-  /* The vanilla 200x20 widget, half width: the footer's right-hand end. */
-  #join-button { margin: 0; width: calc(100 * var(--u)); flex: none; }
 
-  /* Phones: one column. */
+  /* Phones: one column, and the logo scaled to fit. */
   @media (max-width: 640px) {
-    #join-panel {
+    #join { padding-top: calc(12 * var(--u)); }
+    #join-title { width: calc(180 * var(--u)); height: calc(31 * var(--u)); }
+    #join-logo { background-size: calc(180 * var(--u)) calc(45 * var(--u)); }
+    #join-edition { top: calc(26 * var(--u)); font-size: calc(7 * var(--u)); }
+    /* Hung from the logo's right end rather than past it: no room to spill. */
+    #join-splash {
+      font-size: calc(7 * var(--u)); top: calc(30 * var(--u));
+      left: auto; right: 0; --splash-x: 0; transform-origin: right center;
+    }
+    #join-setup, #join[data-mode="solo"] #join-setup {
+      width: 100%;
       grid-template-columns: minmax(0, 1fr);
-      grid-template-areas: "head" "left" "right" "foot";
+      grid-template-areas: "head" "left" "right" "who" "foot";
       padding: calc(4 * var(--u));
     }
-    #join-foot { flex-direction: column; align-items: stretch; }
-    #join-button { width: 100%; }
+    #join-menu, #join-modes { width: 100%; align-items: stretch; }
+    #join-menu .mc-button { width: 100%; }
+    #join-skins { justify-content: start; }
+    #join-corners { flex-direction: column; align-items: center; gap: var(--u); }
   }
 
   /* --- game menu ----------------------------------------------------------- */
@@ -918,46 +1028,62 @@
 
   <div id="players" class="overlay"></div>
 
-  <div id="join" class="overlay mc-dirt">
-    <form id="join-panel" class="mc-panel" action="#">
-      <header id="join-head">
-        <h1>Shared Minecraft</h1>
-        <p id="join-build"></p>
+  <div id="join" class="overlay">
+    <form id="join-panel" action="#">
+      <header id="join-title">
+        <h1 id="join-logo">Minecraft</h1>
+        <p id="join-edition">HackMIT Edition</p>
+        <p id="join-splash" aria-hidden="true"></p>
       </header>
-      <section id="join-left">
-        <p class="section-label join-label">Server</p>
-        <div id="join-server">
-          <input id="join-host" class="mc-text" placeholder="server address" autocomplete="off" spellcheck="false">
-          <input id="join-port" class="mc-text" placeholder="25565" inputmode="numeric" maxlength="5" autocomplete="off">
-        </div>
-        <p class="section-label join-label">How to play</p>
+      <nav id="join-menu" aria-label="Main menu">
         <div id="join-modes"></div>
-        <div id="join-controls">
-          <p class="section-label join-label">Controller</p>
-          <a id="join-controller" class="mode-row" href="/controller" aria-describedby="join-controller-hint"><span><b>Use this device as a controller</b></span></a>
-          <small id="join-controller-hint">Pair with a game on another screen using its pairing code. No extra player needed. Motion controls for this screen are in the game menu.</small>
-        </div>
-      </section>
-      <section id="join-right">
-        <p class="section-label join-label">Your character</p>
-        <div id="join-figure">
-          <div id="join-doll" class="doll">
-            <i class="d-arm-r"></i><i class="d-sleeve-r"></i>
-            <i class="d-arm-l"></i><i class="d-sleeve-l"></i>
-            <i class="d-leg-r"></i><i class="d-pants-r"></i>
-            <i class="d-leg-l"></i><i class="d-pants-l"></i>
-            <i class="d-body"></i><i class="d-jacket"></i>
-            <i class="d-head"></i><i class="d-hat"></i>
+        <a id="join-controller" class="mc-button" href="/controller" title="Pair with a game on another screen using its pairing code. No extra player needed.">Use this device as a controller</a>
+        <p id="join-notice"></p>
+      </nav>
+      <section id="join-setup" class="mc-panel">
+        <header id="join-head">
+          <span>
+            <h2 id="join-mode-title"></h2>
+            <p id="join-mode-blurb"></p>
+          </span>
+        </header>
+        <section id="join-left">
+          <p class="section-label join-label">Server</p>
+          <div id="join-server">
+            <input id="join-host" class="mc-text" placeholder="server address" autocomplete="off" spellcheck="false">
+            <input id="join-port" class="mc-text" placeholder="25565" inputmode="numeric" maxlength="5" autocomplete="off">
           </div>
-        </div>
-        <div id="join-identity">
+        </section>
+        <section id="join-right">
+          <p class="section-label join-label">Your character</p>
+          <div id="join-figure">
+            <div id="join-doll" class="doll">
+              <i class="d-arm-r"></i><i class="d-sleeve-r"></i>
+              <i class="d-arm-l"></i><i class="d-sleeve-l"></i>
+              <i class="d-leg-r"></i><i class="d-pants-r"></i>
+              <i class="d-leg-l"></i><i class="d-pants-l"></i>
+              <i class="d-body"></i><i class="d-jacket"></i>
+              <i class="d-head"></i><i class="d-hat"></i>
+            </div>
+          </div>
+        </section>
+        <section id="join-identity">
+          <p class="section-label join-label">Your name</p>
           <input id="join-name" class="mc-text" maxlength="16" placeholder="your name" autocomplete="off" spellcheck="false">
+          <p class="section-label join-label">Your face</p>
           <div id="join-skins"></div>
-        </div>
+        </section>
+        <footer id="join-foot">
+          <p id="join-error"></p>
+          <div>
+            <button id="join-back" class="mc-button" type="button">Back</button>
+            <button id="join-button" class="mc-button" type="submit">Play</button>
+          </div>
+        </footer>
       </section>
-      <footer id="join-foot">
-        <p id="join-error"></p>
-        <button id="join-button" class="mc-button" type="submit" disabled>Play</button>
+      <footer id="join-corners">
+        <p id="join-build"></p>
+        <p>Not affiliated with Mojang or Microsoft.</p>
       </footer>
     </form>
   </div>
