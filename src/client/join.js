@@ -14,7 +14,7 @@ const MODES = [
   {
     id: 'roadtrip',
     title: 'Collaborative',
-    blurb: 'Control one player together with everyone else.'
+    blurb: 'Very chaotic. Control a player at the same time as everyone else.'
   },
   {
     id: 'solo',

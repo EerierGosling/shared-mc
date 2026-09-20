@@ -611,22 +611,12 @@
   }
   #inventory.open { display: flex; }
 
-  /* Vanilla container chrome: light bevel top-left, dark bevel bottom-right. */
-  #inventory-panel {
-    background: var(--gui);
-    border-style: solid;
-    border-width: calc(2 * var(--u));
-    border-color: var(--gui-lit) var(--gui-dim) var(--gui-dim) var(--gui-lit);
-    padding: calc(3 * var(--u));
-    min-width: calc(176 * var(--u));
-    color: var(--ink);
+  #inventory-panel { display: flex; flex-direction: column; align-items: center; color: var(--ink); }
+  #inventory-hint {
+    margin: calc(2 * var(--u)) 0 0;
+    font-size: calc(var(--px) * 6px); color: var(--mc-gray);
+    text-shadow: var(--u) var(--u) 0 var(--shadow);
   }
-  #inventory-panel h2 {
-    margin: 0 0 calc(2 * var(--u));
-    font-size: calc(var(--px) * 8px); font-weight: normal;
-    display: flex; justify-content: space-between; align-items: baseline;
-  }
-  #inventory-panel h2 small { color: #7f7f7f; font-size: calc(var(--px) * 6px); }
   .section-label {
     color: #7f7f7f; margin: 0 0 var(--u);
     font-size: calc(var(--px) * 6px);
@@ -656,7 +646,15 @@
   /* Hidden outright until the Minecraft server grants creative: creative.js
      adds .open, so a survival session never sees a control it cannot use. */
   #creative { display: none; }
-  #creative.open { display: block; margin-bottom: calc(3 * var(--u)); }
+  /* Vanilla container chrome: light bevel top-left, dark bevel bottom-right. */
+  #creative.open {
+    display: block; margin-bottom: calc(3 * var(--u));
+    width: calc(176 * var(--u)); box-sizing: border-box;
+    background: var(--gui);
+    border-style: solid; border-width: calc(2 * var(--u));
+    border-color: var(--gui-lit) var(--gui-dim) var(--gui-dim) var(--gui-lit);
+    padding: calc(3 * var(--u));
+  }
   #creative-head { display: flex; align-items: baseline; gap: calc(2 * var(--u)); }
   #creative-head .section-label { margin: 0; }
   #creative-note { margin-left: auto !important; }
@@ -686,47 +684,58 @@
   }
   #cursor-item.visible { display: flex; }
 
-  /* --- crafting row: armor, player bust, offhand, 2x2 crafting ------------- */
-  .crafting-row { display: flex; align-items: flex-start; gap: calc(4 * var(--u)); margin-bottom: calc(3 * var(--u)); }
-  .grid.grid-1 { grid-template-columns: repeat(1, calc(18 * var(--u))); margin-bottom: 0; }
-  .grid.grid-2 { grid-template-columns: repeat(2, calc(18 * var(--u))); margin-bottom: 0; }
-  .grid.grid-3 { grid-template-columns: repeat(3, calc(18 * var(--u))); margin-bottom: 0; }
-
-  .player-frame {
+  /* --- container windows ---------------------------------------------------- */
+  /* The real gui/container sheet (256x256, window in its top-left 176 wide)
+     at GUI scale; inventory.js sets the height and lays slots over it at the
+     sheet's own coordinates. */
+  .window {
     position: relative;
-    width: calc(40 * var(--u)); height: calc(52 * var(--u));
-    background: var(--slot);
-    border-style: solid; border-width: var(--u);
-    border-color: var(--slot-dark) var(--gui-lit) var(--gui-lit) var(--slot-dark);
+    width: calc(176 * var(--u));
+    background-size: calc(256 * var(--u)) calc(256 * var(--u));
+    background-repeat: no-repeat;
+    image-rendering: pixelated;
   }
-  .player-figure {
-    position: absolute; left: 50%; top: calc(4 * var(--u));
-    transform: translateX(-50%);
-    width: calc(18 * var(--u)); height: calc(44 * var(--u));
+  /* A chest is two cuts of generic_54.png: the top rows, then the player half
+     from y=126 of the sheet (vanilla's blit). */
+  .window-lower {
+    position: absolute; left: 0;
+    width: calc(176 * var(--u)); height: calc(96 * var(--u));
+    background: inherit;
+    background-position: 0 calc(-126 * var(--u));
   }
-  .player-figure i { position: absolute; display: block; }
-  .p-hair { top: 0; left: calc(3 * var(--u)); width: calc(12 * var(--u)); height: calc(4 * var(--u)); background: #4a3728; }
-  .p-head { top: calc(4 * var(--u)); left: calc(3 * var(--u)); width: calc(12 * var(--u)); height: calc(12 * var(--u)); background: #f0b48c; }
-  .p-body { top: calc(16 * var(--u)); left: calc(3 * var(--u)); width: calc(12 * var(--u)); height: calc(16 * var(--u)); background: #17a5a0; }
-  .p-arm { top: calc(16 * var(--u)); width: calc(3 * var(--u)); height: calc(16 * var(--u)); background: #f0b48c; }
-  .p-arm-l { left: 0; }
-  .p-arm-r { right: 0; }
-  .p-leg { top: calc(32 * var(--u)); width: calc(6 * var(--u)); height: calc(12 * var(--u)); background: #3b5bdb; }
-  .p-leg-l { left: calc(3 * var(--u)); }
-  .p-leg-r { left: calc(9 * var(--u)); }
-  .offhand-wrap { position: absolute; right: calc(-1 * var(--u)); bottom: calc(-1 * var(--u)); }
-
-  .crafting-col { display: flex; flex-direction: column; }
-  .crafting-main { display: flex; align-items: center; gap: calc(3 * var(--u)); margin-bottom: calc(3 * var(--u)); }
-  .crafting-arrow { font-size: calc(var(--px) * 10px); color: var(--ink); padding: 0 var(--u); }
-
-  /* --- crafting table: recipe-book stand-in, 3x3 grid, output --------------- */
-  .workbench-icon {
+  .window .slot {
+    position: absolute;
     width: calc(18 * var(--u)); height: calc(18 * var(--u));
-    flex: none;
-    background: #4a9c46;
-    border-style: solid; border-width: var(--u);
-    border-color: #6fc768 #1f4a1c #1f4a1c #6fc768;
+    background-size: calc(16 * var(--u)) calc(16 * var(--u));
+    background-position: center; background-repeat: no-repeat;
+    cursor: pointer; color: var(--ink);
+  }
+  .window .slot-large { width: calc(26 * var(--u)); height: calc(26 * var(--u)); }
+  /* Vanilla's hover: a half-white square over the 16x16 item area. */
+  .window .slot::after {
+    content: ''; position: absolute; inset: var(--u);
+    background: rgba(255, 255, 255, 0); pointer-events: none;
+  }
+  .window .slot-large::after { inset: calc(5 * var(--u)); }
+  .window .slot:hover::after, .window .slot.drag-target::after { background: rgba(255, 255, 255, 0.5); }
+  .window-label {
+    position: absolute;
+    font-size: calc(var(--px) * 8px); line-height: 1; color: var(--ink);
+    white-space: nowrap;
+  }
+  .recipe-book {
+    position: absolute;
+    width: calc(20 * var(--u)); height: calc(18 * var(--u));
+    background: url('/assets/gui/sprites/recipe_book/button.png') 0 0 / contain no-repeat;
+    image-rendering: pixelated;
+  }
+  /* The black frame in inventory.png is 50x70 at (26,8); the doll is 16x32
+     texels, so two screen pixels per texel fills it the way vanilla's
+     scale-30 player does. */
+  .window-doll {
+    --t: calc(2 * var(--u));
+    position: absolute;
+    left: calc(35 * var(--u)); top: calc(11 * var(--u));
   }
 </style>
 <link rel="stylesheet" href="/motion.css">
@@ -883,7 +892,6 @@
 
   <div id="inventory" class="overlay">
     <div id="inventory-panel">
-      <h2><span id="inventory-title">Inventory</span> <small>E or Esc to close</small></h2>
       <!-- Creative only. Kept above the inventory so a stack dragged up out of
            a slot and released here is destroyed, as it is in vanilla. -->
       <div id="creative">
@@ -896,6 +904,7 @@
         <p class="section-label">click for a stack, right-click for one, drop a stack here to destroy it</p>
       </div>
       <div id="inventory-body"></div>
+      <p id="inventory-hint">E or Esc to close</p>
     </div>
     <div id="cursor-item" class="slot"></div>
   </div>
