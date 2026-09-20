@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Shared Minecraft</title>
 <!-- The GUI scale, palette and vanilla widgets, shared with /controller. -->
 <link rel="stylesheet" href="/ui.css">
@@ -274,9 +274,13 @@
   .player .badge { margin-left: 0; }
 
   /* --- touch controls ------------------------------------------------------- */
-  /* Shown only on coarse-pointer devices (or with ?touch for testing). A
-     D-pad and sneak toggle bottom left, mine/use/jump bottom right, chat and
-     inventory along the top; drag anywhere else to look. */
+  /* Shown only on coarse-pointer devices (or with ?touch for testing), and
+     laid out the way Bedrock's phone HUD is, in landscape: hearts top left,
+     hunger top right, chat and pause top centre, the D-pad with a sneak
+     toggle bottom left, jump (with mine and use beside it) bottom right, the
+     hotbar bottom centre with an inventory button on its end. Drag anywhere
+     else to look. Edge offsets add the notch/home-bar insets, which are zero
+     on a desktop. */
   #touch { display: none; inset: 0; }
   body.touch #touch { display: block; }
   #touch button {
@@ -292,33 +296,79 @@
   #touch button.down { background: #7f8caa; }
   #touch button.on { background: #7f8caa; border-color: var(--mc-white); }
   #touch-pad {
-    position: absolute; left: calc(6 * var(--u)); bottom: calc(60 * var(--u));
-    width: calc(66 * var(--u)); height: calc(66 * var(--u));
+    position: absolute;
+    left: calc(6 * var(--u) + env(safe-area-inset-left, 0px));
+    bottom: calc(6 * var(--u) + env(safe-area-inset-bottom, 0px));
+    width: calc(70 * var(--u)); height: calc(70 * var(--u));
   }
-  #touch-pad .tb-up { left: calc(22 * var(--u)); top: 0; }
-  #touch-pad .tb-left { left: 0; top: calc(22 * var(--u)); }
-  #touch-pad .tb-right { left: calc(44 * var(--u)); top: calc(22 * var(--u)); }
-  #touch-pad .tb-down { left: calc(22 * var(--u)); top: calc(44 * var(--u)); }
-  #touch-pad .tb-sneak { left: calc(22 * var(--u)); top: calc(22 * var(--u)); }
+  #touch-pad .tb-up { left: calc(24 * var(--u)); top: 0; }
+  #touch-pad .tb-left { left: 0; top: calc(24 * var(--u)); }
+  #touch-pad .tb-right { left: calc(48 * var(--u)); top: calc(24 * var(--u)); }
+  #touch-pad .tb-down { left: calc(24 * var(--u)); top: calc(48 * var(--u)); }
+  #touch-pad .tb-sneak { left: calc(24 * var(--u)); top: calc(24 * var(--u)); }
   #touch-actions {
-    position: absolute; right: calc(6 * var(--u)); bottom: calc(60 * var(--u));
-    width: calc(66 * var(--u)); height: calc(66 * var(--u));
+    position: absolute;
+    right: calc(6 * var(--u) + env(safe-area-inset-right, 0px));
+    bottom: calc(6 * var(--u) + env(safe-area-inset-bottom, 0px));
+    width: calc(54 * var(--u)); height: calc(54 * var(--u));
   }
-  #touch-actions .tb-mine { left: 0; top: calc(22 * var(--u)); width: calc(30 * var(--u)); }
-  #touch-actions .tb-use { left: calc(36 * var(--u)); top: calc(22 * var(--u)); width: calc(30 * var(--u)); }
-  #touch-actions .tb-jump { left: calc(22 * var(--u)); top: 0; }
+  #touch-actions .tb-jump { right: 0; bottom: 0; width: calc(28 * var(--u)); height: calc(28 * var(--u)); }
+  #touch-actions .tb-mine { left: 0; bottom: 0; }
+  #touch-actions .tb-use { right: 0; top: 0; }
   #touch-menu {
     position: absolute; top: calc(2 * var(--u)); left: 50%; transform: translateX(-50%);
-    display: flex; gap: var(--u);
+    display: flex; gap: calc(2 * var(--u));
   }
-  #touch-menu button { position: static; width: auto; height: calc(14 * var(--u)); padding: 0 calc(3 * var(--u)); }
+  #touch-menu button { position: static; width: auto; min-width: calc(16 * var(--u)); height: calc(16 * var(--u)); padding: 0 calc(3 * var(--u)); }
+  /* The tenth hotbar slot on Bedrock is the inventory. */
+  #touch [data-action=inventory] {
+    left: calc(50% + 91 * var(--u)); bottom: calc(2 * var(--u) + env(safe-area-inset-bottom, 0px));
+    width: calc(20 * var(--u));
+  }
   /* Push to talk: shown once the server says it can transcribe, red while the
      mic is open, dimmed while the words are on their way back. */
   #touch [data-action=talk] { display: none; }
   body.speech #touch [data-action=talk] { display: block; }
   #touch [data-action=talk].on { background: #a03030; border-color: #ff8080 #501010 #501010 #ff8080; }
   #touch [data-action=talk].busy { opacity: 0.4; }
-  body.touch #status { top: calc(18 * var(--u)); }
+  /* Bedrock's HUD: vitals in the top corners, so the bottom is only the
+     hotbar and the thumbs. The readouts move down to make room. */
+  body.touch #hud-bars {
+    top: calc(2 * var(--u)); bottom: auto; transform: none;
+    left: calc(2 * var(--u) + env(safe-area-inset-left, 0px));
+    right: calc(2 * var(--u) + env(safe-area-inset-right, 0px));
+    width: auto;
+  }
+  body.touch #air {
+    top: calc(12 * var(--u)); bottom: auto; left: auto; transform: none;
+    right: calc(2 * var(--u) + env(safe-area-inset-right, 0px));
+    width: auto;
+  }
+  body.touch #stats { top: calc(13 * var(--u)); left: calc(2 * var(--u) + env(safe-area-inset-left, 0px)); }
+  body.touch #minimap { top: calc(24 * var(--u)); right: calc(2 * var(--u) + env(safe-area-inset-right, 0px)); }
+  body.touch #status { top: calc(20 * var(--u)); }
+  body.touch #hotbar { bottom: calc(2 * var(--u) + env(safe-area-inset-bottom, 0px)); }
+  body.touch #xp { bottom: calc(26 * var(--u) + env(safe-area-inset-bottom, 0px)); }
+  body.touch #held-name { bottom: calc(34 * var(--u) + env(safe-area-inset-bottom, 0px)); }
+
+  /* A small phone in landscape is ~640 CSS px across, and at scale 2 the
+     hotbar plus both thumb clusters overlap. --u is redeclared because
+     ui.css resolves it on :root, where a body override of --px cannot reach. */
+  @media (max-width: 760px) {
+    body.touch { --px: 1.5; --u: calc(var(--px) * 1px); }
+  }
+
+  /* The game is landscape on a phone. Where the browser will not lock the
+     orientation (iOS), this asks instead; the join screen is fine either way. */
+  #rotate {
+    display: none; inset: 0; z-index: 5;
+    flex-direction: column; align-items: center; justify-content: center; gap: calc(3 * var(--u));
+    background: rgba(0, 0, 0, 0.85); pointer-events: auto; text-align: center;
+  }
+  #rotate small { color: var(--mc-gray); font-size: calc(var(--px) * 6px); }
+  @media (orientation: portrait) {
+    body.touch.joined #rotate { display: flex; }
+  }
 
   /* --- join screen ---------------------------------------------------------- */
   /* The dirt tile is also what hides the empty sky before any chunk lands. */
@@ -770,14 +820,14 @@
   <div id="touch" class="overlay">
     <div id="touch-menu">
       <button type="button" data-action="chat">chat</button>
-      <button type="button" data-action="talk">talk</button>
-      <button type="button" data-action="inventory">inventory</button>
-      <button type="button" data-action="menu">menu</button>
+      <button type="button" data-action="talk">mic</button>
+      <button type="button" data-action="menu" aria-label="menu">&#10074;&#10074;</button>
     </div>
+    <button type="button" data-action="inventory" aria-label="inventory">&hellip;</button>
     <div id="touch-pad">
       <button type="button" class="tb-up" data-control="forward">&#9650;</button>
       <button type="button" class="tb-left" data-control="left">&#9664;</button>
-      <button type="button" class="tb-sneak" data-action="sneak">&#8681;</button>
+      <button type="button" class="tb-sneak" data-action="sneak" aria-label="sneak">&#9670;</button>
       <button type="button" class="tb-right" data-control="right">&#9654;</button>
       <button type="button" class="tb-down" data-control="back">&#9660;</button>
     </div>
@@ -786,6 +836,10 @@
       <button type="button" class="tb-mine" data-action="mine">mine</button>
       <button type="button" class="tb-use" data-action="use">use</button>
     </div>
+  </div>
+  <div id="rotate" class="overlay shadowed">
+    <div>Turn your phone sideways</div>
+    <small>the game plays in landscape</small>
   </div>
 
   <div id="chat" class="overlay">

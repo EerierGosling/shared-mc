@@ -8,6 +8,21 @@ const { modeBadge } = require('./badges')
 
 const skinUrl = skin => `/assets/entity/player/${SKIN_VARIANT}/${skin}.png`
 
+// The phone HUD is laid out for landscape. Android will only lock the
+// orientation from fullscreen, and both need to happen inside a tap, so this
+// runs from the join button rather than on the socket's accept. iOS has
+// neither API; index.html shows a rotate prompt there instead.
+const lockLandscape = async () => {
+  if (!document.body.classList.contains('touch')) return
+  const root = document.documentElement
+  try {
+    if (!document.fullscreenElement && root.requestFullscreen) await root.requestFullscreen({ navigationUI: 'hide' })
+  } catch (err) { /* not offered, or refused: the rotate prompt covers it */ }
+  try {
+    if (window.screen.orientation && window.screen.orientation.lock) await window.screen.orientation.lock('landscape')
+  } catch (err) { /* same */ }
+}
+
 // 'roadtrip' is the id the server and the socket protocol know it by; the
 // page calls it Collaborative.
 const MODES = [
@@ -222,6 +237,7 @@ class JoinScreen {
     this.error.textContent = 'joining…'
     this.error.classList.remove('bad')
     this.socket.emit('join', payload)
+    lockLandscape()
   }
 
   reject (reason) {
@@ -233,6 +249,7 @@ class JoinScreen {
   accept (identity) {
     this.joined = true
     this.root.classList.remove('open')
+    document.body.classList.add('joined')
     this.button.disabled = false
     this.onJoined(identity)
   }
