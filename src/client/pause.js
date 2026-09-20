@@ -32,6 +32,8 @@ class PauseMenu {
     document.getElementById('pause-resume').addEventListener('click', () => onResume())
     document.getElementById('pause-quit').addEventListener('click', () => onQuit())
     document.getElementById('pause-motion').addEventListener('click', () => { this.open(); this.showPage('motion') })
+    // Aim and per-action tuning; a page of this menu like the motion controls.
+    document.getElementById('pause-settings').addEventListener('click', () => { this.open(); this.showPage('settings') })
     // The advancements screen is its own overlay, not a page of this menu:
     // it also opens from the L key with no menu involved.
     document.getElementById('pause-advancements').addEventListener('click', () => { this.close(); onAdvancements() })

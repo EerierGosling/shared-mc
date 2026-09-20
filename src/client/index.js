@@ -22,6 +22,7 @@ const { Hand } = require('./hand')
 const { JoinScreen } = require('./join')
 const { PhoneLink, buildPairingUI } = require('./phone-pairing')
 const PauseMenu = require('./pause')
+const setupSettings = require('./settings-panel')
 const SkinPainter = require('./skins')
 const icons = require('./icons')
 
@@ -108,11 +109,19 @@ document.getElementById('join-phone').append(buildPairingUI(phoneLink, {
 const pause = new PauseMenu({
   onResume: () => input.resume(),
   onQuit: () => window.location.reload(),
-  onPage: page => input.showMotion(page === 'motion'),
+  onPage: page => {
+    input.showMotion(page === 'motion')
+    if (page === 'settings') settings.show()
+    else settings.hide()
+  },
   onAdvancements: () => advancementsUI.open()
 })
 
-const input = setupInput({ socket, viewer, camera, hud, inventoryUI, advancementsUI, canvas, hand, join, creative, placePrediction, pause, phoneLink })
+// The Controls page of the game menu. It owns the live tuning object; input.js
+// reads it through getControls so a slider lands on the next mouse move.
+const settings = setupSettings({ mount: document.getElementById('pause'), onDone: () => pause.showPage('main') })
+
+const input = setupInput({ socket, viewer, camera, hud, inventoryUI, advancementsUI, canvas, hand, join, creative, placePrediction, pause, phoneLink, getControls: settings.get })
 
 const highlight = new THREE.LineSegments(
   new THREE.EdgesGeometry(new THREE.BoxGeometry(1.002, 1.002, 1.002)),
