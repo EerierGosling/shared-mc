@@ -49,6 +49,9 @@
   }
   #status[data-state="connected"] { color: var(--mc-green); }
   #status[data-state="error"] { color: var(--mc-red); }
+  /* Where this page lives, so anyone watching the screen can join from it. */
+  #status [data-role="url"] { display: block; color: var(--mc-gray); font-size: calc(var(--px) * 6px); text-align: center; }
+  #status [data-role="url"][hidden] { display: none; }
 
   /* The coordinate readout apes the F3 debug overlay: plain translucent black. */
   #stats {
@@ -920,7 +923,7 @@
   <canvas id="viewport"></canvas>
 
   <div id="crosshair" class="overlay"></div>
-  <div id="status" class="overlay tooltip shadowed" data-state="connecting">connecting&hellip;</div>
+  <div id="status" class="overlay tooltip shadowed" data-state="connecting"><span data-role="message">connecting&hellip;</span><small data-role="url" hidden></small></div>
   <div id="stats" class="overlay shadowed"></div>
 
   <div id="minimap" class="overlay">

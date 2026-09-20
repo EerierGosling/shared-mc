@@ -100,7 +100,10 @@ class Hud {
 
   setStatus (state, message) {
     this.status.dataset.state = state
-    this.status.textContent = message
+    this.status.querySelector('[data-role=message]').textContent = message
+    const url = this.status.querySelector('[data-role=url]')
+    url.textContent = window.location.origin + window.location.pathname
+    url.hidden = state !== 'connected'
   }
 
   /**
