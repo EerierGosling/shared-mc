@@ -59,7 +59,8 @@ class Gestures {
       hipY, scale, upperScale, shoulderX, shoulderY,
       leftFoot: legs ? p[27].y : null,
       rightFoot: legs ? p[28].y : null,
-      kneeOffset: legs ? (p[25].y - p[26].y) / scale : null
+      kneeOffset: legs ? (p[25].y - p[26].y) / scale : null,
+      footOffset: legs ? (p[27].y - p[28].y) / scale : null
     }
     if (!this.neutral) {
       // Compare with the beginning of the window, not only the previous frame:
@@ -73,11 +74,19 @@ class Gestures {
       return { ...idle(), tracking, status: `Calibrating ${this.samples.length}/30 — hold a comfortable neutral pose` }
     }
     tracking.jumpReady = this.neutral.hipY !== null && this.neutral.leftFoot !== null && this.neutral.rightFoot !== null
-    let knee = 0; let speed = 0; let rise = 0
+    let lift = 0; let speed = 0; let rise = 0
     if (legs) {
-      const difference = (p[25].y - p[26].y) / scale - (this.neutral.kneeOffset || 0)
-      knee = Math.abs(difference)
-      const leg = knee > settings.stepThreshold ? Math.sign(difference) : 0
+      // A step is one leg riding higher than the other. Read that from both
+      // the knees and the ankles and take whichever swings further: a gentle
+      // walk in place lifts the thigh only a little, so the knees barely
+      // separate, but the raised leg carries its ankle up with it and the foot
+      // clears the threshold the knee alone missed. Knee-only detection is why
+      // it took a full stomp before — the feet are the more sensitive signal.
+      const kneeDiff = (p[25].y - p[26].y) / scale - (this.neutral.kneeOffset || 0)
+      const footDiff = (p[27].y - p[28].y) / scale - (this.neutral.footOffset || 0)
+      const difference = Math.abs(footDiff) > Math.abs(kneeDiff) ? footDiff : kneeDiff
+      lift = Math.abs(difference)
+      const leg = lift > settings.stepThreshold ? Math.sign(difference) : 0
       if (leg && leg !== this.lastLeg && now - this.lastStep > 180) {
         if (this.lastLeg && now - this.lastStep < 1200) this.walkUntil = now + settings.walkHold
         this.lastLeg = leg
@@ -132,7 +141,7 @@ class Gestures {
     this.smoothedX = x === 0 ? 0 : this.smoothedX * smoothing + x * (1 - smoothing)
     this.smoothedY = y === 0 ? 0 : this.smoothedY * smoothing + y * (1 - smoothing)
     return {
-      metrics: { headX, headY, knee, speed, rise }, tracking,
+      metrics: { headX, headY, lift, speed, rise }, tracking,
       tracked: true, forward,
       jump: (forward && settings.autojump) || now < this.jumpUntil,
       digging: now < this.digUntil,

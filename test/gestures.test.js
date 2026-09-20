@@ -165,6 +165,17 @@ test('small alternating knee lifts walk while tiny shifts stay idle', () => {
   assert.equal(g.update(p, 2500).forward, true)
 })
 
+test('a gentle walk that lifts the feet more than the knees still steps', () => {
+  const g = calibrated()
+  // The raised leg's ankle clears the planted one while the knees barely part —
+  // a knee-only detector needed a full stomp; the ankle carries the step now.
+  let p = pose(); p[27].y -= 0.06; p[25].y -= 0.02
+  assert.equal(g.update(p, 1500).forward, false)
+  g.update(p, 1700)
+  p = pose(); p[28].y -= 0.06; p[26].y -= 0.02
+  assert.equal(g.update(p, 1850).forward, true)
+})
+
 test('moderate arm movement does not mine; deliberate swings still do', () => {
   const g = calibrated()
   const p = pose()

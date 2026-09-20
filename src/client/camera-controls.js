@@ -260,7 +260,7 @@ module.exports = function setupCameraControls ({ apply, canPlay, onStart, onDone
   $('[data-setting=preset]').addEventListener('change', event => {
     const values = {
       normal: DEFAULTS,
-      gentle: { ...DEFAULTS, stepThreshold: 0.07, swingThreshold: 1.3, jumpThreshold: 0.1, phoneThreshold: 2, lookSpeed: 0.7 },
+      gentle: { ...DEFAULTS, stepThreshold: 0.04, swingThreshold: 1.3, jumpThreshold: 0.1, phoneThreshold: 2, lookSpeed: 0.7 },
       deliberate: { ...DEFAULTS, deadzone: 0.14, stepThreshold: 0.22, swingThreshold: 3.5, jumpThreshold: 0.25, phoneThreshold: 4 }
     }
     settings = { ...values[event.target.value], camera: settings.camera }
@@ -386,7 +386,7 @@ module.exports = function setupCameraControls ({ apply, canPlay, onStart, onDone
     const m = candidate.metrics
     $('[data-role=diagnostics]').textContent = [
       m && `Head: ${m.headX.toFixed(2)}, ${m.headY.toFixed(2)} | dead zone ${settings.deadzone}`,
-      m && `Knee: ${m.knee.toFixed(2)} / ${settings.stepThreshold} | arm: ${m.speed.toFixed(2)} / ${settings.swingThreshold}`,
+      m && `Step lift: ${m.lift.toFixed(2)} / ${settings.stepThreshold} | arm: ${m.speed.toFixed(2)} / ${settings.swingThreshold}`,
       m && `Jump rise: ${m.rise.toFixed(2)} / ${settings.jumpThreshold}`,
       settings.facial && `Expression: ${faceState.score.toFixed(2)} / ${settings.faceThreshold}`,
       running && `Tracking time: ${Math.round(inferenceMs)} ms. ${cameraFresh ? 'Camera live' : 'Waiting for fresh camera frames'}`
