@@ -43,13 +43,25 @@ module.exports = {
   // dig, with no error anywhere. 4.5 is vanilla survival reach and stays inside
   // the limit in the worst case.
   reach: Math.min(Number(process.env.REACH) || 4.5, 4.5),
-  // Every visitor gets their own bot, and every bot is a real login, so this is
-  // bounded by the Minecraft server's max-players. Clamped further at startup
-  // once we have pinged it; MAX_BOTS only ever lowers that.
-  maxBots: int(process.env.MAX_BOTS, 8),
+  // Bots this process will run at once, across every Minecraft server its
+  // visitors name. A memory and CPU number, not a Minecraft one: each bot is
+  // a physics loop plus a copy of its surroundings on the one thread. Room on
+  // any particular server is checked by pinging it at join. Below this, the
+  // event-loop and heap thresholds in `load` refuse joins sooner if the box
+  // is already struggling.
+  maxBots: int(process.env.MAX_BOTS, 32),
   // Headroom left for humans playing on the same server without our bots
   // filling every slot.
   playerSlotsReserved: int(process.env.PLAYER_SLOTS_RESERVED, 2),
+  load: {
+    // p99 event-loop delay over the last five seconds above which new bots
+    // are refused; anything already here is being served late by then.
+    maxLagMs: int(process.env.MAX_LAG_MS, 100),
+    maxHeapFraction: Number(process.env.MAX_HEAP_FRACTION) || 0.85
+  },
+  // A solo bot whose visitor has not touched anything for this long is
+  // logged out and its login handed back; the tab returns to the join screen.
+  idleTimeoutMs: int(process.env.IDLE_TIMEOUT_MS, 10 * 60 * 1000),
   // Anti-grief budgets, per visitor. Each is "how many in the window", refused
   // once spent rather than queued, so a client cannot bank actions by idling.
   limits: {

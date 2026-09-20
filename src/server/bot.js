@@ -4,6 +4,16 @@ const mineflayer = require('mineflayer')
 const { pathfinder, Movements } = require('mineflayer-pathfinder')
 
 const MAX_BACKOFF_MS = 30000
+// Retries after a drop before the bot is declared gone: with the backoff
+// below that is about a minute of trying. A bot retrying a dead server
+// forever holds its session, and its visitor's attention, for nothing.
+const MAX_ATTEMPTS = 5
+
+// Kick reasons that no amount of retrying will change. Matched against the
+// raw kick text, which is a translation key or a JSON chat component
+// depending on the server.
+const TERMINAL_KICKS = ['duplicate_login', 'banned', 'outdated_client', 'outdated_server',
+  'not_whitelisted', 'incompatible', 'name_taken', 'server_full']
 
 /**
  * Owns the mineflayer bot and keeps it alive across disconnects.
@@ -11,6 +21,7 @@ const MAX_BACKOFF_MS = 30000
  * Emits:
  *   'ready'  (bot)      - bot has spawned and is safe to use
  *   'down'   (reason)   - bot lost; every consumer must drop its reference
+ *   'gone'   (reason)   - given up; the session should be torn down
  *   'log'    (message)
  */
 class BotHolder extends EventEmitter {
@@ -22,6 +33,7 @@ class BotHolder extends EventEmitter {
     this.attempts = 0
     this.reconnectTimer = null
     this.stopped = false
+    this.terminal = null
   }
 
   start () {
@@ -80,7 +92,11 @@ class BotHolder extends EventEmitter {
     // mineflayer re-emits 'error' as an EventEmitter error, which throws if
     // nothing is listening. Swallow it here and let 'end' drive reconnection.
     bot.on('error', err => this.emit('log', `bot error: ${err.message}`))
-    bot.on('kicked', reason => this.emit('log', `kicked: ${typeof reason === 'string' ? reason : JSON.stringify(reason)}`))
+    bot.on('kicked', reason => {
+      const text = typeof reason === 'string' ? reason : JSON.stringify(reason)
+      this.emit('log', `kicked: ${text}`)
+      if (TERMINAL_KICKS.some(key => text.includes(key))) this.terminal = text
+    })
     bot.on('end', reason => this._handleEnd(bot, reason))
   }
 
@@ -91,6 +107,17 @@ class BotHolder extends EventEmitter {
     this.bot = null
     if (wasReady || this.attempts === 0) this.emit('down', String(reason || 'disconnected'))
     if (this.stopped) return
+
+    if (this.terminal) {
+      this.emit('log', `not retrying: ${this.terminal}`)
+      this.emit('gone', this.terminal)
+      return
+    }
+    if (this.attempts >= MAX_ATTEMPTS) {
+      this.emit('log', `giving up after ${this.attempts} attempts (${reason})`)
+      this.emit('gone', String(reason || 'disconnected'))
+      return
+    }
 
     const delay = Math.min(MAX_BACKOFF_MS, 1000 * Math.pow(2, this.attempts))
     this.attempts += 1

@@ -27,18 +27,20 @@ const { attachWorldView } = require('./worldStream')
  * setBot/clearBot rather than anything caching it.
  */
 class Session {
-  constructor ({ mode, identity, server, config, emitter, io, onPlayers }) {
+  constructor ({ mode, identity, server, config, emitter, io, onPlayers, onGone }) {
     this.mode = mode // 'solo' | 'roadtrip'
     this.identity = identity // { username, skin }
     this.server = server // { host, port } this bot logs into
     this.serverKey = `${server.host}:${server.port}`
     this.onPlayers = onPlayers || (() => {}) // the server's tab list changed
+    this.onGone = onGone || (() => {}) // the bot gave up; tear this session down
     this.config = config
     this.emitter = emitter
     this.io = io
     this.members = new Set() // socket ids
-    this.detachByMember = new Map() // socket.id -> detach fn
     this.socketsById = new Map()
+    // One world stream per bot, shared by every member (see worldStream.js).
+    this.stream = null
     this.address = null
     this.status = { state: 'connecting', message: 'joining the server', server: { ...server, address: null } }
 
@@ -70,6 +72,7 @@ class Session {
     this.holder.on('log', message => console.log(`[${identity.username}@${this.serverKey}] ${message}`))
     this.holder.on('ready', bot => this._onReady(bot))
     this.holder.on('down', reason => this._onDown(reason))
+    this.holder.on('gone', reason => this._onGone(reason))
   }
 
   get size () {
@@ -78,6 +81,11 @@ class Session {
 
   get bot () {
     return this.holder.ready ? this.holder.bot : null
+  }
+
+  /** When a member last did anything, for reclaiming idle bots. */
+  get lastInputAt () {
+    return this.controller.lastInputAt
   }
 
   start () {
@@ -99,9 +107,9 @@ class Session {
     this.lights.sendTo(socket)
     this.creative.sendTo(socket)
     socket.emit('bot:status', this.status)
-    // Each member needs their own world view: prismarine's WorldView tracks
-    // which chunks that particular client has been sent.
-    if (this.bot) this._attachMember(socket)
+    // The stream is already talking to the room; this member has missed the
+    // columns and entities it sent so far and gets them one to one.
+    if (this.stream) this.stream.catchUp(socket)
   }
 
   removeMember (socket) {
@@ -110,22 +118,12 @@ class Session {
     this.controller.dropSocket(socket.id)
     this.chatLog.dropSocket(socket.id)
     this.respawner.viewersChanged()
-    const detach = this.detachByMember.get(socket.id)
-    if (detach) {
-      detach()
-      this.detachByMember.delete(socket.id)
-    }
   }
 
-  _attachMember (socket) {
-    const existing = this.detachByMember.get(socket.id)
-    if (existing) existing()
-    this.detachByMember.set(socket.id, attachWorldView(this.bot, socket, this.config.viewDistance))
-  }
-
-  _detachAll () {
-    for (const detach of this.detachByMember.values()) detach()
-    this.detachByMember.clear()
+  _detachStream () {
+    if (!this.stream) return
+    this.stream.detach()
+    this.stream = null
   }
 
   _setStatus (state, message) {
@@ -149,8 +147,10 @@ class Session {
     // bot's tab list is where that comes from. Listeners die with the bot.
     bot.on('playerJoined', () => this.onPlayers())
     bot.on('playerLeft', () => this.onPlayers())
-    this._detachAll()
-    for (const socket of this.socketsById.values()) this._attachMember(socket)
+    this._detachStream()
+    // Speaks to the whole session, so every member present gets the initial
+    // load from here; nobody needs a catch-up for a stream that just started.
+    this.stream = attachWorldView(bot, this.emitter, this.config.viewDistance)
     const tcp = bot._client && bot._client.socket
     this.address = (tcp && tcp.remoteAddress) || null
     this._setStatus('connected', `playing as ${bot.username}`)
@@ -164,14 +164,19 @@ class Session {
     this.inventory.clearBot()
     this.chatLog.clearBot()
     this.respawner.clearBot()
-    this._detachAll()
+    this._detachStream()
     this._setStatus('reconnecting', reason)
     this.onPlayers()
   }
 
+  _onGone (reason) {
+    this._setStatus('gone', `could not stay on ${this.server.host}`)
+    this.onGone(reason)
+  }
+
   /** Must leave no bot behind: this now runs whenever the last member goes. */
   destroy () {
-    this._detachAll()
+    this._detachStream()
     this.creative.clearBot()
     this.controller.clearBot()
     this.statePusher.stop()
