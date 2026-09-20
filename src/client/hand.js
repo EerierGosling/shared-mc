@@ -141,6 +141,12 @@ class Hand {
     this.repeatTimer = null
   }
 
+  // Nothing to hold before a bot is joined; the arm would float over the
+  // join screen.
+  setVisible (visible) {
+    this.pivot.visible = visible
+  }
+
   attachTo (camera) {
     camera.add(this.pivot)
     // The mesh only being on HAND_LIGHT_LAYER means the world's lights skip

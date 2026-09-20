@@ -50,6 +50,7 @@ const breaking = new BreakingAnimation(viewer.scene)
 viewer.scene.add(viewer.camera)
 const hand = new Hand()
 hand.attachTo(viewer.camera)
+hand.setVisible(false)
 
 // Local camera angles. The server owns position; we own where we are looking,
 // so mouse movement shows up on screen before the network round trip lands.
@@ -60,6 +61,7 @@ const camera = { yaw: 0, pitch: 0 }
 const skins = new SkinPainter(viewer)
 const join = new JoinScreen(socket, identity => {
   hud.setStatus('connecting', `joining as ${identity.username}…`)
+  hand.setVisible(true)
 })
 
 const input = setupInput({ socket, viewer, camera, hud, inventoryUI, canvas, hand, join })
@@ -133,6 +135,7 @@ socket.on('version', version => {
   }
 })
 
+let lastPos = null
 socket.on('position', ({ pos, yaw, pitch }) => {
   // While we hold pointer lock our own angles win; otherwise ride along with
   // whoever is currently driving.
@@ -140,6 +143,7 @@ socket.on('position', ({ pos, yaw, pitch }) => {
     camera.yaw = yaw
     camera.pitch = pitch
   }
+  lastPos = pos
   viewer.setFirstPersonCamera(pos, camera.yaw, camera.pitch)
   minimap.setCenter(pos)
 })
@@ -150,6 +154,14 @@ socket.on('dig:stop', () => breaking.stop())
 socket.on('state', state => {
   hud.setState(state)
   applySkyForTime(viewer, state.timeOfDay, sky)
+  // The camera dips while sneaking. Viewer only applies the flag on the next
+  // position packet, and a bot sneaking in place never sends one, so reapply
+  // the last position ourselves.
+  const sneaking = Boolean(state.sneaking)
+  if (viewer.isSneaking !== sneaking) {
+    viewer.isSneaking = sneaking
+    if (lastPos) viewer.setFirstPersonCamera(lastPos, camera.yaw, camera.pitch)
+  }
   if (state.targetBlock) {
     const { x, y, z } = state.targetBlock.position
     highlight.position.set(x + 0.5, y + 0.5, z + 0.5)

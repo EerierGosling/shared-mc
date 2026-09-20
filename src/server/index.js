@@ -2,6 +2,7 @@
 const path = require('path')
 const http = require('http')
 const express = require('express')
+const compression = require('compression')
 const { Server } = require('socket.io')
 const mc = require('minecraft-protocol')
 
@@ -26,9 +27,19 @@ const clientDir = path.join(__dirname, '..', 'client')
 const distDir = path.join(__dirname, '..', '..', 'dist')
 const viewerPublic = path.join(path.dirname(require.resolve('prismarine-viewer/package.json')), 'public')
 
+// gzip for everything below. The block atlas JSON and the client bundle are
+// megabytes of highly repetitive text and shrink several times over; the
+// socket has its own deflate and is untouched by this.
+app.use(compression())
+
+// Everything under a version or package number is immutable for as long as
+// that number holds, so browsers may keep it; the bundle changes on every
+// build and stays on plain ETag revalidation.
+const CACHED = { maxAge: '1d' }
+
 app.get(['/', '/index.html'], (req, res) => res.sendFile(path.join(clientDir, 'index.html')))
 app.use('/dist', express.static(distDir))
-app.use('/fonts', express.static(path.join(clientDir, 'fonts')))
+app.use('/fonts', express.static(path.join(clientDir, 'fonts'), { maxAge: '7d' }))
 
 // prismarine-viewer only ships atlases for some versions (…, 1.20.1, 1.21.1,
 // …). Rounding DOWN to the previous atlas loses every block added since —
@@ -45,13 +56,13 @@ if (!assetVersion) {
 if (assetVersion && assetVersion !== config.mc.version) {
   console.log(`viewer assets: serving ${assetVersion} atlas as ${config.mc.version}`)
   app.get(`/textures/${config.mc.version}.png`, (req, res) =>
-    res.sendFile(path.join(viewerPublic, 'textures', `${assetVersion}.png`)))
+    res.sendFile(path.join(viewerPublic, 'textures', `${assetVersion}.png`), CACHED))
   app.get(`/blocksStates/${config.mc.version}.json`, (req, res) =>
-    res.sendFile(path.join(viewerPublic, 'blocksStates', `${assetVersion}.json`)))
-  app.use(`/textures/${config.mc.version}`, express.static(path.join(viewerPublic, 'textures', assetVersion)))
+    res.sendFile(path.join(viewerPublic, 'blocksStates', `${assetVersion}.json`), CACHED))
+  app.use(`/textures/${config.mc.version}`, express.static(path.join(viewerPublic, 'textures', assetVersion), CACHED))
 }
 
-app.use(express.static(viewerPublic))
+app.use(express.static(viewerPublic, CACHED))
 
 function pickAssetVersion (version) {
   if (supportedVersions.includes(version)) return version
@@ -68,7 +79,7 @@ function pickAssetVersion (version) {
 // text labels.
 try {
   const assets = require('minecraft-assets')(config.mc.version)
-  if (assets && assets.directory) app.use('/assets', express.static(assets.directory))
+  if (assets && assets.directory) app.use('/assets', express.static(assets.directory, CACHED))
 } catch (err) {
   console.warn(`no minecraft-assets for ${config.mc.version}; inventory will use text labels`)
 }
