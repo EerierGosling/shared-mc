@@ -165,8 +165,10 @@ function setupInput ({ socket, viewer, camera, hud, inventoryUI, canvas, hand, j
 
   cameraControls = setupCameraControls({
     socket,
+    mount: document.getElementById('pause'),
     canPlay: () => socket.connected && join.joined && !uiOpen() && !document.hidden && document.hasFocus(),
     onStart: () => { releaseAll(); pause.close() },
+    onDone: () => pause.showPage('main'),
     apply: (state, dt = 0) => {
       const changed = CONTROL_KEYS.some(key => Boolean(state[key]) !== Boolean(gestureState[key]))
       const startingDig = state.digging && !gestureState.digging
@@ -340,7 +342,10 @@ function setupInput ({ socket, viewer, camera, hud, inventoryUI, canvas, hand, j
       // Firefox delivers the Escape that released the lock as well, right
       // after pointerlockchange has opened the menu; a second press is what
       // closes it, so a fresh menu ignores the one that opened it.
-      if (event.code === 'Escape' && !pause.justOpened) resume()
+      if (event.code === 'Escape' && !pause.justOpened) {
+        if (pause.page === 'main') resume()
+        else pause.showPage('main')
+      }
       return
     }
 
@@ -448,6 +453,7 @@ function setupInput ({ socket, viewer, camera, hud, inventoryUI, canvas, hand, j
   })
 
   return {
+    showMotion: on => on ? cameraControls.show() : cameraControls.hide(),
     ownsLook,
     releaseAll,
     resume

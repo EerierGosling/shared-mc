@@ -9,14 +9,16 @@ const { FIELDS, DEFAULTS, load, save } = require('./motion-settings')
 const RUNTIME = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.22-rc.20250304'
 const MODEL_ROOT = 'https://storage.googleapis.com/mediapipe-models/'
 
-module.exports = function setupCameraControls ({ apply, canPlay, onStart, socket, companion = false, mount = document.body }) {
+// In the game the panel is a page of the game menu (mount is #pause and the
+// menu shows and hides it, so onDone hands Done back to the menu); on the
+// phone it sits in the page and Done just hides it.
+module.exports = function setupCameraControls ({ apply, canPlay, onStart, onDone, socket, companion = false, mount = document.body }) {
   let settings = load()
   const gestures = new Gestures(settings)
   const faces = new FaceGestures()
   const steps = new PhoneSteps()
   const panel = document.createElement('section')
   panel.id = 'camera-controls'
-  panel.className = 'mc-panel'
   panel.hidden = true
   panel.setAttribute('aria-label', 'Motion controls setup')
   const pairing = companion
@@ -45,7 +47,7 @@ module.exports = function setupCameraControls ({ apply, canPlay, onStart, socket
       <button type="button" class="mc-button" data-action="motion">Phone Steps: OFF</button>
       <label class="mc-button mc-cycle">Camera:&nbsp;<select data-setting="camera"><option value="user">Front</option><option value="environment">Rear</option></select></label>
     </div>
-    <div class="motion-buttons motion-primary">
+    <div class="motion-buttons">
       <button type="button" class="mc-button wide" data-action="arm">Enable Player Control</button>
       <button type="button" class="mc-button wide" data-action="stop">Stop All Inputs</button>
     </div>
@@ -89,8 +91,6 @@ module.exports = function setupCameraControls ({ apply, canPlay, onStart, socket
   const status = $('[data-role=status]')
   const mode = $('[data-role=mode]')
   const startButton = $('[data-action=start]')
-  // The game menu's button; the phone page has no menu.
-  document.getElementById('pause-motion')?.addEventListener('click', () => show())
   let running = false
   let armed = false
   let generation = 0
@@ -310,7 +310,7 @@ module.exports = function setupCameraControls ({ apply, canPlay, onStart, socket
     document.activeElement?.blur()
   })
   $('[data-action=stop]').addEventListener('click', stop)
-  $('[data-action=hide]').addEventListener('click', hide)
+  $('[data-action=hide]').addEventListener('click', onDone || hide)
   $('[data-action=motion]').addEventListener('click', async () => {
     if (motionEnabled) { motionEnabled = false; practice(); $('[data-action=motion]').textContent = 'Phone Steps: OFF'; return }
     const token = generation
@@ -427,5 +427,5 @@ module.exports = function setupCameraControls ({ apply, canPlay, onStart, socket
   window.addEventListener('blur', reset)
   document.addEventListener('visibilitychange', () => { if (document.hidden) reset() })
   window.addEventListener('pagehide', () => { stop(); clearInterval(controlTimer) })
-  return { get active () { return armed }, reset, stop, show, practice }
+  return { get active () { return armed }, reset, stop, show, hide, practice }
 }

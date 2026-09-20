@@ -485,8 +485,11 @@
     margin: calc(20 * var(--u)) 0 calc(16 * var(--u));
     font-size: calc(var(--px) * 8px); font-weight: normal; line-height: 1;
   }
-  #pause .mc-button { margin-top: calc(4 * var(--u)); }
-  #pause .mc-button:first-of-type { margin-top: 0; }
+  /* The main page; the motion controls page is #camera-controls, in motion.css. */
+  #pause-main { display: flex; flex-direction: column; align-items: center; }
+  #pause-main[hidden] { display: none; }
+  #pause-main .mc-button { margin-top: calc(4 * var(--u)); }
+  #pause-main .mc-button:first-of-type { margin-top: 0; }
   /* Where this bot really is: the address as typed, then the IP the socket
      resolved to when they differ. */
   #pause-where {
@@ -659,7 +662,6 @@
     left: calc(35 * var(--u)); top: calc(11 * var(--u));
   }
 </style>
-<link rel="stylesheet" href="/motion.css">
 </head>
 <body>
   <canvas id="viewport"></canvas>
@@ -723,6 +725,7 @@
   </div>
 
   <div id="pause" class="overlay shadowed">
+    <div id="pause-main">
     <h1>Game menu</h1>
     <button id="pause-resume" class="mc-button" type="button">Back to Game</button>
     <button id="pause-motion" class="mc-button" type="button">Motion Controls...</button>
@@ -749,6 +752,7 @@
       <div class="row creative-only"><b>MMB</b><span>pick block</span></div>
       <div class="row creative-only"><b>double-space</b><span>toggle flight</span></div>
       <div class="row creative-only"><b>space / shift</b><span>fly up / down</span></div>
+    </div>
     </div>
   </div>
 

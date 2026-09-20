@@ -2,25 +2,24 @@
    control rows and the phone controller page. Widgets are the vanilla sprites
    under gui/sprites/widget at --px, like the rest of the interface. */
 
-/* --- the setup panel ------------------------------------------------------- */
-/* A container window at the top right of the world, so the practice readout
-   stays in view while you move. On the phone page it is the page itself. */
+/* --- the setup page -------------------------------------------------------- */
+/* A page of the game menu, laid out like vanilla's Options: the title up
+   top, rows of two 150x20 buttons on the dimmed world, Done at the bottom.
+   On the phone page it sits inside the page's own panel. */
 #camera-controls {
-  position: fixed; top: calc(4 * var(--u)); right: calc(4 * var(--u)); z-index: 100;
-  width: calc(212 * var(--u)); max-width: calc(100vw - 8 * var(--u));
-  max-height: calc(100dvh - 8 * var(--u)); overflow-y: auto;
-  padding: calc(4 * var(--u)) calc(5 * var(--u));
-  pointer-events: auto;
+  width: calc(310 * var(--u)); max-width: 92vw;
+  padding: 0 0 calc(12 * var(--u));
+  text-align: left; color: var(--mc-white);
 }
 #camera-controls[hidden] { display: none; }
 #camera-controls h2 {
-  margin: 0 0 calc(3 * var(--u));
-  font-size: calc(var(--px) * 8px); font-weight: normal; text-align: center;
+  margin: calc(20 * var(--u)) 0 calc(12 * var(--u));
+  font-size: calc(var(--px) * 8px); font-weight: normal; line-height: 1; text-align: center;
 }
 #camera-controls p { margin: calc(2 * var(--u)) 0; }
-#camera-controls small { display: block; color: #7f7f7f; font-size: calc(var(--px) * 6px); line-height: 1.4; }
-#camera-controls a { color: var(--ink); }
-#camera-controls .motion-live { color: var(--ink-green); }
+#camera-controls small { display: block; color: var(--mc-gray); font-size: calc(var(--px) * 6px); line-height: 1.4; }
+#camera-controls a { color: var(--mc-white); }
+#camera-controls .motion-live { color: var(--mc-green); }
 
 /* The camera, framed like the join screen's player figure. Not scoped to the
    panel: the same element moves into #motion-feed while the panel is closed. */
@@ -33,19 +32,14 @@
 .motion-preview video { display: block; width: 100%; max-height: calc(95 * var(--u)); object-fit: contain; transform: scaleX(-1); }
 .motion-preview [data-role=landmarks] { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; transform: scaleX(-1); pointer-events: none; }
 
-/* Vanilla options rows: two 150x20 buttons per line, one full width. */
+/* Vanilla options rows: two 150x20 buttons per line, 10 apart, or one the
+   full 310 wide. */
 #camera-controls .motion-buttons {
-  display: grid; grid-template-columns: 1fr 1fr; gap: calc(2 * var(--u));
-  margin: calc(2 * var(--u)) 0;
+  display: grid; grid-template-columns: 1fr 1fr; gap: calc(4 * var(--u)) calc(10 * var(--u));
+  margin: calc(4 * var(--u)) 0;
 }
 #camera-controls .motion-buttons > * { width: 100%; height: calc(20 * var(--u)); margin: 0; }
 #camera-controls .motion-buttons .wide { grid-column: 1 / -1; }
-/* Enable / stop stay reachable while the tuning below is scrolled. */
-#camera-controls .motion-primary {
-  position: sticky; top: calc(-4 * var(--u)); z-index: 1;
-  padding: calc(2 * var(--u)) 0; margin: 0;
-  background: var(--gui);
-}
 #camera-controls .motion-buttons + .motion-buttons { margin-top: 0; }
 
 /* Vanilla cycles a choice with a button reading "Camera: Front". The native
@@ -100,11 +94,11 @@
   pointer-events: none; white-space: nowrap;
 }
 .mc-slider:hover span, .mc-slider:has(input:focus-visible) span { color: var(--mc-yellow); }
-#camera-controls [data-role=sliders] { display: flex; flex-direction: column; gap: calc(2 * var(--u)); margin: calc(2 * var(--u)) 0; }
+#camera-controls [data-role=sliders] { display: flex; flex-direction: column; gap: calc(4 * var(--u)); margin: calc(4 * var(--u)) 0; }
 
 /* Vanilla opens a sub screen from a "Controls..." button. A collapsible with
-   the button as its summary is the same idea without leaving the panel. */
-#camera-controls details { margin-top: calc(2 * var(--u)); }
+   the button as its summary is the same idea without leaving the page. */
+#camera-controls details { margin-top: calc(4 * var(--u)); }
 #camera-controls summary { list-style: none; width: 100%; height: calc(20 * var(--u)); margin: 0; display: flex; align-items: center; justify-content: center; }
 #camera-controls summary::-webkit-details-marker { display: none; }
 #camera-controls details[open] > summary { color: var(--mc-yellow); }
@@ -113,12 +107,12 @@
 #camera-controls li { margin-bottom: var(--u); }
 #camera-controls .motion-help p { font-size: calc(var(--px) * 7px); }
 
-/* Numbers, in the inset field the inventory uses for its search. */
+/* Numbers, in the inset black field of a vanilla text box. */
 #camera-controls [data-role=diagnostics] {
   margin: 0; white-space: pre-wrap;
   font: inherit; font-size: calc(var(--px) * 6px); line-height: 1.5;
   padding: calc(2 * var(--u));
-  color: var(--ink); background: var(--slot);
+  color: var(--mc-white); background: #000;
   border-style: solid; border-width: var(--u);
   border-color: var(--slot-dark) var(--gui-lit) var(--gui-lit) var(--slot-dark);
 }
@@ -180,10 +174,16 @@ body.companion {
 .companion .mc-button:hover, .companion .mc-button:focus-visible { color: var(--mc-yellow); }
 .companion .mc-button[hidden] { display: none; }
 .companion #pair-code { margin-top: var(--u); }
-/* Inside the page's own panel: no second frame, no floating. */
+/* Inside the page's own panel, under a rule, narrower than the game's page. */
 .companion #camera-controls {
-  position: static; width: auto; max-width: none; max-height: none;
-  border: 0; padding: 0; margin: calc(4 * var(--u)) 0 0;
-  border-top: var(--u) solid var(--slot); padding-top: calc(3 * var(--u));
+  width: auto; max-width: none;
+  margin: calc(4 * var(--u)) 0 0; padding: calc(3 * var(--u)) 0 0;
+  border-top: var(--u) solid var(--slot);
+  color: var(--ink);
 }
-.companion #camera-controls .motion-primary { position: static; }
+.companion #camera-controls h2 { margin: 0 0 calc(3 * var(--u)); }
+.companion #camera-controls small { color: #7f7f7f; }
+.companion #camera-controls a { color: var(--ink); }
+.companion #camera-controls .motion-live { color: var(--ink-green); }
+.companion #camera-controls .motion-buttons { gap: calc(2 * var(--u)); margin: calc(2 * var(--u)) 0; }
+.companion #camera-controls [data-role=diagnostics] { color: var(--ink); background: var(--slot); }

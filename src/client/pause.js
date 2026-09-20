@@ -12,21 +12,38 @@
  * The world keeps rendering underneath, and the held keys are released by
  * whoever opens this (pointer lock going away does it on desktop), so a
  * menu on screen never means a bot walking into lava.
+ *
+ * Like vanilla's Options, the motion controls are a page of this menu, not
+ * a window over it: "Motion Controls..." swaps the main page out for the
+ * setup panel (mounted in here by camera-controls.js) and Done or Escape
+ * brings the main page back. onPage tells the owner which one is showing.
  */
 class PauseMenu {
-  constructor ({ onResume, onQuit }) {
+  constructor ({ onResume, onQuit, onPage }) {
     this.root = document.getElementById('pause')
+    this.main = document.getElementById('pause-main')
     this.serverLine = document.getElementById('pause-server')
     this.addressLine = document.getElementById('pause-address')
     this.server = null
     this.openedAt = 0
+    this.page = 'main'
+    this.onPage = onPage
 
     document.getElementById('pause-resume').addEventListener('click', () => onResume())
     document.getElementById('pause-quit').addEventListener('click', () => onQuit())
+    document.getElementById('pause-motion').addEventListener('click', () => { this.open(); this.showPage('motion') })
   }
 
   get isOpen () {
     return this.root.classList.contains('open')
+  }
+
+  showPage (page) {
+    if (page === this.page) return
+    this.page = page
+    this.main.hidden = page !== 'main'
+    this.root.scrollTop = 0
+    this.onPage(page)
   }
 
   // True for a moment after opening: long enough to swallow the keydown of
@@ -43,7 +60,9 @@ class PauseMenu {
     this.render()
   }
 
+  // Closes on the main page, so the next Escape lands there.
   close () {
+    this.showPage('main')
     this.root.classList.remove('open')
     document.body.classList.remove('paused')
   }

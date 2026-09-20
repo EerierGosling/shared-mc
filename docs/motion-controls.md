@@ -1,16 +1,17 @@
 # Motion controls: setup, practice, and tuning
 
-## Open the setup panel from the game menu
+## Open the setup page from the game menu
 
-Join the game normally, then open **Game menu → Motion Controls**. Setup starts
+Join the game normally, then open **Game menu → Motion Controls**. It is a
+page of the game menu; **Done** or Escape returns to the menu. Setup starts
 in **practice mode**, without requesting camera permission until you press
-**Start Camera**. While the camera runs and the panel is closed, its feed stays
-in a small box beside the minimap.
+**Start Camera**. While the camera runs and the page is not showing, its feed
+stays in a small box beside the minimap.
 
 Practice mode displays detected actions without sending them to the player.
 Press **Enable Player Control** when ready. **Return to Practice** releases all
 motion actions; **Stop All Inputs** also stops the camera and motion sensor and
-revokes a desktop pairing. Done closes the panel and keeps enabled controls running.
+revokes a desktop pairing. Done returns to the game menu and keeps enabled controls running.
 Keyboard/touch input remains available alongside motion controls.
 
 ## Camera-only setup
