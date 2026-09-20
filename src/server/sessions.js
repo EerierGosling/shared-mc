@@ -234,22 +234,37 @@ class Sessions {
    * needs them labelled and skinned. Our own bots come with the skin their
    * visitor picked; `mode: 'player'` rows are real Minecraft clients read off
    * a bot's tab list, whose skins we cannot see, so they carry none.
+   *
+   * A tab-list name is matched against every session in the process, not
+   * only those under `key`: the same server typed as a hostname by one
+   * visitor and an IP by another is two keys, and each bot would otherwise
+   * see the other badged as a real player. Only this process logs browser
+   * bots in, so a name that belongs to any session here is ours.
    */
   roster (key) {
     const rows = []
+    const seen = new Set()
     for (const s of this._sessions(key)) {
-      rows.push({
-        username: s.identity.username,
-        skin: s.identity.skin,
-        mode: s.mode,
-        riders: s.mode === 'roadtrip' ? s.size : undefined
-      })
+      rows.push(this._row(s))
+      seen.add(s.identity.username)
     }
-    const ours = new Set(rows.map(r => r.username))
+    const ours = new Map(this._sessions().map(s => [s.identity.username, s]))
     for (const username of this._serverPlayers(key)) {
-      if (!ours.has(username)) rows.push({ username, mode: 'player' })
+      if (seen.has(username)) continue
+      seen.add(username)
+      const s = ours.get(username)
+      rows.push(s ? this._row(s) : { username, mode: 'player' })
     }
     return rows
+  }
+
+  _row (s) {
+    return {
+      username: s.identity.username,
+      skin: s.identity.skin,
+      mode: s.mode,
+      riders: s.mode === 'roadtrip' ? s.size : undefined
+    }
   }
 
   /** The roster for the server this socket is playing on; nothing before it joins. */
