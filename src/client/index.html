@@ -223,20 +223,35 @@
   #chat-input::placeholder { color: #7f7f7f; }
 
   /* --- player list --------------------------------------------------------- */
+  /* Sits under the minimap, which is 64 texels plus a texel of padding each
+     side, and moves up into its place while the map has nothing to show. */
   #players {
-    top: calc(2 * var(--u)); right: calc(2 * var(--u));
+    top: calc(70 * var(--u)); right: calc(2 * var(--u));
     min-width: calc(60 * var(--u));
     padding: calc(1 * var(--u)) calc(2 * var(--u));
     background: rgba(0, 0, 0, 0.5);
     text-shadow: var(--u) var(--u) 0 var(--shadow);
   }
+  #minimap:not(.live) ~ #players { top: calc(2 * var(--u)); }
   .player { display: flex; align-items: center; gap: calc(2 * var(--u)); }
+  .player i { flex: none; image-rendering: pixelated; }
   /* The face is the 8x8 head region of a 64x64 skin sheet, cropped by CSS. */
-  .player i {
+  .player .face {
     width: calc(8 * var(--u)); height: calc(8 * var(--u));
     background-size: calc(64 * var(--u)) calc(64 * var(--u));
     background-position: calc(-8 * var(--u)) calc(-8 * var(--u));
   }
+  /* How the name got onto the server, in the join screen's own vocabulary:
+     heart for the road trip, drumstick for a solo bot, and vanilla's
+     checkmark for a real Minecraft client. All three sprites are 9 texels. */
+  .player .badge {
+    width: calc(9 * var(--u)); height: calc(9 * var(--u));
+    margin-left: auto;
+    background-size: contain; background-repeat: no-repeat; background-position: center;
+  }
+  .player[data-mode="roadtrip"] .badge { background-image: url(/assets/gui/sprites/hud/heart/full.png); }
+  .player[data-mode="solo"] .badge { background-image: url(/assets/gui/sprites/hud/food_full.png); }
+  .player[data-mode="player"] .badge { background-image: url(/assets/gui/sprites/icon/checkmark.png); }
 
   /* --- join screen ---------------------------------------------------------- */
   #join {

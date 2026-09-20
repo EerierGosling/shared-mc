@@ -61,17 +61,26 @@ class Hud {
     this.status.textContent = message
   }
 
-  /** Who else is here. Vanilla shows this on Tab; we keep it always visible. */
+  /**
+   * Who else is here. Vanilla shows this on Tab; we keep it always visible.
+   * Each row is badged by how that name got onto the server — a real Minecraft
+   * client, a solo bot from this page, or the shared road trip bot — using
+   * the same sprites the join screen used to describe the two modes.
+   */
   setRoster (roster) {
     if (!this.players) return
     this.players.innerHTML = ''
-    for (const { username, skin } of roster) {
+    for (const { username, skin, mode } of roster) {
       const row = document.createElement('div')
       row.className = 'player'
+      row.dataset.mode = mode
       const face = document.createElement('i')
-      face.style.backgroundImage = `url(/assets/entity/player/wide/${skin}.png)`
-      row.appendChild(face)
-      row.appendChild(document.createTextNode(username))
+      face.className = 'face'
+      // A real player's skin is not ours to know; show the default face.
+      face.style.backgroundImage = `url(/assets/entity/player/wide/${skin || 'steve'}.png)`
+      const badge = document.createElement('i')
+      badge.className = 'badge'
+      row.append(face, document.createTextNode(username), badge)
       this.players.appendChild(row)
     }
   }

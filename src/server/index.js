@@ -77,6 +77,7 @@ try {
 // Two ways to play: ride the shared bot with everyone else, or drive one of
 // your own. Sessions owns both; nothing crosses between them but the roster.
 const sessions = new Sessions(config, io)
+sessions.onChange = () => broadcastRoster()
 
 function broadcastRoster () {
   io.emit('roster', sessions.roster())
