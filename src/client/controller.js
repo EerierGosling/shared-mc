@@ -1,13 +1,25 @@
 'use strict'
 const io = require('socket.io-client')
 const setupPhoneControls = require('./phone-controls')
+const setupSpeech = require('./speech')
 const socket = io({ transports: ['websocket', 'polling'] })
 const status = document.getElementById('pair-status')
 const code = document.getElementById('pair-code')
 const disconnect = document.getElementById('pair-disconnect')
 const connect = document.getElementById('pair-connect')
 const show = document.getElementById('show-controls')
+const talk = document.getElementById('talk')
 let paired = false
+// Speech notices replace the pairing status line; the game page gets them as
+// chat, which this page has none of.
+const speech = setupSpeech({ socket, notify: text => { status.textContent = text.replace(/^\* /, '') } })
+// The server says at join:options whether it can transcribe, and the button
+// is pointless before pairing: the words have nowhere to go.
+let speechEnabled = false
+socket.on('join:options', options => {
+  speechEnabled = Boolean(options.speech)
+  talk.hidden = !(paired && speechEnabled)
+})
 let wakeLock = null
 let wakeGeneration = 0
 const hashCode = window.location.hash.slice(1)
@@ -41,9 +53,11 @@ const controls = setupPhoneControls({
 function ended (message) {
   paired = false
   controls.stop()
+  speech.stop()
   releaseWake()
   disconnect.hidden = true
   show.hidden = true
+  talk.hidden = true
   connect.disabled = !socket.connected
   status.textContent = message
 }
@@ -61,6 +75,7 @@ function pair () {
     status.textContent = 'Paired. Tap Start Mining to allow motion access and start tracking. Enable Player Control on the game screen when ready.'
     disconnect.hidden = false
     show.hidden = false
+    talk.hidden = !speechEnabled
     controls.show()
     document.querySelector('[data-action=motion]').scrollIntoView({ block: 'center' })
   })
@@ -71,6 +86,17 @@ document.getElementById('pair-form').addEventListener('submit', event => {
 })
 disconnect.addEventListener('click', () => { socket.emit('motion:unpair'); ended('Disconnected. Generate a new code to pair again.') })
 show.addEventListener('click', () => controls.show())
+// Held like the game's own mic button: the mic is open only while a finger
+// is down, and anything that takes the finger away (a cancelled pointer, the
+// page going hidden) releases it.
+talk.addEventListener('pointerdown', event => {
+  event.preventDefault()
+  if (!paired) return
+  talk.setPointerCapture(event.pointerId)
+  speech.start()
+})
+for (const event of ['pointerup', 'pointercancel']) talk.addEventListener(event, () => speech.stop())
+talk.addEventListener('contextmenu', event => event.preventDefault())
 socket.on('connect', () => {
   connect.disabled = false
   status.textContent = 'Ready to pair. Enter a code and connect.'
@@ -83,7 +109,7 @@ socket.on('connect', () => {
 socket.on('motion:ended', () => ended('Pairing ended. Generate a new code on the game screen.'))
 socket.on('disconnect', () => ended('Connection lost. Reconnect with a new pairing code.'))
 document.addEventListener('visibilitychange', () => {
-  if (document.hidden) releaseWake()
+  if (document.hidden) { releaseWake(); speech.stop() }
   else if (paired && controls.active) keepAwake()
 })
 window.addEventListener('pagehide', releaseWake)

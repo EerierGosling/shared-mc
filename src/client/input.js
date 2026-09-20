@@ -110,7 +110,7 @@ function setupInput ({ socket, viewer, camera, hud, inventoryUI, advancementsUI,
   }
 
   // Talk is held like mine and use: V on a keyboard, the mic button on touch.
-  const speech = setupSpeech({ socket, hud })
+  const speech = setupSpeech({ socket, notify: text => hud.addChat(text) })
 
   const releaseAll = () => {
     cameraControls?.reset()

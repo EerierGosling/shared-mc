@@ -32,14 +32,16 @@ const tick = () => new Promise(resolve => setImmediate(resolve))
 function setup ({ configured = true } = {}) {
   const connections = []
   const transcripts = []
+  const sockets = Object.fromEntries(['a', 'b', 'lobby', 'phone'].map(id => [id, new Socket(id)]))
+  // 'phone' is paired to 'a' until the test unpairs it.
+  const pairing = { phone: sockets.a }
   const speech = new Speech({
-    isPlayer: id => id !== 'lobby',
+    playerFor: socket => ['a', 'b'].includes(socket.id) ? socket : pairing[socket.id] || null,
     onTranscript: (socket, text) => transcripts.push([socket.id, text]),
     connect: configured ? async () => { const dg = new FakeDeepgram(); connections.push(dg); return dg } : null
   })
-  const sockets = Object.fromEntries(['a', 'b', 'lobby'].map(id => [id, new Socket(id)]))
   for (const s of Object.values(sockets)) speech.register(s)
-  return { speech, connections, transcripts, ...sockets }
+  return { speech, connections, transcripts, pairing, ...sockets }
 }
 
 test('each socket gets its own transcription, delivered to its own session', async () => {
@@ -101,6 +103,33 @@ test('nothing heard, disconnects and an unconfigured server are reported without
   assert.equal(none.length, 0)
   lobby.receive('speech:start')
   assert.deepEqual(lobby.sent, [{ event: 'speech:error', payload: { reason: NOT_CONFIGURED } }])
+})
+
+test('a paired phone speaks for its host, who sees the progress', async () => {
+  const { a, phone, connections, transcripts, pairing } = setup()
+  phone.receive('speech:start')
+  await tick()
+  assert.deepEqual(a.sent, [{ event: 'speech:phone', payload: { state: 'listening' } }])
+  connections[0].results('dig here')
+  phone.receive('speech:stop')
+  assert.deepEqual(a.sent.at(-1), { event: 'speech:phone', payload: { state: 'sending' } })
+  connections[0].end()
+  assert.deepEqual(transcripts, [['a', 'dig here']])
+  assert.deepEqual(phone.sent.at(-1), { event: 'speech:result', payload: { text: 'dig here' } })
+  assert.deepEqual(a.sent.at(-1), { event: 'speech:phone', payload: { state: 'idle' } })
+  // Unpaired mid-hold: the phone gets its result but nobody says the words.
+  phone.receive('speech:start')
+  await tick()
+  connections[1].results('not mine')
+  delete pairing.phone
+  phone.receive('speech:stop')
+  connections[1].end()
+  assert.deepEqual(transcripts, [['a', 'dig here']])
+  assert.deepEqual(phone.sent.at(-1), { event: 'speech:result', payload: { text: 'not mine' } })
+  // Never paired: nothing starts.
+  phone.receive('speech:start')
+  await tick()
+  assert.equal(connections.length, 2)
 })
 
 test('spoken lines queue one per chat interval instead of being refused', async () => {

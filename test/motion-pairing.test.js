@@ -110,8 +110,13 @@ test('pair before joining; only mining is relayed once the host joins', t => {
   const gestures = { digging: true, forward: true, jump: true, use: true, dx: 1, dy: -1 }
   phone.receive('motion:state', gestures)
   assert.equal(host.sent.length, count, 'No game input before joining')
+  assert.equal(manager.hostOf(phone.id), null, 'The phone speaks for nobody before the host joins')
   joined.add(host.id)
   phone.receive('motion:state', gestures)
   assert.deepEqual(host.sent.at(-1), { event: 'motion:state', payload: packet })
+  assert.equal(manager.hostOf(phone.id), host)
+  assert.equal(manager.hostOf(host.id), null)
+  phone.receive('motion:unpair')
+  assert.equal(manager.hostOf(phone.id), null)
   assert.deepEqual(sanitize({ digging: false }), { ...packet, digging: false })
 })

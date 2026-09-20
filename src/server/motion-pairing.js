@@ -82,6 +82,12 @@ class MotionPairing {
     socket.on('disconnect', () => this.remove(socket))
   }
 
+  /** The player socket a paired phone speaks for, while that host is playing. */
+  hostOf (socketId) {
+    const entry = this.phones.get(socketId)
+    return entry && this.isPlayer(entry.host.id) ? entry.host : null
+  }
+
   remove (socket) {
     const entry = this.hosts.get(socket.id) || this.phones.get(socket.id)
     if (!entry) return

@@ -150,7 +150,7 @@ const sessions = new Sessions(config, io, load)
 const motionPairing = new MotionPairing(id => sessions.modeBySocket.has(id))
 const speech = new Speech({
   apiKey: config.speech.apiKey,
-  isPlayer: id => sessions.modeBySocket.has(id),
+  playerFor: socket => sessions.modeBySocket.has(socket.id) ? socket : motionPairing.hostOf(socket.id),
   onTranscript: (socket, text) => sessions.say(socket, text)
 })
 metrics.install(app, sessions, io, load)

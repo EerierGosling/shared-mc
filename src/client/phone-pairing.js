@@ -77,7 +77,7 @@ function buildPairingUI (link, {
     <p data-role="pair-status">No phone connected. Codes expire after five minutes and work once.</p>
     <label class="motion-field">Site address reachable from your phone <input type="text" class="mc-text" data-role="pair-origin" aria-label="Phone-accessible HTTPS site address"></label>
     <small>Use this server's HTTPS address. localhost on your phone points to the phone, not your computer.</small>
-    <small>The phone uses its accelerometer for mining. Pairing does not create another player.</small>`
+    <small>The phone uses its accelerometer for mining, and its Hold to Talk button sends speech to chat as you. Pairing does not create another player.</small>`
   const $ = selector => details.querySelector(selector)
   const pairStatus = $('[data-role=pair-status]')
   const pairButton = $('[data-action=pair]')

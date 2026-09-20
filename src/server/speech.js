@@ -9,6 +9,11 @@
 // to `onTranscript`, which queues it on the speaker's session (one queue per
 // bot: a solo player's own, or the road trip's shared one), and echoed to
 // the speaker as `speech:result` so the page can show what was heard.
+//
+// The speaker is not always the player: a paired phone (motion-pairing.js)
+// can hold its own mic, and its words go to the host browser's bot. The
+// host is then told the phone's progress as `speech:phone` so its HUD can
+// show listening/sending the way it does for its own key.
 
 const MAX_CHUNK_BYTES = 64 * 1024
 // A held button must not stream for ever if the release is lost.
@@ -20,14 +25,16 @@ const NOT_CONFIGURED = 'speech to text is not set up on this server'
 
 class Speech {
   /**
+   * `playerFor` maps a socket to the player socket it speaks for: itself
+   * while it is playing, its host while it is a paired phone, else null.
    * `connect` opens a Deepgram live socket; the default builds one from the
    * SDK, and tests hand in a fake.
    */
-  constructor ({ apiKey, isPlayer, onTranscript, connect }) {
-    this.isPlayer = isPlayer
+  constructor ({ apiKey, playerFor, onTranscript, connect }) {
+    this.playerFor = playerFor
     this.onTranscript = onTranscript
     this.connect = connect || (apiKey ? deepgramConnect(apiKey) : null)
-    this.live = new Map() // socket.id -> { socket, dg, parts, queue, timer, closing }
+    this.live = new Map() // socket.id -> { socket, player, dg, parts, queue, timer, closing }
   }
 
   get enabled () {
@@ -43,10 +50,12 @@ class Speech {
 
   async start (socket) {
     if (!this.enabled) return socket.emit('speech:error', { reason: NOT_CONFIGURED })
-    if (!this.isPlayer(socket.id)) return
+    const player = this.playerFor(socket)
+    if (!player) return
     this.abort(socket.id)
-    const entry = { socket, dg: null, parts: [], queue: [], timer: null, closing: false, done: false }
+    const entry = { socket, player, dg: null, parts: [], queue: [], timer: null, closing: false, done: false }
     this.live.set(socket.id, entry)
+    this._progress(entry, 'listening')
     entry.timer = setTimeout(() => this.stop(socket.id), MAX_HOLD_MS)
     let dg
     try {
@@ -87,6 +96,7 @@ class Speech {
     const entry = this.live.get(socketId)
     if (!entry || entry.closing) return
     entry.closing = true
+    this._progress(entry, 'sending')
     clearTimeout(entry.timer)
     entry.timer = setTimeout(() => this._deliver(entry), FLUSH_TIMEOUT_MS)
     // Not open yet: start() sends the close once it is.
@@ -104,7 +114,8 @@ class Speech {
     if (entry.done) return
     const text = entry.parts.join(' ').replace(/\s+/g, ' ').trim()
     entry.socket.emit('speech:result', { text })
-    if (text) this.onTranscript(entry.socket, text)
+    // A phone unpaired mid-hold no longer speaks for anyone.
+    if (text && this.playerFor(entry.socket) === entry.player) this.onTranscript(entry.player, text)
     this._finish(entry)
   }
 
@@ -117,11 +128,16 @@ class Speech {
 
   _finish (entry) {
     entry.done = true
+    this._progress(entry, 'idle')
     clearTimeout(entry.timer)
     if (this.live.get(entry.socket.id) === entry) this.live.delete(entry.socket.id)
     if (entry.dg) {
       try { entry.dg.close() } catch (err) { /* already closed */ }
     }
+  }
+
+  _progress (entry, state) {
+    if (entry.player !== entry.socket) entry.player.emit('speech:phone', { state })
   }
 }
 

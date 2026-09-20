@@ -203,6 +203,11 @@ body.companion {
 .companion .mc-button:hover, .companion .mc-button:focus-visible { color: var(--mc-yellow); }
 .companion .mc-button[hidden] { display: none; }
 .companion #pair-code { margin-top: var(--u); }
+/* Hold to Talk: red while the mic is open, dimmed while the last recording
+   is being transcribed, the same states as the game's own mic button. */
+.companion #talk { height: calc(30 * var(--u)); }
+body.companion.talking #talk { background: #a03030; border-color: #ff8080 #501010 #501010 #ff8080; }
+body.companion.talk-busy #talk { opacity: 0.4; }
 /* Inside the page's own panel, under a rule, narrower than the game's page. */
 .companion #camera-controls {
   width: auto; max-width: none;
