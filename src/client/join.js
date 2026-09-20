@@ -14,13 +14,12 @@ const MODES = [
   {
     id: 'roadtrip',
     title: 'Collaborative',
-    blurb: 'Everyone drives one character together.',
-    note: 'One shared character. Held keys are merged, so it keeps walking while anyone holds W, and everyone sees the same inventory.'
+    blurb: 'Control one player together with everyone else.'
   },
   {
     id: 'solo',
     title: 'Solo',
-    blurb: 'A character of your own on the same world.'
+    blurb: 'Control your own player.'
   }
 ]
 
@@ -52,7 +51,6 @@ class JoinScreen {
     this.build = document.getElementById('join-build')
     this.button = document.getElementById('join-button')
     this.doll = document.getElementById('join-doll')
-    this.note = document.getElementById('join-note')
 
     this.mode = null
     this.skin = 'steve'
@@ -162,10 +160,8 @@ class JoinScreen {
     this.mode = mode
     this.renderModes()
     // Only your own bot needs a name and a face; the shared one already has
-    // both, so the right column shows it and says what sharing means.
+    // both, so the right column just shows it.
     this.root.dataset.mode = mode
-    const chosen = MODES.find(m => m.id === mode)
-    this.note.textContent = (chosen && chosen.note) || ''
     this.setDoll(mode === 'solo' ? this.skin : (this.options && this.options.skins && this.options.skins[0]) || 'steve')
     this.button.disabled = false
     this.button.textContent = mode === 'roadtrip' ? 'Join in' : 'Play'

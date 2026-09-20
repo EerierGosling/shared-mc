@@ -484,8 +484,6 @@
   .doll .d-pants-l { left: calc(8 * var(--t)); top: calc(20 * var(--t)); width: calc(4 * var(--t)); height: calc(12 * var(--t)); background-position: calc(-4 * var(--t)) calc(-52 * var(--t)); }
   /* Nobody chosen yet: the doll waits in the dark. */
   #join:not([data-mode]) .doll { opacity: 0.35; }
-  #join-note { margin: 0; font-size: calc(var(--px) * 6px); color: #555; line-height: 1.5; }
-  #join[data-mode="solo"] #join-note { display: none; }
 
   /* Name and skin only matter for your own bot, so they stay hidden until then. */
   #join-identity { display: none; flex-direction: column; gap: calc(2 * var(--u)); }
@@ -513,7 +511,7 @@
   /* The vanilla 200x20 widget, half width: the footer's right-hand end. */
   #join-button { margin: 0; width: calc(100 * var(--u)); flex: none; }
 
-  /* Phones: one column, the doll beside the note rather than above it. */
+  /* Phones: one column. */
   @media (max-width: 640px) {
     #join-panel {
       grid-template-columns: minmax(0, 1fr);
@@ -849,7 +847,6 @@
             <i class="d-head"></i><i class="d-hat"></i>
           </div>
         </div>
-        <p id="join-note">Pick how you want to play.</p>
         <div id="join-identity">
           <input id="join-name" maxlength="16" placeholder="your name" autocomplete="off" spellcheck="false">
           <div id="join-skins"></div>
