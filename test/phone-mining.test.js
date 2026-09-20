@@ -85,3 +85,19 @@ test('gentle forward thrusts mine at the lower default threshold', () => {
     assert.equal(h.sensor.active(h.time()), false)
   }
 })
+
+test('small sensor bias does not prevent arming or recognizing a short forward stroke', () => {
+  const sensor = new PhoneMining()
+  let now = 0
+  const sample = z => {
+    now += 20
+    return sensor.update({ acceleration: { x: 0.05, y: 0.04, z } }, now)
+  }
+  for (let i = 0; i < 30; i++) assert.equal(sample(0.06), false)
+  assert.equal(sensor.ready, true, 'A stationary hand need not be perfectly noise-free')
+  for (let i = 0; i < 4; i++) sample(-0.2)
+  const braking = [sample(0.2), sample(0.2), sample(0.2)]
+  assert.ok(braking.some(Boolean), 'A short forward stroke should register')
+  for (let i = 0; i < 25; i++) sample(0.06)
+  assert.equal(sensor.active(now), false)
+})

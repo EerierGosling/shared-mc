@@ -7,6 +7,7 @@ module.exports = function setupPhoneControls ({ mount, apply, canPlay, onStart, 
   const settings = load()
   const sensor = new PhoneMining()
   let enabled = false
+  let manual = false
   let generation = 0
   let started = 0
   const panel = document.createElement('section')
@@ -14,7 +15,8 @@ module.exports = function setupPhoneControls ({ mount, apply, canPlay, onStart, 
   panel.hidden = true
   panel.innerHTML = `<h2>Phone</h2>
     <p>Hold the phone upright, screen facing you. Thrust forward repeatedly to mine; rest to stop.</p>
-    <div class="motion-buttons"><button class="mc-button wide" data-action="motion">Start Mining</button>
+    <div class="motion-buttons"><button class="mc-button wide" type="button" data-action="mine" aria-pressed="false" style="touch-action: none; user-select: none">Hold to Mine</button>
+    <button class="mc-button wide" data-action="motion">Start Mining</button>
     <button class="mc-button wide" data-action="stop">Stop</button></div>
     <p data-role="mode" role="status">Mining is off.</p>
     <p data-role="detected">Detected: idle</p>
@@ -23,7 +25,40 @@ module.exports = function setupPhoneControls ({ mount, apply, canPlay, onStart, 
   mount.append(panel)
   const $ = selector => panel.querySelector(selector)
   const button = $('[data-action=motion]')
-  function reset () { sensor.reset(); apply(idle()) }
+  const mineButton = $('[data-action=mine]')
+  function releaseManual () {
+    manual = false
+    mineButton.setAttribute('aria-pressed', 'false')
+    if (!enabled) onStop?.()
+  }
+  function reset () { releaseManual(); sensor.reset(); apply(idle()) }
+  function pressManual () {
+    if (manual || !canPlay() || document.hidden) return
+    manual = true
+    mineButton.setAttribute('aria-pressed', 'true')
+    apply({ ...idle(), digging: true })
+    onStart()
+  }
+  function endManual () {
+    releaseManual()
+    apply({ ...idle(), digging: enabled && canPlay() && !document.hidden && document.hasFocus() && sensor.active(performance.now()) })
+  }
+  mineButton.addEventListener('pointerdown', event => {
+    if (event.button !== 0 || !event.isPrimary) return
+    event.preventDefault()
+    mineButton.setPointerCapture(event.pointerId)
+    pressManual()
+  })
+  for (const event of ['pointerup', 'pointercancel', 'lostpointercapture']) mineButton.addEventListener(event, endManual)
+  mineButton.addEventListener('keydown', event => {
+    if (!['Space', 'Enter'].includes(event.code)) return
+    event.preventDefault()
+    if (!event.repeat) pressManual()
+  })
+  mineButton.addEventListener('keyup', event => {
+    if (['Space', 'Enter'].includes(event.code)) { event.preventDefault(); endManual() }
+  })
+  mineButton.addEventListener('blur', endManual)
   function stop () {
     generation++
     enabled = false
@@ -70,15 +105,15 @@ module.exports = function setupPhoneControls ({ mount, apply, canPlay, onStart, 
   })
   const timer = setInterval(() => {
     const now = performance.now()
-    const digging = enabled && canPlay() && !document.hidden && document.hasFocus() && sensor.active(now)
+    const digging = canPlay() && !document.hidden && document.hasFocus() && (manual || (enabled && sensor.active(now)))
     apply({ ...idle(), digging })
     $('[data-role=detected]').textContent = digging ? 'Detected: mining' : 'Detected: idle'
     if (enabled) $('[data-role=diagnostics]').textContent = now - started > 3000 && now - sensor.lastSample > 1000
       ? 'No recent motion data. Check motion permissions and keep this page visible.'
-      : `Forward motion: ${sensor.strength.toFixed(2)} m/s²`
+      : `${sensor.status} Forward motion: ${sensor.strength.toFixed(2)} / ${settings.phoneThreshold} m/s²`
   }, 50)
   window.addEventListener('blur', reset)
   document.addEventListener('visibilitychange', () => { if (document.hidden) reset() })
   window.addEventListener('pagehide', () => { stop(); clearInterval(timer) })
-  return { get active () { return enabled }, stop, show: () => { panel.hidden = false } }
+  return { get active () { return enabled || manual }, stop, show: () => { panel.hidden = false } }
 }

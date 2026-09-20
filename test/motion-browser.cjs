@@ -99,42 +99,53 @@ async function main () {
     await host.locator('[data-action=arm]').click()
     await phone.locator('[data-action=motion]').click()
     assert.match(await phone.locator('[data-role=mode]').textContent(), /Player control enabled/)
-    const sendMotion = (z, count, y = 0) => phone.evaluate(async ({ z, count, y }) => {
+    const sendMotion = (z, count, y = 0.04) => phone.evaluate(async ({ z, count, y }) => {
       for (let i = 0; i < count; i++) {
         window.dispatchEvent(new DeviceMotionEvent('devicemotion', {
-          acceleration: { x: 0, y, z },
-          accelerationIncludingGravity: { x: 0, y: y + 9.8, z }
+          acceleration: { x: 0.05, y, z },
+          accelerationIncludingGravity: { x: 0.05, y: y + 9.8, z }
         }))
         await new Promise(resolve => setTimeout(resolve, 20))
       }
     }, { z, count, y })
-    await sendMotion(0, 15)
+    await sendMotion(0.06, 15)
     await sendMotion(0, 6, 5)
     await sendMotion(0, 6, -5)
-    await sendMotion(0, 15)
+    await sendMotion(0.06, 15)
     assert.ok(!packets.some(state => state.digging), 'Stationary and vertical handling do not mine')
-    await sendMotion(-4, 6)
-    await sendMotion(4, 4)
+    await sendMotion(-0.2, 4)
+    await sendMotion(0.2, 3)
     await phone.waitForTimeout(80)
     assert.ok(packets.some(state => state.digging), 'Phone swings start mining')
     assert.ok(!packets.some(state => state.forward || state.jump), 'Phone acceleration never walks or autojumps')
     const miningStart = packets.length
     for (let stroke = 0; stroke < 5; stroke++) {
       await sendMotion(0, 8)
-      await sendMotion(-4, 6)
-      await sendMotion(4, 4)
+      await sendMotion(-0.2, 4)
+      await sendMotion(0.2, 3)
     }
     assert.ok(!packets.slice(miningStart).some(p => p.digging === false), 'Repeated thrusts hold mining continuously')
-    await sendMotion(0, 30)
+    await sendMotion(0.06, 30)
     await phone.waitForTimeout(100)
     assert.equal(packets.filter(p => 'digging' in p).at(-1).digging, false, 'Resting releases mining')
     await phone.locator('[data-action=stop]').click()
     await phone.waitForTimeout(200)
     assert.equal(packets.filter(p => 'digging' in p).at(-1).digging, false)
+    // Manual mining works with the accelerometer stopped and releases on up.
+    const mineButton = phone.locator('[data-action=mine]')
+    await mineButton.scrollIntoViewIfNeeded()
+    const mineBox = await mineButton.boundingBox()
+    await phone.mouse.move(mineBox.x + mineBox.width / 2, mineBox.y + mineBox.height / 2)
+    await phone.mouse.down()
+    await phone.waitForTimeout(150)
+    assert.equal(packets.filter(p => 'digging' in p).at(-1).digging, true)
+    await phone.mouse.up()
+    await phone.waitForTimeout(150)
+    assert.equal(packets.filter(p => 'digging' in p).at(-1).digging, false)
     await phone.locator('[data-role=tuning] > summary').click()
-    await phone.locator('[data-setting=phoneThreshold]').fill('2.2')
+    await phone.locator('[data-setting=phoneThreshold]').fill('1.2')
     assert.match(await phone.locator('[data-role=mode]').textContent(), /Mining is off/)
-    assert.equal(await phone.evaluate(() => JSON.parse(localStorage.getItem('motion-settings-v1')).phoneThreshold), 2.2)
+    assert.equal(await phone.evaluate(() => JSON.parse(localStorage.getItem('motion-settings-v1')).phoneThreshold), 1.2)
     await phone.screenshot({ path: '/private/tmp/shared-mc-phone.png', fullPage: true })
     await phone.locator('#pair-disconnect').click()
     await host.waitForFunction(() => document.querySelector('[data-role=pair-status]').textContent.includes('disconnected'))

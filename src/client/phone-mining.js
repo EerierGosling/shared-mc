@@ -11,6 +11,7 @@ class PhoneMining {
     this.rawAnchor = null
     this.rawStableSince = null
     this.strength = 0
+    this.status = 'Hold still briefly to get ready.'
     this.quietSince = null
     this.ready = false
     this.stroke = null
@@ -38,17 +39,19 @@ class PhoneMining {
         a = { x: raw.x - this.gravity[0], y: raw.y - this.gravity[1], z: raw.z - this.gravity[2] }
       }
     }
-    if (!valid(a)) { this.reset(); return false }
+    if (!valid(a)) { this.reset(); this.status = 'No usable motion data. Check motion permissions.'; return false }
     this.lastSample = now
     this.strength = Math.max(0, -a.z)
     const flat = this.gravity && Math.abs(this.gravity[2]) > Math.hypot(...this.gravity) * 0.8
     const turning = event.rotationRate && Object.values(event.rotationRate).some(value => Number.isFinite(value) && Math.abs(value) > 120)
     if (flat || turning || (fallback && now - this.gravitySince < 500)) {
       this.digUntil = 0; this.stroke = null; this.ready = false; this.quietSince = null
+      this.status = flat ? 'Hold the phone upright with the screen facing you.' : turning ? 'Thrust forward without twisting the phone.' : 'Hold still while the motion sensor settles.'
       return false
     }
     const magnitude = Math.hypot(a.x, a.y, a.z)
-    if (magnitude < threshold * 0.45) {
+    // Sensor noise must not make a low mining threshold impossible to arm.
+    if (magnitude < Math.max(0.12, threshold * 0.45)) {
       if (this.quietSince === null) this.quietSince = now
       if (now - this.quietSince >= 150) {
         this.stroke = null
@@ -70,9 +73,9 @@ class PhoneMining {
     }
     if (this.stroke) {
       if (axial && a.z < -threshold) this.stroke.forward = now - this.stroke.started
-      else if (axial && a.z > threshold * 0.6 && this.stroke.forward >= 70) {
+      else if (axial && a.z > threshold * 0.6 && this.stroke.forward >= 40) {
         if (this.stroke.brakeSince === null) this.stroke.brakeSince = now
-        if (now - this.stroke.brakeSince >= 40) {
+        if (now - this.stroke.brakeSince >= 20) {
           this.digUntil = now + hold
           this.stroke = null
           // A completed stroke arms the next one without requiring a rest.
@@ -80,6 +83,7 @@ class PhoneMining {
         }
       } else if (magnitude >= threshold) this.stroke = null
     }
+    this.status = this.active(now) ? 'Mining — keep thrusting to continue.' : this.stroke ? 'Forward stroke detected — finish the thrust.' : this.ready ? 'Ready — thrust forward, screen facing you.' : 'Hold still briefly to get ready.'
     return this.active(now)
   }
   active (now) { return now < this.digUntil && now - this.lastSample < 250 }

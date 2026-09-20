@@ -88,7 +88,7 @@ including gravity.
 
 The game menu has two tracking options: **Camera** for body tracking and
 **Phone** for QR pairing. The phone controller uses only accelerometer mining;
-it has Start/Pause, Stop, and mining sensitivity controls, with no camera setup.
+it has Hold to Mine, Start/Pause, Stop, and mining sensitivity controls, with no camera setup. Hold to Mine works without enabling motion access; releasing it stops manual mining. The phone threshold slider ranges from 0.1 to 2 m/s².
 Camera walking and phone mining can run together.
 
 The receiving game browser's look-speed slider controls final turn speed.

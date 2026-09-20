@@ -1,7 +1,7 @@
 'use strict'
 const { test } = require('node:test')
 const assert = require('node:assert/strict')
-const { load, save } = require('../src/client/motion-settings')
+const { load, save, normalize, FIELDS } = require('../src/client/motion-settings')
 test('saved old defaults upgrade once while custom values survive', t => {
   const original = global.localStorage
   let stored = JSON.stringify({ stepThreshold: 0.13, swingThreshold: 2.5, phoneThreshold: 3, lookSpeed: 1.7 })
@@ -28,4 +28,11 @@ test('saved old defaults upgrade once while custom values survive', t => {
   assert.equal(custom.stepThreshold, 0.2)
   assert.equal(custom.swingThreshold, 4)
   assert.equal(custom.phoneThreshold, 1.5)
+})
+
+test('phone threshold slider and saved settings stay within 0.1 to 2 m/s²', () => {
+  assert.equal(FIELDS.phoneThreshold[1], 0.1)
+  assert.equal(FIELDS.phoneThreshold[2], 2)
+  assert.equal(normalize({ phoneThreshold: 8 }).phoneThreshold, 2)
+  assert.equal(normalize({ phoneThreshold: 0 }).phoneThreshold, 0.1)
 })
