@@ -25,12 +25,13 @@ const DOUBLE_TAP_MS = 300
  * the server, so aiming never waits for a round trip. Everything else is a
  * plain message; the bot stays authoritative over what actually happens.
  */
-function setupInput ({ socket, viewer, camera, hud, inventoryUI, canvas, hand, join }) {
+function setupInput ({ socket, viewer, camera, hud, inventoryUI, canvas, hand, join, creative }) {
   const held = Object.create(null)
   let locked = false
   let lastLookSent = 0
   let lookPending = false
   let lastForwardTap = 0
+  let lastJumpTap = 0
 
   const sendControls = () => {
     const payload = {}
@@ -81,6 +82,11 @@ function setupInput ({ socket, viewer, camera, hud, inventoryUI, canvas, hand, j
       hand.startSwinging()
     } else if (event.button === 2) {
       socket.emit('action:use')
+    } else if (event.button === 1) {
+      // Vanilla's pick block. preventDefault stops the browser opening its
+      // middle-click autoscroll instead.
+      event.preventDefault()
+      socket.emit('creative:pick')
     }
   })
 
@@ -117,6 +123,9 @@ function setupInput ({ socket, viewer, camera, hud, inventoryUI, canvas, hand, j
       event.preventDefault()
       if (locked) document.exitPointerLock()
       inventoryUI.toggle()
+      // Vanilla's creative screen opens with the search box already taking
+      // keystrokes; nothing else on this overlay wants them.
+      if (inventoryUI.isOpen) creative.focusSearch()
       return
     }
     if (event.code === 'Escape') {
@@ -150,6 +159,16 @@ function setupInput ({ socket, viewer, camera, hud, inventoryUI, canvas, hand, j
       const now = Date.now()
       if (now - lastForwardTap < DOUBLE_TAP_MS) held.autoSprint = true
       lastForwardTap = now
+    }
+    // Double-tapping space is how vanilla toggles creative flight. Asking for
+    // it without the grant only earns a notice in chat: the server kicks a bot
+    // that flies without permission, so the refusal lives on the server.
+    if (control === 'jump') {
+      const now = Date.now()
+      if (now - lastJumpTap < DOUBLE_TAP_MS && creative.canFly) {
+        socket.emit('creative:fly', { active: !creative.flying })
+      }
+      lastJumpTap = now
     }
     held[control] = true
     sendControls()

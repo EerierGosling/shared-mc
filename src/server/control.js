@@ -2,6 +2,7 @@
 const Vec3 = require('vec3')
 const { goals } = require('mineflayer-pathfinder')
 const { blockAtCursor, entityAtCursor } = require('./raycast')
+const { FLIGHT_DRIVEN } = require('./creative')
 
 const CONTROL_KEYS = ['forward', 'back', 'left', 'right', 'jump', 'sneak', 'sprint']
 
@@ -43,22 +44,27 @@ const DIG_NOTICE_MS = 4000
  * from lag and gets reported as a bug.
  */
 class Controller {
-  constructor (emitter, config, primitives, budget, chatLog) {
+  constructor (emitter, config, primitives, budget, chatLog, creative) {
     this.emitter = emitter
     this.config = config
     this.primitives = primitives
     this.budget = budget
     this.chatLog = chatLog
+    this.creative = creative
     this.bot = null
     this.desired = new Map() // socket.id -> that member's held keys
-    this.effective = {}
+    this.effective = {} // the merge: what the members between them are holding
+    this.applied = {} // what was last written to the bot, which flight changes
     this.lastLookAt = new Map() // socket.id -> timestamp
     this.lastChatAt = new Map()
     this.diggers = new Set() // socket.ids currently holding the mouse button
     this.lastDigNoticeAt = 0
     this.digHeld = false
     this.digging = false
-    for (const key of CONTROL_KEYS) this.effective[key] = false
+    for (const key of CONTROL_KEYS) {
+      this.effective[key] = false
+      this.applied[key] = false
+    }
   }
 
   setBot (bot) {
@@ -114,16 +120,31 @@ class Controller {
     for (const state of this.desired.values()) {
       for (const key of CONTROL_KEYS) if (state[key]) next[key] = true
     }
+    this.effective = next
+    // The flight loop reads the merge whole, flying or not, so it is already
+    // holding the right keys the moment flight starts.
+    if (this.creative) this.creative.setControls(next)
+
+    const flying = Boolean(this.creative && this.creative.flying)
     for (const key of CONTROL_KEYS) {
-      if (!force && next[key] === this.effective[key]) continue
-      this.effective[key] = next[key]
+      // While flying, creative.js moves the body by writing velocity each tick;
+      // leaving mineflayer's movement controls set would have
+      // prismarine-physics accelerate against that override.
+      const value = flying && FLIGHT_DRIVEN.has(key) ? false : next[key]
+      if (!force && value === this.applied[key]) continue
+      this.applied[key] = value
       if (!this.bot) continue
       try {
-        this.bot.setControlState(key, next[key])
+        this.bot.setControlState(key, value)
       } catch (err) {
         // bot went away between the check and the call
       }
     }
+  }
+
+  /** Flight starting or stopping changes which keys reach mineflayer. */
+  refreshControls () {
+    this._applyEffective(true)
   }
 
   look (socketId, look) {

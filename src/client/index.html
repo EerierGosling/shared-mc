@@ -422,6 +422,32 @@
   .grid .slot img { width: calc(16 * var(--u)); height: calc(16 * var(--u)); }
   .grid .slot .count { color: var(--mc-white); }
 
+  /* --- creative item list --------------------------------------------------- */
+  /* Hidden outright until the Minecraft server grants creative: creative.js
+     adds .open, so a survival session never sees a control it cannot use. */
+  #creative { display: none; }
+  #creative.open { display: block; margin-bottom: calc(3 * var(--u)); }
+  #creative-head { display: flex; align-items: baseline; gap: calc(2 * var(--u)); }
+  #creative-head .section-label { margin: 0; }
+  #creative-note { margin-left: auto !important; }
+  #creative-search {
+    flex: 1;
+    font: inherit; font-size: calc(var(--px) * 7px);
+    color: var(--ink); background: var(--slot);
+    border-style: solid; border-width: var(--u);
+    border-color: var(--slot-dark) var(--gui-lit) var(--gui-lit) var(--slot-dark);
+    padding: var(--u) calc(2 * var(--u));
+    outline: none;
+  }
+  /* Six rows visible, the rest scrolled - vanilla pages at five. */
+  #creative-list {
+    max-height: calc(6 * 19 * var(--u));
+    overflow-y: auto;
+    margin-bottom: var(--u);
+  }
+  .creative-only { display: none; }
+  body.creative .creative-only { display: inline; }
+
   /* The item currently picked up, following the mouse while the inventory is open. */
   #cursor-item {
     position: fixed; left: 0; top: 0; z-index: 20;
@@ -510,6 +536,7 @@
     <b>click</b> to play &nbsp; <b>WASD</b> move &nbsp; <b>space</b> jump<br>
     <b>LMB</b> mine &nbsp; <b>RMB</b> use/place &nbsp; <b>1-9</b> hotbar<br>
     <b>E</b> inventory &nbsp; <b>T</b> chat &nbsp; <b>Q</b> drop &nbsp; <b>G</b> walk to cursor
+    <span class="creative-only"><br><b>MMB</b> pick block &nbsp; <b>double-space</b> fly &nbsp; <b>space/shift</b> up/down</span>
   </div>
 
   <div id="players" class="overlay"></div>
@@ -530,6 +557,17 @@
   <div id="inventory" class="overlay">
     <div id="inventory-panel">
       <h2><span id="inventory-title">Inventory</span> <small>E or Esc to close</small></h2>
+      <!-- Creative only. Kept above the inventory so a stack dragged up out of
+           a slot and released here is destroyed, as it is in vanilla. -->
+      <div id="creative">
+        <div id="creative-head">
+          <p class="section-label">Creative</p>
+          <input id="creative-search" placeholder="search items" autocomplete="off" spellcheck="false">
+          <p id="creative-note" class="section-label"></p>
+        </div>
+        <div id="creative-list" class="grid"></div>
+        <p class="section-label">click for a stack, right-click for one, drop a stack here to destroy it</p>
+      </div>
       <div id="inventory-body"></div>
     </div>
     <div id="cursor-item" class="slot"></div>

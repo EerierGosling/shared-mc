@@ -7,6 +7,7 @@ const LightTracker = require('./lights')
 const InventoryBridge = require('./inventory')
 const ChatLog = require('./chat')
 const Respawner = require('./respawn')
+const Creative = require('./creative')
 const { Budget } = require('./limits')
 const { attachWorldView } = require('./worldStream')
 
@@ -44,7 +45,12 @@ class Session {
     // theirs alone, road trip riders share both.
     this.chatLog = new ChatLog(emitter)
     this.respawner = new Respawner(emitter, this.chatLog, () => this.size)
-    this.controller = new Controller(emitter, config, this.primitives, this.budget, this.chatLog)
+    // Creative is built before the controller because the controller has to
+    // ask it whether flight is running before deciding which held keys
+    // mineflayer is allowed to see.
+    this.creative = new Creative(emitter, config, this.budget, this.chatLog)
+    this.controller = new Controller(emitter, config, this.primitives, this.budget, this.chatLog, this.creative)
+    this.creative.onFlyingChange = () => this.controller.refreshControls()
     this.statePusher = new StatePusher(emitter, config)
     this.lights = new LightTracker(emitter)
     this.inventory = new InventoryBridge(emitter)
@@ -77,8 +83,10 @@ class Session {
     // A solo player is their own bot, so their chat lines carry that name.
     this.chatLog.register(socket, this.mode === 'solo' ? this.identity.username : null)
     this.respawner.register(socket)
+    this.creative.register(socket)
     this.primitives.sendAll(socket)
     this.lights.sendTo(socket)
+    this.creative.sendTo(socket)
     socket.emit('bot:status', this.status)
     // Each member needs their own world view: prismarine's WorldView tracks
     // which chunks that particular client has been sent.
@@ -117,6 +125,7 @@ class Session {
   _onReady (bot) {
     this.chatLog.setBot(bot)
     this.respawner.setBot(bot)
+    this.creative.setBot(bot)
     this.controller.setBot(bot)
     this.controller.attachPathfinderEvents(bot)
     this.statePusher.setBot(bot)
@@ -132,6 +141,7 @@ class Session {
   }
 
   _onDown (reason) {
+    this.creative.clearBot()
     this.controller.clearBot()
     this.statePusher.clearBot()
     this.lights.clearBot()
@@ -146,6 +156,7 @@ class Session {
   /** Must leave no bot behind: this now runs whenever the last member goes. */
   destroy () {
     this._detachAll()
+    this.creative.clearBot()
     this.controller.clearBot()
     this.statePusher.stop()
     this.statePusher.clearBot()

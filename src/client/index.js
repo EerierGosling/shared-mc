@@ -8,6 +8,7 @@ const { Viewer } = require('prismarine-viewer/viewer')
 const { supportedVersions } = require('prismarine-viewer/viewer/lib/version')
 const { Hud } = require('./hud')
 const InventoryUI = require('./inventory')
+const CreativeUI = require('./creative')
 const BlockLights = require('./lights')
 const Minimap = require('./minimap')
 const BreakingAnimation = require('./breaking')
@@ -38,6 +39,9 @@ const socket = io({ transports: ['websocket', 'polling'] })
 window.__socket = socket
 const hud = new Hud()
 const inventoryUI = new InventoryUI(socket)
+// Hidden until the Minecraft server says the bot really is in creative.
+const creative = new CreativeUI(socket)
+creative.onState = state => hud.setCreative(state)
 const minimap = new Minimap(viewer.entities)
 const breaking = new BreakingAnimation(viewer.scene)
 
@@ -62,7 +66,7 @@ const join = new JoinScreen(socket, identity => {
   hud.setStatus('connecting', `joining as ${identity.username}…`)
 })
 
-const input = setupInput({ socket, viewer, camera, hud, inventoryUI, canvas, hand, join })
+const input = setupInput({ socket, viewer, camera, hud, inventoryUI, canvas, hand, join, creative })
 
 const highlight = new THREE.LineSegments(
   new THREE.EdgesGeometry(new THREE.BoxGeometry(1.002, 1.002, 1.002)),
