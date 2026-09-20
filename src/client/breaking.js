@@ -42,6 +42,7 @@ class BreakingAnimation {
       this.materials.push(new THREE.MeshBasicMaterial({
         map: texture,
         transparent: true,
+        opacity: 0.5,
         depthWrite: false
       }))
     }

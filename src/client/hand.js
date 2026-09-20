@@ -96,7 +96,7 @@ function buildArmGeometry () {
 // item) around REST_POSITION so it reads at a similar apparent size without
 // needing to sit so far down/out that it clips.
 const SCALE = 0.8
-const REST_POSITION = [0.6``, -0.6, -0.55]
+const REST_POSITION = [0.6, -0.6, -0.55]
 // X here is the arm's pitch: how far it's raised off a straight hang, which
 // is what actually reads as "the arm" rather than a floating block — 35°
 // up, the vanilla-ish raised-fist angle.
@@ -202,15 +202,32 @@ class Hand {
           this.item.rotation.set(-0.25, -0.45, 0)
         } else {
           model.scale.setScalar(0.75)
-          this.item.position.set(-0.12, 0.12, -0.16)
+          this.item.position.set(...ARM_BOTTOM)
           this.item.rotation.set(-0.25, -0.45, -0.25)
         }
         this.item.add(model)
       }
     }
     this.root.matrix.copy(camera.matrixWorld)
+
+    // The item shares the arm's own local space closely enough (it's
+    // anchored at the arm's hand end) that it ends up partly or fully
+    // inside the arm's geometry — drawn together, the arm's depth values
+    // bury it. Draw them as two passes with the depth buffer cleared
+    // between, same idea as clearing depth before this scene draws over the
+    // world: whichever draws second wins, regardless of who's "really" in
+    // front in that shared local space.
+    const showingItem = this.item.children.length > 0
+    if (showingItem) this.item.visible = false
     renderer.clearDepth()
     renderer.render(this.scene, camera)
+    if (showingItem) {
+      this.item.visible = true
+      this.arm.visible = false
+      renderer.clearDepth()
+      renderer.render(this.scene, camera)
+      this.arm.visible = true
+    }
   }
 
   setItem (item) {
