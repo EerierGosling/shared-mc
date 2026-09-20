@@ -25,6 +25,11 @@ const MAX_CHAT_LENGTH = 256
 // cannot flood the chat log.
 const DIG_NOTICE_MS = 4000
 
+// Vanilla places at most once every four ticks while the button is held.
+const USE_COOLDOWN_MS = 200
+// How often an in-flight dig checks that the crosshair is still on its block.
+const DIG_WATCH_MS = 100
+
 /**
  * Translates browser input into one bot's actions.
  *
@@ -59,6 +64,7 @@ class Controller {
     this.lastChatAt = new Map()
     this.diggers = new Set() // socket.ids currently holding the mouse button
     this.lastDigNoticeAt = 0
+    this.lastUseAt = 0
     this.digHeld = false
     this.digging = false
     for (const key of CONTROL_KEYS) {
@@ -86,7 +92,7 @@ class Controller {
     socket.on('input:state', state => this.setInput(socket.id, state))
     socket.on('input:look', look => this.look(socket.id, look))
     socket.on('action:dig', payload => this.setDig(socket.id, Boolean(payload && payload.active)))
-    socket.on('action:use', () => this.use())
+    socket.on('action:use', payload => this.use(Boolean(payload && payload.repeat)))
     socket.on('action:attack', () => this.attack())
     socket.on('hotbar', payload => this.setHotbar(payload && payload.slot))
     socket.on('drop', () => this.drop())
@@ -237,12 +243,24 @@ class Controller {
         let digMs = 1000
         try { digMs = this.bot.digTime(block) } catch (err) {}
         this.emitter.emit('dig:start', { position: block.position, ms: digMs })
+        // Vanilla resets the dig the moment the crosshair leaves the block;
+        // mineflayer would finish the one it started, so a player sweeping
+        // across a wall would break blocks they had already moved off. Abort
+        // when the target changes and let the loop pick up the new one.
+        const watcher = setInterval(() => {
+          const now = this.targetBlock()
+          if (now && now.position.equals(block.position)) return
+          try {
+            this.bot.stopDigging()
+          } catch (err) {}
+        }, DIG_WATCH_MS)
         try {
           // 'ignore' keeps the bot's head where the browser pointed it.
           await this.bot.dig(block, 'ignore')
         } catch (err) {
           await sleep(100)
         } finally {
+          clearInterval(watcher)
           this.emitter.emit('dig:stop')
         }
       }
@@ -261,15 +279,23 @@ class Controller {
     }
   }
 
-  async use () {
+  /**
+   * Right click. `repeat` is the browser holding the button down, which
+   * vanilla treats as "keep placing" and nothing else: no re-opening the
+   * chest under the crosshair, no eating again.
+   */
+  async use (repeat = false) {
     const bot = this.bot
     if (!bot) return
+    const now = Date.now()
+    if (now - this.lastUseAt < USE_COOLDOWN_MS) return
+    this.lastUseAt = now
     const block = this.targetBlock()
     const held = bot.heldItem
 
     if (block) {
       const sneaking = this.effective.sneak
-      if (!sneaking && INTERACTABLE.test(block.name)) {
+      if (!repeat && !sneaking && INTERACTABLE.test(block.name)) {
         try {
           // Opening a chest changes nothing, so it costs no budget.
           await bot.activateBlock(block)
@@ -281,8 +307,14 @@ class Controller {
       if (held && this._isPlaceable(bot, held)) {
         if (!this._afford('place')) return
         const face = FACE_VECTORS[block.face] || new Vec3(0, 1, 0)
+        // Where on the face the crosshair actually hit. Slabs, stairs and
+        // trapdoors take their orientation from that point, so without it
+        // every slab lands on the bottom half. 'ignore' keeps the head where
+        // the browser pointed it, as dig() does — placeBlock() alone would
+        // snap the bot's look at the block and fight the mouse.
+        const delta = block.intersect ? block.intersect.minus(block.position) : undefined
         try {
-          await bot.placeBlock(block, face)
+          await bot._placeBlockWithOptions(block, face, { delta, forceLook: 'ignore', swingArm: 'right' })
           return
         } catch (err) {
           // no valid placement; fall through
@@ -290,6 +322,7 @@ class Controller {
       }
     }
 
+    if (repeat) return
     try {
       bot.activateItem()
       setTimeout(() => {

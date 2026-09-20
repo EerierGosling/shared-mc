@@ -55,7 +55,13 @@ class Session {
     this.lights = new LightTracker(emitter)
     this.inventory = new InventoryBridge(emitter)
 
-    this.holder = new BotHolder({ ...config.mc, username: identity.username })
+    this.holder = new BotHolder({
+      ...config.mc,
+      username: identity.username,
+      // One chunk past what WorldView streams: its ring is exclusive, and the
+      // pathfinder and the cursor raycast both like a little margin.
+      viewDistance: Math.max(2, config.viewDistance + 1)
+    })
     this.holder.on('log', message => console.log(`[${identity.username}] ${message}`))
     this.holder.on('ready', bot => this._onReady(bot))
     this.holder.on('down', reason => this._onDown(reason))

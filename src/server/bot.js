@@ -49,12 +49,19 @@ class BotHolder extends EventEmitter {
   }
 
   _connect () {
-    const { host, port, username, version, auth } = this.mcConfig
+    const { host, port, username, version, auth, viewDistance } = this.mcConfig
     this.emit('log', `connecting to ${host}:${port} as ${username} (${version}, ${auth})`)
 
     // respawn: false so death reaches the browser as a screen with a button;
     // respawn.js still respawns unattended bots so nothing stays dead.
-    const bot = mineflayer.createBot({ host, port, username, version, auth, respawn: false })
+    // viewDistance is what the bot asks the server for, in chunks. mineflayer
+    // defaults to 'far' (12), and every bot decodes and holds every chunk it is
+    // sent, so with several solo bots up that is most of the process's memory
+    // spent on terrain no browser is ever shown. WorldView streams only the
+    // configured radius, so ask for exactly that.
+    const bot = mineflayer.createBot({
+      host, port, username, version, auth, respawn: false, viewDistance
+    })
     this.bot = bot
     bot.loadPlugin(pathfinder)
 
