@@ -288,8 +288,8 @@ class Controller {
     try {
       while (this.digHeld && this.bot) {
         const block = this.targetBlock()
+        // Vanilla says nothing when the button is held on air.
         if (!block) {
-          this._digNotice('* nothing in reach to mine')
           await sleep(100)
           continue
         }
