@@ -122,18 +122,24 @@ class Gestures {
       z: Number.isFinite(p[hand].z) && Number.isFinite(p[shoulder].z) ? (p[hand].z - p[shoulder].z) * aspect / upperScale : null
     } : null
     const dt = this.previous ? (now - this.previous.time) / 1000 : 0
-    if (wrist && this.previous?.wrist && dt > 0 && dt <= 0.3) {
+    // Mining is a forward thrust of the mining arm toward the camera, not any
+    // swing. MediaPipe's z shrinks as a landmark nears the lens, so a thrust
+    // drives z down; requiring that forward motion to outrun the sideways and
+    // vertical drift is what keeps waving, reaching or fidgeting from mining.
+    // With no depth reading there is no thrust to measure, so nothing digs.
+    if (wrist && wrist.z !== null && this.previous?.wrist && this.previous.wrist.z !== null && dt > 0 && dt <= 0.3) {
       const old = this.previous.wrist
-      const depth = wrist.z !== null && old.z !== null ? wrist.z - old.z : 0
-      speed = Math.hypot(wrist.x - old.x, wrist.y - old.y, depth) / dt
+      const forward = old.z - wrist.z
+      const lateral = Math.hypot(wrist.x - old.x, wrist.y - old.y)
+      speed = forward > lateral ? forward / dt : 0
       if (speed > settings.swingThreshold) {
         if (!this.swingStart) this.swingStart = { ...old, time: this.previous.time, frames: 0 }
         const start = this.swingStart
         start.frames++
-        const displacement = Math.hypot(wrist.x - start.x, wrist.y - start.y, wrist.z !== null && start.z !== null ? wrist.z - start.z : 0)
-        // Confirm a sustained movement instead of mining from a single noisy
-        // frame. Net displacement rejects a spike that immediately snaps back.
-        if (start.frames >= 2 && now - start.time >= 75 && displacement > 0.18 && now - this.lastSwing > 250) {
+        // Net forward reach, not total travel: a spike that snaps straight back,
+        // or a stroke that wanders sideways, never accumulates a thrust.
+        const reach = start.z - wrist.z
+        if (start.frames >= 2 && now - start.time >= 75 && reach > 0.18 && now - this.lastSwing > 250) {
           this.digUntil = now + settings.digHold
           this.lastSwing = now
           this.swingStart = null

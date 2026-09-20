@@ -61,12 +61,12 @@ module.exports = function setupCameraControls ({ apply, canPlay, onStart, onDone
       <ol>
         <li>Place the camera at chest or face height with your whole body in view. Use even light and a clear background.</li>
         <li>Click Calibrate and stand still, looking straight ahead, until tracking is ready.</li>
-        <li>Lean your head each way, swing your mining arm, alternate knee lifts, then try a small jump. Watch Detected.</li>
+        <li>Lean your head each way, thrust your mining arm forward, alternate knee lifts, then try a small jump. Watch Detected.</li>
         <li>Lower a threshold if a gesture is missed. Raise it if ordinary movement triggers actions. Increase head dead zone for drift, smoothing for jitter, or reduce look speed for overshooting.</li>
         <li>Test standing still for 10 seconds and each gesture 10 times. Change one slider at a time. Enable player control when ready.</li>
       </ol>
       <p>Walking automatically jumps while moving forward. To jump from camera input, both feet and hips must rise.</p>
-      <p>To place a block, raise your other hand above your shoulder and hold it there a moment; lower and raise it again for the next block.</p>
+      <p>Thrust your mining arm forward to mine. To place a block, raise your other hand above your shoulder and hold it there a moment; lower and raise it again for the next block.</p>
       <p>Use a mounted camera for body tracking. For phone mining, pair a separate phone, enable its motion sensor, hold it upright with the screen facing you, then thrust it forward to mine. Keep the controller page visible and awake.</p>
       <p>Calibration and sliders personalize a pretrained detector; they do not train a new AI model. No videos or landmarks are uploaded.</p>
     </details>
@@ -403,7 +403,7 @@ module.exports = function setupCameraControls ({ apply, canPlay, onStart, onDone
     const m = candidate.metrics
     $('[data-role=diagnostics]').textContent = [
       m && `Head: ${m.headX.toFixed(2)}, ${m.headY.toFixed(2)} | dead zone ${settings.deadzone}`,
-      m && `Step lift: ${m.lift.toFixed(2)} / ${settings.stepThreshold} | arm: ${m.speed.toFixed(2)} / ${settings.swingThreshold}`,
+      m && `Step lift: ${m.lift.toFixed(2)} / ${settings.stepThreshold} | thrust: ${m.speed.toFixed(2)} / ${settings.swingThreshold}`,
       m && `Jump rise: ${m.rise.toFixed(2)} / ${settings.jumpThreshold} | raise: ${(m.place ?? 0).toFixed(2)} / ${settings.placeThreshold}`,
       settings.facial && `Expression: ${faceState.score.toFixed(2)} / ${settings.faceThreshold}`,
       running && `Tracking time: ${Math.round(inferenceMs)} ms. ${cameraFresh ? 'Camera live' : 'Waiting for fresh camera frames'}`

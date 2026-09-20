@@ -47,10 +47,11 @@ test('walking requires alternating steps, autojumps, and expires', () => {
 
 test('lost landmarks release mining and movement immediately', () => {
   const g = calibrated()
-  g.update(pose(), 1500)
-  const p = pose(); p[16].y += 0.1
+  const p = pose(); p[12].z = 0; p[16].z = 0
+  g.update(p, 1500)
+  p[16].z = -0.06
   assert.equal(g.update(p, 1550).digging, false)
-  p[16].y += 0.1
+  p[16].z = -0.12
   assert.equal(g.update(p, 1600).digging, true)
   assert.equal(g.update([], 1650).digging, false)
   assert.equal(g.update(pose(), 1700).digging, false)
@@ -85,13 +86,14 @@ test('upper-body calibration and steering do not require visible hips', () => {
   for (let i = 23; i < 33; i++) p[i].visibility = 0
   for (let i = 0; i < 30; i++) g.update(p, i * 50)
   assert.ok(g.neutral)
-  p[0].x += 0.05
+  p[0].x += 0.05; p[12].z = 0; p[16].z = 0
   const state = g.update(p, 1500)
   assert.ok(state.dx < 0)
   assert.equal(state.tracking.legs, false)
   assert.equal(state.forward, false)
-  p[16].y += 0.1; g.update(p, 1550)
-  p[16].y += 0.1
+  p[16].z = -0.06
+  assert.equal(g.update(p, 1550).digging, false)
+  p[16].z = -0.12
   assert.equal(g.update(p, 1600).digging, true)
 })
 
@@ -106,10 +108,12 @@ test('slow calibration drift cannot masquerade as a neutral pose', () => {
 
 test('single-frame wrist outliers and snap-back do not mine', () => {
   const g = calibrated()
-  g.update(pose(), 1500)
-  const p = pose(); p[16].y += 0.1
+  const p = pose(); p[12].z = 0; p[16].z = 0
+  g.update(p, 1500)
+  p[16].z = -0.12
   assert.equal(g.update(p, 1600).digging, false)
-  assert.equal(g.update(pose(), 1700).digging, false)
+  p[16].z = 0
+  assert.equal(g.update(p, 1700).digging, false)
 })
 
 test('forward punches use depth and require consecutive movement samples', () => {
@@ -124,10 +128,11 @@ test('forward punches use depth and require consecutive movement samples', () =>
 
 test('tracking gaps discard partial swings and pending walking', () => {
   const g = calibrated()
-  g.update(pose(), 1500)
-  const p = pose(); p[16].y += 0.1
+  const p = pose(); p[12].z = 0; p[16].z = 0
+  g.update(p, 1500)
+  p[16].z = -0.06
   g.update(p, 1550)
-  p[16].y += 0.1
+  p[16].z = -0.12
   const state = g.update(p, 2000)
   assert.equal(state.digging, false)
   assert.equal(state.forward, false)
@@ -176,18 +181,38 @@ test('a gentle walk that lifts the feet more than the knees still steps', () => 
   assert.equal(g.update(p, 1850).forward, true)
 })
 
-test('moderate arm movement does not mine; deliberate swings still do', () => {
+test('sideways or vertical arm movement never mines', () => {
   const g = calibrated()
-  const p = pose()
+  const p = pose(); p[12].z = 0; p[16].z = 0
   g.update(p, 1500)
-  p[16].y += 0.03
+  // A fast sideways sweep of the mining arm carries no forward thrust.
+  p[16].x += 0.2
   assert.equal(g.update(p, 1550).digging, false)
-  p[16].y += 0.03
+  p[16].x += 0.2
   assert.equal(g.update(p, 1600).digging, false)
-  p[16].y += 0.05
+  // Neither does flailing the arm up and down.
+  p[16].y += 0.2
   assert.equal(g.update(p, 1650).digging, false)
   p[16].y += 0.05
+  assert.equal(g.update(p, 1700).digging, false)
+})
+
+test('repeated forward thrusts sustain mining between strokes', () => {
+  const g = calibrated()
+  const p = pose(); p[12].z = 0; p[16].z = 0
+  g.update(p, 1500)
+  p[16].z = -0.06
+  g.update(p, 1550)
+  p[16].z = -0.12
+  assert.equal(g.update(p, 1600).digging, true)
+  // Retracting between strokes holds mining through the hold window.
+  p[16].z = -0.06
   assert.equal(g.update(p, 1700).digging, true)
+  // A second thrust re-arms it.
+  p[16].z = -0.12
+  g.update(p, 1900)
+  p[16].z = -0.18
+  assert.equal(g.update(p, 1950).digging, true)
 })
 
 test('raising the off-hand overhead places one block per raise', () => {

@@ -4,7 +4,7 @@ const FIELDS = {
   deadzone: ['Head dead zone', 0.02, 0.3, 0.01, 0.08],
   smoothing: ['Head smoothing', 0, 0.9, 0.05, 0.45],
   stepThreshold: ['Leg lift threshold', 0.04, 0.4, 0.01, 0.06],
-  swingThreshold: ['Arm speed threshold', 0.5, 6, 0.1, 3.5],
+  swingThreshold: ['Arm thrust threshold', 0.5, 6, 0.1, 3.5],
   jumpThreshold: ['Jump height threshold', 0.08, 0.4, 0.01, 0.18],
   walkHold: ['Walking stop delay (ms)', 250, 1000, 50, 650],
   digHold: ['Mining hold (ms)', 250, 1500, 50, 800],
