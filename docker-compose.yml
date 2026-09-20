@@ -17,7 +17,10 @@ services:
       - mc-data:/data
 
   app:
-    build: .
+    build:
+      context: .
+      args:
+        COMMIT: ${COMMIT:-unknown}
     depends_on:
       - minecraft
     environment:

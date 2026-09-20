@@ -1,5 +1,17 @@
 'use strict'
 require('dotenv').config()
+const { execSync } = require('child_process')
+
+// The join screen shows which build is serving. Docker images carry no .git,
+// so the Dockerfile bakes the hash into COMMIT and that is preferred.
+function commitHash () {
+  if (process.env.COMMIT) return String(process.env.COMMIT).slice(0, 7)
+  try {
+    return execSync('git rev-parse --short HEAD', { stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim()
+  } catch (err) {
+    return 'unknown'
+  }
+}
 
 const int = (v, d) => {
   const n = parseInt(v, 10)
@@ -10,6 +22,9 @@ module.exports = {
   mc: {
     host: process.env.MC_HOST || 'localhost',
     port: int(process.env.MC_PORT, 25565),
+    // What the join screen shows. Under compose MC_HOST is an internal service
+    // name that means nothing outside the network, so it can be overridden.
+    publicHost: process.env.MC_PUBLIC_HOST || process.env.MC_HOST || 'localhost',
     username: process.env.MC_USERNAME || 'StreamBot',
     version: process.env.MC_VERSION || '1.20.4',
     auth: process.env.MC_AUTH || 'offline'
@@ -17,6 +32,7 @@ module.exports = {
   web: {
     port: int(process.env.PORT, 3000)
   },
+  commit: commitHash(),
   viewDistance: int(process.env.VIEW_DISTANCE, 6),
   // Clamped, not just defaulted. mineflayer's canDigBlock measures eye-to-block
   // *centre* against 5.1, while blockAtCursor measures eye-to-the-face-the-ray-

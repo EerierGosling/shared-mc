@@ -10,13 +10,13 @@ const MODES = [
   {
     id: 'roadtrip',
     title: 'Road Trip',
-    blurb: 'Everyone drives one character together. Keys are merged, so the bot moves while anyone holds W.',
+    blurb: 'Everyone drives one character together.',
     icon: '/assets/gui/sprites/hud/heart/full.png'
   },
   {
     id: 'solo',
-    title: 'Your Own Bot',
-    blurb: 'Spawn a character of your own on the same world. Pick a name and a skin.',
+    title: 'Individual',
+    blurb: 'Spawn a character of your own on the same world.',
     icon: '/assets/gui/sprites/hud/food_full.png'
   }
 ]
@@ -43,6 +43,8 @@ class JoinScreen {
     this.nameInput = document.getElementById('join-name')
     this.skinList = document.getElementById('join-skins')
     this.error = document.getElementById('join-error')
+    this.server = document.getElementById('join-server')
+    this.build = document.getElementById('join-build')
     this.button = document.getElementById('join-button')
 
     this.mode = null
@@ -67,6 +69,11 @@ class JoinScreen {
   setOptions (options) {
     this.options = options
     if (!this.isOpen && !this.joined) this.root.classList.add('open')
+    if (options.server) {
+      const { host, port } = options.server
+      this.server.textContent = port === 25565 ? host : `${host}:${port}`
+    }
+    if (options.commit) this.build.textContent = options.commit
     this.renderModes()
     if (!this.renderedSkins) {
       this.renderSkins(options.skins)

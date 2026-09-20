@@ -10,6 +10,9 @@ RUN npm ci --no-audit --no-fund
 COPY . .
 RUN npm run build
 
+# .git is not in the image; pass --build-arg COMMIT=$(git rev-parse --short HEAD).
+ARG COMMIT=unknown
+ENV COMMIT=$COMMIT
 ENV PORT=3000
 EXPOSE 3000
 

@@ -221,7 +221,10 @@ class Sessions {
       botCount: this.botCount,
       roadtripRiders: this.roadtripRiders,
       soloAvailable: this.botCount < this.capacity,
-      taken: this.roster().map(r => r.username)
+      taken: this.roster().map(r => r.username),
+      // Shown on the join screen so a visitor can also connect with a real client.
+      server: { host: this.config.mc.publicHost, port: this.config.mc.port },
+      commit: this.config.commit
     }
   }
 }

@@ -268,9 +268,15 @@
     color: var(--ink); text-align: center;
   }
   #join-panel h1 {
-    margin: 0 0 calc(4 * var(--u));
+    margin: 0 0 calc(1 * var(--u));
     font-size: calc(var(--px) * 12px); font-weight: normal;
   }
+  /* The server address, for anyone who would rather bring a real client. */
+  #join-server { margin: 0 0 calc(4 * var(--u)); font-size: calc(var(--px) * 7px); color: #555; }
+  #join-server:empty { display: none; }
+  /* Which build is serving, so a bug report can say which. */
+  #join-build { margin: calc(2 * var(--u)) 0 0; font-size: calc(var(--px) * 6px); color: #7f7f7f; }
+  #join-build:empty { display: none; }
   #join-name {
     width: 100%; font: inherit;
     font-size: calc(var(--px) * 10px);
@@ -517,6 +523,7 @@
   <div id="join" class="overlay">
     <form id="join-panel" action="#">
       <h1>Shared Minecraft</h1>
+      <p id="join-server"></p>
       <div id="join-modes"></div>
       <div id="join-identity">
         <input id="join-name" maxlength="16" placeholder="your name" autocomplete="off" spellcheck="false">
@@ -524,6 +531,7 @@
       </div>
       <button id="join-button" type="submit" disabled>Play</button>
       <p id="join-error"></p>
+      <p id="join-build"></p>
     </form>
   </div>
 
