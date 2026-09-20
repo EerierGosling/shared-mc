@@ -68,6 +68,16 @@ async function main () {
     // Opening the pairing section generates a code by itself.
     await host.locator('[data-role=pairing] > summary').click()
     await host.locator('[data-role=pair-qr]').waitFor({ state: 'visible' })
+    // Explicit generation must also reveal and focus the QR, even if the
+    // section is collapsed while the request is pending.
+    await host.locator('[data-role=pairing]').evaluate(section => {
+      section.querySelector('[data-action=pair]').click()
+      section.open = false
+    })
+    await host.waitForFunction(() => {
+      const qr = document.querySelector('[data-role=pair-qr]')
+      return document.querySelector('[data-role=pairing]').open && !qr.hidden && document.activeElement === qr && !document.querySelector('[data-action=pair]').disabled
+    })
     const code = await host.locator('[data-role=pair-code]').textContent()
     assert.match(code, /^[A-HJ-NP-Z2-9]{6}$/)
     const link = await host.locator('[data-role=pair-link]').getAttribute('href')

@@ -22,15 +22,15 @@ module.exports = function setupCameraControls ({ apply, canPlay, onStart, onDone
   panel.setAttribute('aria-label', 'Motion controls setup')
   const pairing = `<details data-role="pairing"><summary class="mc-button">Phone</summary>
       <p>Open <a href="/controller" target="_blank" rel="noopener">the phone controller</a> on your phone and enter the code, or scan it. Both devices must reach this site over HTTPS.</p>
-      <label class="motion-field">Site address reachable from your phone <input type="text" class="mc-text" data-role="pair-origin" aria-label="Phone-accessible HTTPS site address"></label>
-      <small>Use this server's HTTPS address. localhost on your phone points to the phone, not your computer.</small>
       <div class="motion-buttons">
-        <button type="button" class="mc-button" data-action="pair">Generate Code</button>
+        <button type="button" class="mc-button" data-action="pair">Generate QR Code</button>
         <button type="button" class="mc-button" data-action="unpair">Disconnect Phone</button>
       </div>
-      <canvas data-role="pair-qr" role="img" aria-label="Scan to open the phone controller with the pairing code" hidden></canvas>
+      <canvas data-role="pair-qr" tabindex="-1" role="img" aria-label="Scan to open the phone controller with the pairing code" hidden></canvas>
       <strong data-role="pair-code"></strong><a data-role="pair-link"></a>
       <p data-role="pair-status">No phone connected. Codes expire after five minutes and work once.</p>
+      <label class="motion-field">Site address reachable from your phone <input type="text" class="mc-text" data-role="pair-origin" aria-label="Phone-accessible HTTPS site address"></label>
+      <small>Use this server's HTTPS address. localhost on your phone points to the phone, not your computer.</small>
       <small>The phone uses its accelerometer for mining. Recommended: desktop camera + phone mining. Pairing does not create another player.</small>
     </details>`
   panel.innerHTML = `<h2>Motion Controls</h2>
@@ -325,10 +325,11 @@ module.exports = function setupCameraControls ({ apply, canPlay, onStart, onDone
     const pairStatus = $('[data-role=pair-status]')
     const pairButton = $('[data-action=pair]')
     const pairing = $('[data-role=pairing]')
-    let lastPairRequest = -Infinity
     $('[data-role=pair-origin]').value = window.location.origin
     pairButton.addEventListener('click', async () => {
       if (pairButton.disabled) return
+      show()
+      pairing.open = true
       if (!socket.connected) { pairStatus.textContent = 'Connect to the game first.'; return }
       let link
       try {
@@ -337,16 +338,6 @@ module.exports = function setupCameraControls ({ apply, canPlay, onStart, onDone
       } catch { pairStatus.textContent = 'Enter a valid HTTPS address for this game server.'; return }
       pairButton.disabled = true
       pairStatus.textContent = 'Creating phone pairing QR code…'
-      // The server rate-limits code requests; opening the section generates
-      // one, so a Generate click right after has to wait its turn.
-      const wait = Math.max(0, 1100 - (performance.now() - lastPairRequest))
-      if (wait) await new Promise(resolve => setTimeout(resolve, wait))
-      if (!socket.connected) {
-        pairButton.disabled = false
-        pairStatus.textContent = 'Connection lost. Reconnect to the game and retry.'
-        return
-      }
-      lastPairRequest = performance.now()
       socket.timeout(5000).emit('motion:create', async (error, result) => {
         if (error || result?.error || !/^(?:[A-HJ-NP-Z2-9]{6}|[A-F0-9]{12})$/.test(result?.code || '')) {
           pairButton.disabled = false
@@ -358,13 +349,19 @@ module.exports = function setupCameraControls ({ apply, canPlay, onStart, onDone
         link.hash = result.code
         const anchor = $('[data-role=pair-link]')
         anchor.href = link.href; anchor.textContent = 'Open phone controller'
-        pairStatus.textContent = 'Scan the QR code, enter the code, or open the link on your phone. Expires in five minutes.'
+        pairStatus.textContent = 'Scan this QR code with your phone to connect automatically. Code expires in five minutes.'
         if (link.protocol !== 'https:' || ['localhost', '127.0.0.1', '[::1]'].includes(link.hostname)) pairStatus.textContent += ' This address will not provide camera/motion access on a separate phone; use a phone-accessible HTTPS address.'
         const qr = $('[data-role=pair-qr]')
         qr.hidden = true
         try {
           await QRCode.toCanvas(qr, link.href, { width: 240, margin: 4, errorCorrectionLevel: 'M' })
-          if ($('[data-role=pair-code]').textContent === result.code) { qr.hidden = false; qr.scrollIntoView({ block: 'center' }) }
+          if ($('[data-role=pair-code]').textContent === result.code) {
+            show()
+            pairing.open = true
+            qr.hidden = false
+            qr.focus({ preventScroll: true })
+            qr.scrollIntoView({ block: 'center' })
+          }
         } catch { pairStatus.textContent += ' QR generation failed; enter the code manually.' }
         finally { pairButton.disabled = false }
       })
