@@ -40,6 +40,8 @@ class Hud {
     this.respawnAt = 0
     this.ping = null
     this.lastState = null
+    this.lastVitalsKey = null
+    this.lastHotbarKey = null
 
     setInterval(() => this._expireChat(), 500)
     setInterval(() => this._tickDeath(), 250)
@@ -84,8 +86,20 @@ class Hud {
   setState (state) {
     this.lastState = state
     this.renderStats()
-    this.renderVitals(state)
-    this.renderHotbar(state)
+    // The state packet fires whenever anything in it changes — timeOfDay and
+    // position alone make that nearly every tick — so each section repaints
+    // only when its own data moved, not whenever a sibling field did. The
+    // hotbar one matters most: renderSlot rebuilds nine <img> nodes per call.
+    const vitalsKey = `${state.health},${state.food}`
+    if (vitalsKey !== this.lastVitalsKey) {
+      this.lastVitalsKey = vitalsKey
+      this.renderVitals(state)
+    }
+    const hotbarKey = `${state.quickBarSlot}|${JSON.stringify(state.hotbar)}`
+    if (hotbarKey !== this.lastHotbarKey) {
+      this.lastHotbarKey = hotbarKey
+      this.renderHotbar(state)
+    }
   }
 
   renderStats () {

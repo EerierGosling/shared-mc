@@ -28,6 +28,16 @@ const KEYFRAMES = [
   { t: DAY_LENGTH, horizon: 0xfcb46b, zenith: 0x6a89c9, ambient: 0.41, sun: 0.41, sunColor: 0xffd9a0 }
 ]
 
+// Scratch for applySkyForTime, which runs on every state packet: lerping via
+// fresh THREE.Color objects made six allocations per packet, ten times a
+// second, for values that are copied out immediately.
+const _colorA = new THREE.Color()
+const _colorB = new THREE.Color()
+
+function lerpHex (fromHex, toHex, frac) {
+  return _colorA.set(fromHex).lerp(_colorB.set(toHex), frac)
+}
+
 function findSegment (t) {
   for (let i = 0; i < KEYFRAMES.length - 1; i++) {
     if (t >= KEYFRAMES[i].t && t <= KEYFRAMES[i + 1].t) return [KEYFRAMES[i], KEYFRAMES[i + 1]]
@@ -175,19 +185,16 @@ function applySkyForTime (viewer, timeOfDay, sky) {
   const span = to.t - from.t
   const frac = span === 0 ? 0 : (t - from.t) / span
 
-  const sunColor = new THREE.Color(from.sunColor).lerp(new THREE.Color(to.sunColor), frac)
   const ambient = from.ambient + (to.ambient - from.ambient) * frac
 
   viewer.ambientLight.intensity = ambient
   viewer.directionalLight.intensity = from.sun + (to.sun - from.sun) * frac
-  viewer.directionalLight.color = sunColor
+  viewer.directionalLight.color.copy(lerpHex(from.sunColor, to.sunColor, frac))
 
   if (!sky) return
 
-  const horizon = new THREE.Color(from.horizon).lerp(new THREE.Color(to.horizon), frac)
-  const zenith = new THREE.Color(from.zenith).lerp(new THREE.Color(to.zenith), frac)
-  sky.dome.material.uniforms.bottomColor.value.copy(horizon)
-  sky.dome.material.uniforms.topColor.value.copy(zenith)
+  sky.dome.material.uniforms.bottomColor.value.copy(lerpHex(from.horizon, to.horizon, frac))
+  sky.dome.material.uniforms.topColor.value.copy(lerpHex(from.zenith, to.zenith, frac))
 
   // Reuses the ambient keyframe curve so stars/moon fade in exactly as the
   // sky darkens, instead of keying off timeOfDay again with new thresholds.

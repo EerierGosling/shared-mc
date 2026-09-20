@@ -38,6 +38,10 @@ class Minimap {
     this.target = new THREE.WebGLRenderTarget(SIZE, SIZE)
     this.pixels = new Uint8Array(SIZE * SIZE * 4)
     this.flipped = new Uint8ClampedArray(SIZE * SIZE * 4)
+    // Async readback state (WebGL2 only): the pixel-pack buffer the GPU
+    // writes into and the fence that says it has finished doing so.
+    this.pbo = null
+    this.fence = null
   }
 
   setCenter (pos) {
@@ -46,6 +50,15 @@ class Minimap {
 
   render (renderer, scene) {
     if (!this.center) return
+    const gl = renderer.getContext()
+
+    // A previous pass may still be crossing the GPU→CPU gap; collect it (or
+    // keep waiting) before starting another. Never more than one in flight.
+    if (this.fence) {
+      this._collect(gl)
+      if (this.fence) return
+    }
+
     const now = performance.now()
     if (now - this.lastRenderAt < INTERVAL_MS) return
     this.lastRenderAt = now
@@ -60,10 +73,50 @@ class Minimap {
     renderer.setClearColor(0x000000, 0)
     renderer.clear()
     renderer.render(scene, this.camera)
+
+    if (renderer.capabilities.isWebGL2) {
+      // Async readback: readPixels into a pixel-pack buffer returns
+      // immediately, and a fence tells us when the GPU has actually written
+      // it. The naive readRenderTargetPixels drains the whole pipeline every
+      // pass — a full GPU sync per minimap frame, felt as a main-render
+      // hitch. The map shows up a frame or two late, which is nothing at
+      // 10 updates a second.
+      if (!this.pbo) {
+        this.pbo = gl.createBuffer()
+        gl.bindBuffer(gl.PIXEL_PACK_BUFFER, this.pbo)
+        gl.bufferData(gl.PIXEL_PACK_BUFFER, this.pixels.byteLength, gl.STREAM_READ)
+      } else {
+        gl.bindBuffer(gl.PIXEL_PACK_BUFFER, this.pbo)
+      }
+      gl.readPixels(0, 0, SIZE, SIZE, gl.RGBA, gl.UNSIGNED_BYTE, 0)
+      gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null)
+      this.fence = gl.fenceSync(gl.SYNC_GPU_COMMANDS_COMPLETE, 0)
+      gl.flush()
+      renderer.setRenderTarget(null)
+      scene.background = background
+      return
+    }
+
     renderer.setRenderTarget(null)
     scene.background = background
-
+    // WebGL1 has no fences or pixel-pack buffers; eat the synchronous read.
     renderer.readRenderTargetPixels(this.target, 0, 0, SIZE, SIZE, this.pixels)
+    this._blit()
+  }
+
+  _collect (gl) {
+    const status = gl.clientWaitSync(this.fence, 0, 0)
+    if (status === gl.TIMEOUT_EXPIRED) return
+    gl.deleteSync(this.fence)
+    this.fence = null
+    if (status === gl.WAIT_FAILED) return
+    gl.bindBuffer(gl.PIXEL_PACK_BUFFER, this.pbo)
+    gl.getBufferSubData(gl.PIXEL_PACK_BUFFER, 0, this.pixels)
+    gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null)
+    this._blit()
+  }
+
+  _blit () {
     // GL reads rows bottom-up; flip so north stays at the top of the canvas.
     const row = SIZE * 4
     for (let y = 0; y < SIZE; y++) {

@@ -2,6 +2,7 @@
 const path = require('path')
 const http = require('http')
 const express = require('express')
+const compression = require('compression')
 const { Server } = require('socket.io')
 const mc = require('minecraft-protocol')
 
@@ -19,6 +20,13 @@ const io = new Server(server, {
 })
 
 // --- static assets ---------------------------------------------------------
+// Gzip everything text-shaped before any route sees the response: the two
+// webpack bundles are a couple of MB of javascript each and the blocksStates
+// JSON runs to megabytes, all of which compress several-fold. PNGs are
+// skipped automatically (already compressed) and socket.io traffic has its
+// own perMessageDeflate.
+app.use(compression())
+
 // Order matters. prismarine-viewer ships its own index.html in the same public
 // folder we need for /textures, /blocksStates and /worker.js, so our page is
 // registered first and our bundle lives under /dist to avoid any collision.
