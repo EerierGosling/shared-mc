@@ -12,12 +12,14 @@ const CreativeUI = require('./creative')
 const BlockLights = require('./lights')
 const Minimap = require('./minimap')
 const BreakingAnimation = require('./breaking')
+const PlacePrediction = require('./place')
 const setupInput = require('./input')
 const { createSky, applySkyForTime } = require('./sky')
 const { Entities } = require('./entities')
 const { Hand } = require('./hand')
 const { JoinScreen } = require('./join')
 const SkinPainter = require('./skins')
+const icons = require('./icons')
 
 const canvas = document.getElementById('viewport')
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: false })
@@ -44,6 +46,7 @@ const creative = new CreativeUI(socket)
 creative.onState = state => hud.setCreative(state)
 const minimap = new Minimap(viewer.entities)
 const breaking = new BreakingAnimation(viewer.scene)
+const placePrediction = new PlacePrediction(viewer, socket)
 
 // First-person hand viewmodel: its own scene and lights, drawn over the world
 // as a second pass in the render loop. Swung from input.js while a dig/attack
@@ -63,7 +66,7 @@ const join = new JoinScreen(socket, identity => {
   hand.setVisible(true)
 })
 
-const input = setupInput({ socket, viewer, camera, hud, inventoryUI, canvas, hand, join, creative })
+const input = setupInput({ socket, viewer, camera, hud, inventoryUI, canvas, hand, join, creative, placePrediction })
 
 const highlight = new THREE.LineSegments(
   new THREE.EdgesGeometry(new THREE.BoxGeometry(1.002, 1.002, 1.002)),
@@ -118,6 +121,10 @@ socket.on('version', version => {
     return
   }
   breaking.setVersion(version)
+  icons.init(version, () => {
+    hud.refreshHotbar()
+    inventoryUI.refresh()
+  })
   if (!listening) {
     // Wires loadChunk / unloadChunk / entity / blockUpdate straight off the socket.
     viewer.listen(socket)
@@ -152,6 +159,7 @@ socket.on('dig:stop', () => breaking.stop())
 
 socket.on('state', state => {
   hud.setState(state)
+  placePrediction.setTarget(state.placeTarget)
   applySkyForTime(viewer, state.timeOfDay, sky)
   // The camera dips while sneaking. Viewer only applies the flag on the next
   // position packet, and a bot sneaking in place never sends one, so reapply

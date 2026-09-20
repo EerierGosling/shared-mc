@@ -113,7 +113,8 @@ class Creative {
     socket.on('creative:fly', payload => this.setFlying(socket.id, Boolean(payload && payload.active)))
     socket.on('creative:give', payload => this.give(socket.id, payload))
     socket.on('creative:destroy', payload => this.destroy(socket.id, payload && payload.slot))
-    socket.on('creative:pick', () => this.pickBlock(socket.id))
+    // 'creative:pick' is wired in control.js: it raycasts, so it needs the
+    // member's pending look applied first, and that queue lives there.
   }
 
   /** A browser that arrived mid-session still needs the state and the list. */

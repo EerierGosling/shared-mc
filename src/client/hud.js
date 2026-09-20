@@ -33,6 +33,8 @@ const LOW_HEALTH = 4
 // The player list's connection bars, thresholds straight from vanilla.
 const PING_BARS = [[150, 5], [300, 4], [600, 3], [1000, 2], [Infinity, 1]]
 
+const icons = require('./icons')
+
 const el = id => document.getElementById(id)
 
 /** Everything drawn in DOM on top of the canvas. */
@@ -59,6 +61,8 @@ class Hud {
     this.ping = null
     this.lastState = null
     this.creative = { available: false, flying: false }
+    this.lastVitalsKey = null
+    this.lastHotbarKey = null
     this.pingByName = new Map() // username -> its bars element
     this.lastPingsKey = null
     this.lastHeldKey = null
@@ -162,8 +166,20 @@ class Hud {
     document.body.dataset.gamemode = state.gameMode || ''
     if (previous && state.health < previous.health) this._startBlink(previous.health)
     this.renderStats()
-    this.renderVitals(state)
-    this.renderHotbar(state)
+    // The state packet fires whenever anything in it changes — timeOfDay and
+    // position alone make that nearly every tick — so each section repaints
+    // only when its own data moved, not whenever a sibling field did. The
+    // hotbar one matters most: renderSlot rebuilds nine <img> nodes per call.
+    const vitalsKey = `${state.health},${state.food}`
+    if (vitalsKey !== this.lastVitalsKey) {
+      this.lastVitalsKey = vitalsKey
+      this.renderVitals(state)
+    }
+    const hotbarKey = `${state.quickBarSlot}|${JSON.stringify(state.hotbar)}`
+    if (hotbarKey !== this.lastHotbarKey) {
+      this.lastHotbarKey = hotbarKey
+      this.renderHotbar(state)
+    }
     this.renderPings()
   }
 
@@ -244,6 +260,12 @@ class Hud {
     // Force a layout so the removed transition restarts from fully visible.
     this.heldName.getBoundingClientRect()
     this.heldName.classList.add('fade')
+  }
+
+  /** Repaint slots drawn before the icon data had loaded (see icons.js). */
+  refreshHotbar () {
+    this.lastHotbarKey = null
+    if (this.lastState) this.renderHotbar(this.lastState)
   }
 
   /**
@@ -352,24 +374,25 @@ function renderSlot (slot, item) {
   slot.innerHTML = ''
   if (!item) return
 
-  const img = document.createElement('img')
-  img.alt = ''
-  // Native HTML drag-and-drop on this <img> would hijack our own mouse-based
-  // slot dragging (stack splitting) before it ever sees a mouseenter.
-  img.draggable = false
-  // minecraft-assets splits textures between items/ and blocks/; try both
-  // before giving up and showing the item name as text.
-  img.src = `/assets/items/${item.name}.png`
-  img.onerror = () => {
-    if (img.dataset.retried) {
+  // A flat item texture or a little 3D render of the block model (icons.js).
+  // Null means the icon data is still loading or the item has no texture
+  // anywhere; show the name as text, as vanilla shows missing models.
+  const url = icons.iconFor(item.name)
+  if (url) {
+    const img = document.createElement('img')
+    img.alt = ''
+    // Native HTML drag-and-drop on this <img> would hijack our own mouse-based
+    // slot dragging (stack splitting) before it ever sees a mouseenter.
+    img.draggable = false
+    img.src = url
+    img.onerror = () => {
       slot.textContent = item.displayName || item.name
       if (item.count > 1) appendCount(slot, item.count)
-      return
     }
-    img.dataset.retried = '1'
-    img.src = `/assets/blocks/${item.name}.png`
+    slot.appendChild(img)
+  } else {
+    slot.textContent = item.displayName || item.name
   }
-  slot.appendChild(img)
   if (item.count > 1) appendCount(slot, item.count)
   slot.title = `${item.displayName || item.name} x${item.count}`
 }

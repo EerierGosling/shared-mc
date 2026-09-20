@@ -3,21 +3,9 @@ const Vec3 = require('vec3')
 const { goals } = require('mineflayer-pathfinder')
 const { blockAtCursor, entityAtCursor } = require('./raycast')
 const { FLIGHT_DRIVEN } = require('./creative')
+const { FACE_VECTORS, INTERACTABLE, isPlaceable } = require('./placement')
 
 const CONTROL_KEYS = ['forward', 'back', 'left', 'right', 'jump', 'sneak', 'sprint']
-
-// prismarine's raycast reports the hit face as an index; placing a block needs
-// the matching normal vector.
-const FACE_VECTORS = [
-  new Vec3(0, -1, 0),
-  new Vec3(0, 1, 0),
-  new Vec3(0, 0, -1),
-  new Vec3(0, 0, 1),
-  new Vec3(-1, 0, 0),
-  new Vec3(1, 0, 0)
-]
-
-const INTERACTABLE = /chest|furnace|crafting_table|barrel|shulker_box|hopper|dispenser|dropper|anvil|enchanting_table|brewing_stand|beacon|lectern|loom|smoker|blast_furnace|cartography|grindstone|stonecutter|door|trapdoor|fence_gate|button|lever|bed$|note_block|jukebox|comparator|repeater|sign$/
 
 const MAX_CHAT_LENGTH = 256
 
@@ -60,7 +48,8 @@ class Controller {
     this.desired = new Map() // socket.id -> that member's held keys
     this.effective = {} // the merge: what the members between them are holding
     this.applied = {} // what was last written to the bot, which flight changes
-    this.lastLookAt = new Map() // socket.id -> timestamp
+    this.lastLookAt = new Map() // socket.id -> timestamp of last applied look
+    this.pendingLooks = new Map() // socket.id -> { yaw, pitch, timer }
     this.lastChatAt = new Map()
     this.diggers = new Set() // socket.ids currently holding the mouse button
     this.lastDigNoticeAt = 0
@@ -86,18 +75,39 @@ class Controller {
     this.diggers.clear()
     this.digHeld = false
     this.digging = false
+    for (const pending of this.pendingLooks.values()) clearTimeout(pending.timer)
+    this.pendingLooks.clear()
   }
 
   register (socket) {
     socket.on('input:state', state => this.setInput(socket.id, state))
     socket.on('input:look', look => this.look(socket.id, look))
-    socket.on('action:dig', payload => this.setDig(socket.id, Boolean(payload && payload.active)))
-    socket.on('action:use', payload => this.use(Boolean(payload && payload.repeat)))
-    socket.on('action:attack', () => this.attack())
+    // Cursor actions raycast against the bot's current aim, so a look still
+    // waiting out its rate window is applied first — the click meant "there",
+    // not wherever the bot pointed a window ago.
+    socket.on('action:dig', payload => {
+      this._flushLook(socket.id)
+      this.setDig(socket.id, Boolean(payload && payload.active))
+    })
+    socket.on('action:use', payload => {
+      this._flushLook(socket.id)
+      this.use(Boolean(payload && payload.repeat))
+    })
+    socket.on('action:attack', () => {
+      this._flushLook(socket.id)
+      this.attack()
+    })
+    socket.on('creative:pick', () => {
+      this._flushLook(socket.id)
+      if (this.creative) this.creative.pickBlock(socket.id)
+    })
     socket.on('hotbar', payload => this.setHotbar(payload && payload.slot))
     socket.on('drop', () => this.drop())
     socket.on('chat', payload => this.chat(socket.id, payload && payload.text))
-    socket.on('goto', () => this.gotoCursor())
+    socket.on('goto', () => {
+      this._flushLook(socket.id)
+      this.gotoCursor()
+    })
     socket.on('stop', () => this.stopEverything())
   }
 
@@ -105,6 +115,11 @@ class Controller {
   dropSocket (socketId) {
     this.desired.delete(socketId)
     this.lastLookAt.delete(socketId)
+    const pending = this.pendingLooks.get(socketId)
+    if (pending) {
+      clearTimeout(pending.timer)
+      this.pendingLooks.delete(socketId)
+    }
     this.lastChatAt.delete(socketId)
     this._applyEffective()
     // A tab that vanishes mid-click must not leave the bot mining forever.
@@ -155,17 +170,54 @@ class Controller {
 
   look (socketId, look) {
     if (!this.bot || !look) return
-    const now = Date.now()
-    if (now - (this.lastLookAt.get(socketId) || 0) < this.config.lookIntervalMs) return
-    this.lastLookAt.set(socketId, now)
-
     const yaw = Number(look.yaw)
     const pitch = Number(look.pitch)
     if (!Number.isFinite(yaw) || !Number.isFinite(pitch)) return
     const clamped = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, pitch))
+
+    const now = Date.now()
+    const wait = this.config.lookIntervalMs - (now - (this.lastLookAt.get(socketId) || 0))
+    if (wait <= 0) {
+      this.lastLookAt.set(socketId, now)
+      this._applyLook(yaw, clamped)
+      return
+    }
+    // Inside the rate window: coalesce, never drop. Only the latest mouse
+    // sample matters, and dropping the final message of a flick left the bot
+    // aimed somewhere stale until the mouse moved again.
+    const pending = this.pendingLooks.get(socketId)
+    if (pending) {
+      pending.yaw = yaw
+      pending.pitch = clamped
+      return
+    }
+    const entry = { yaw, pitch: clamped, timer: null }
+    entry.timer = setTimeout(() => {
+      this.pendingLooks.delete(socketId)
+      this.lastLookAt.set(socketId, Date.now())
+      this._applyLook(entry.yaw, entry.pitch)
+    }, wait)
+    entry.timer.unref?.()
+    this.pendingLooks.set(socketId, entry)
+  }
+
+  _applyLook (yaw, pitch) {
+    if (!this.bot) return
     // force=true: the browser already applied this rotation locally, so any
-    // server-side smoothing would just fight it.
-    Promise.resolve(this.bot.look(yaw, clamped, true)).catch(() => {})
+    // server-side smoothing would just fight it. No packet is written here
+    // either way — mineflayer snapshots yaw/pitch once per 50ms physics tick,
+    // which is what actually paces what the Minecraft server sees.
+    Promise.resolve(this.bot.look(yaw, pitch, true)).catch(() => {})
+  }
+
+  /** Apply a member's pending look now; cursor actions must not aim into the past. */
+  _flushLook (socketId) {
+    const pending = this.pendingLooks.get(socketId)
+    if (!pending) return
+    clearTimeout(pending.timer)
+    this.pendingLooks.delete(socketId)
+    this.lastLookAt.set(socketId, Date.now())
+    this._applyLook(pending.yaw, pending.pitch)
   }
 
   // --- world interaction ---------------------------------------------------
@@ -304,7 +356,7 @@ class Controller {
           // fall through to placing / using the held item
         }
       }
-      if (held && this._isPlaceable(bot, held)) {
+      if (held && isPlaceable(bot, held)) {
         if (!this._afford('place')) return
         const face = FACE_VECTORS[block.face] || new Vec3(0, 1, 0)
         // Where on the face the crosshair actually hit. Slabs, stairs and
@@ -314,6 +366,10 @@ class Controller {
         // snap the bot's look at the block and fight the mouse.
         const delta = block.intersect ? block.intersect.minus(block.position) : undefined
         try {
+          // 'ignore' skips placeBlock's smooth lookAt — several physics ticks
+          // before the packet even leaves, on a head the browser has already
+          // pointed at this block. Same reason the dig path passes it. `delta`
+          // is the face point the ray hit, so slabs/stairs/trapdoors orient.
           await bot._placeBlockWithOptions(block, face, { delta, forceLook: 'ignore', swingArm: 'right' })
           return
         } catch (err) {
@@ -331,12 +387,6 @@ class Controller {
         } catch (err) {}
       }, 200)
     } catch (err) {}
-  }
-
-  _isPlaceable (bot, item) {
-    const registry = bot.registry || bot.mcData
-    if (!registry || !registry.blocksByName) return false
-    return Boolean(registry.blocksByName[item.name])
   }
 
   attack () {

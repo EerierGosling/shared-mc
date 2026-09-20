@@ -13,7 +13,10 @@ const KEY_TO_CONTROL = {
 }
 
 const CONTROL_KEYS = ['forward', 'back', 'left', 'right', 'jump', 'sneak', 'sprint']
-const LOOK_SEND_MS = 50
+// Roughly once per frame. The traffic is one tiny message either way, and what
+// the Minecraft server sees is unchanged (mineflayer snapshots yaw/pitch once
+// per 50ms physics tick), so sending fresher samples only cuts aim latency.
+const LOOK_SEND_MS = 16
 const SENSITIVITY = 0.004
 // A finger drag is in CSS pixels on a screen a fraction of the width, so it
 // needs to turn further per pixel than the mouse does.
@@ -34,7 +37,7 @@ const CHAT_HISTORY = 50
  * Touch devices get the same messages from on-screen buttons (see #touch in
  * index.html) and steer by dragging the canvas.
  */
-function setupInput ({ socket, viewer, camera, hud, inventoryUI, canvas, hand, join, creative }) {
+function setupInput ({ socket, viewer, camera, hud, inventoryUI, canvas, hand, join, creative, placePrediction }) {
   const held = Object.create(null)
   let locked = false
   // Once a finger has steered the camera this browser's angles win over the
@@ -42,7 +45,7 @@ function setupInput ({ socket, viewer, camera, hud, inventoryUI, canvas, hand, j
   // release on a phone, and snapping back between drags would be unusable.
   let touchLook = false
   let lastLookSent = 0
-  let lookPending = false
+  let lookTimer = null
   let lastForwardTap = 0
   let lastJumpTap = 0
   let useRepeat = null
@@ -111,18 +114,38 @@ function setupInput ({ socket, viewer, camera, hud, inventoryUI, canvas, hand, j
     if (changed) sendControls()
   }
 
-  const sendLook = force => {
-    const now = Date.now()
-    if (!force && now - lastLookSent < LOOK_SEND_MS) {
-      lookPending = true
-      return
-    }
-    lastLookSent = now
-    lookPending = false
+  const emitLook = () => {
+    lastLookSent = Date.now()
     socket.emit('input:look', { yaw: camera.yaw, pitch: camera.pitch })
   }
 
-  setInterval(() => { if (lookPending) sendLook(true) }, LOOK_SEND_MS)
+  const sendLook = () => {
+    // A scheduled trailing send reads the camera when it fires, so it already
+    // covers every sample between now and then. The old polling interval could
+    // sit on the final sample of a flick for a full extra window.
+    if (lookTimer) return
+    const wait = LOOK_SEND_MS - (Date.now() - lastLookSent)
+    if (wait <= 0) {
+      emitLook()
+      return
+    }
+    lookTimer = setTimeout(() => {
+      lookTimer = null
+      emitLook()
+    }, wait)
+  }
+
+  // Dig/use/attack raycast server-side against the bot's current aim, so the
+  // freshest angles must be on the wire ahead of the action message — socket.io
+  // preserves per-connection order, which makes this exact rather than merely
+  // likely.
+  const flushLook = () => {
+    if (lookTimer) {
+      clearTimeout(lookTimer)
+      lookTimer = null
+    }
+    emitLook()
+  }
 
   const turn = (dx, dy, sensitivity) => {
     camera.yaw -= dx * sensitivity
@@ -142,12 +165,22 @@ function setupInput ({ socket, viewer, camera, hud, inventoryUI, canvas, hand, j
       canvas.requestPointerLock()
       return
     }
-    if (event.button === 0) startDig()
-    else if (event.button === 2) startUse()
-    else if (event.button === 1) {
+    // Flush the freshest aim ahead of the action so the server raycasts
+    // against where the browser is actually pointing.
+    if (event.button === 0) {
+      flushLook()
+      startDig()
+    } else if (event.button === 2) {
+      flushLook()
+      // Draw the assumed placement before the round trip; the server's
+      // blockUpdate confirms or corrects it.
+      placePrediction.place()
+      startUse()
+    } else if (event.button === 1) {
       // Vanilla's pick block. preventDefault stops the browser opening its
       // middle-click autoscroll instead.
       event.preventDefault()
+      flushLook()
       socket.emit('creative:pick')
     }
   })
@@ -290,7 +323,7 @@ function setupInput ({ socket, viewer, camera, hud, inventoryUI, canvas, hand, j
     }
 
     if (event.code === 'KeyQ') { socket.emit('drop'); return }
-    if (event.code === 'KeyG') { socket.emit('goto'); return }
+    if (event.code === 'KeyG') { flushLook(); socket.emit('goto'); return }
 
     const control = KEY_TO_CONTROL[event.code]
     if (!control || held[control]) return

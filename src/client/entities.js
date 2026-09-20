@@ -8,7 +8,6 @@
 // and reuse the real per-mob model for everything upstream does cover.
 
 const THREE = global.THREE || require('three')
-const TWEEN = require('@tweenjs/tween.js')
 
 // Some of prismarine-viewer's bundled mob models declare a texture-atlas size
 // that doesn't match the actual PNG (e.g. zombie/husk say 64x32 but the real
@@ -50,7 +49,11 @@ const warnedMissing = new Set()
 // to Entity.js's internals is already how this file patches entities.json
 // above; this just extends it one step further to reach the bones themselves.
 const PLAYER_BONE_ORDER = entitiesData.player.geometry.default.bones.map(b => b.name)
-const LIMB_BONE_NAMES = ['leftArm', 'rightArm', 'leftLeg', 'rightLeg']
+const LIMB_BONE_NAMES = ['head', 'leftArm', 'rightArm', 'leftLeg', 'rightLeg']
+
+function wrapAngle (a) {
+  return ((a + Math.PI) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2) - Math.PI
+}
 
 function getPlayerLimbBones (mesh) {
   const skinned = mesh.children.find(c => c.isSkinnedMesh)
@@ -273,6 +276,10 @@ function getEntityMesh (entity, scene) {
   return mesh
 }
 
+// How long a movement packet is smoothed over — matches the server's 50ms
+// position cadence, so a moving entity is always mid-lerp into its last
+// reported spot.
+const SMOOTH_MS = 50
 // Below this horizontal speed (blocks/s) a player reads as standing still —
 // small server-correction jitter shouldn't twitch the limbs.
 const WALK_SPEED_DEADZONE = 0.15
@@ -284,16 +291,24 @@ const MAX_SWING_ANGLE = Math.PI / 3
 // the server only sends a move packet when something actually moved, so
 // silence is the "not moving" signal, not a value to keep animating toward.
 const STOP_AFTER_MS = 250
+// How far the head can turn past the shoulders before the body gets dragged
+// around to follow (vanilla lets you look ~50° over either shoulder).
+const MAX_NECK = 0.9
 
 class Entities {
   constructor (scene) {
     this.scene = scene
     this.entities = {}
     // Player meshes by id, for the minimap. Move events don't repeat the
-    // entity name, so membership is decided once here at spawn; the tweened
+    // entity name, so membership is decided once here at spawn; the smoothed
     // mesh position doubles as a smoothed map position for free.
     this.players = {}
     this.motion = {}
+    // In-flight position/yaw lerps by id, stepped from animate(). Retargeted
+    // lerps instead of tweens: the server relays thousands of entity moves
+    // and allocating a TWEEN per packet (never stopped, briefly fighting its
+    // predecessor over the same mesh) was measurable GC churn.
+    this.lerps = {}
   }
 
   clear () {
@@ -304,9 +319,24 @@ class Entities {
     this.entities = {}
     this.players = {}
     this.motion = {}
+    this.lerps = {}
   }
 
   update (entity) {
+    // Handled first so an unknown entity's delete doesn't build a mesh only
+    // to throw it away, and nothing below runs against a removed mesh.
+    if (entity.delete) {
+      const e = this.entities[entity.id]
+      if (!e) return
+      this.scene.remove(e)
+      disposeDeep(e)
+      delete this.entities[entity.id]
+      delete this.players[entity.id]
+      delete this.motion[entity.id]
+      delete this.lerps[entity.id]
+      return
+    }
+
     if (!this.entities[entity.id]) {
       const mesh = getEntityMesh(entity, this.scene)
       if (!mesh) return
@@ -321,22 +351,38 @@ class Entities {
       setItemMeshTexture(e, entity.itemName)
     }
 
-    if (entity.delete) {
-      this.scene.remove(e)
-      disposeDeep(e)
-      delete this.entities[entity.id]
-      delete this.players[entity.id]
-      delete this.motion[entity.id]
-    }
-
     if (entity.pos) {
       if (e.userData.limbs) this._trackMotion(entity.id, entity.pos)
-      new TWEEN.Tween(e.position).to({ x: entity.pos.x, y: entity.pos.y, z: entity.pos.z }, 50).start()
+      const l = this.lerps[entity.id] || (this.lerps[entity.id] = {})
+      l.x0 = e.position.x
+      l.y0 = e.position.y
+      l.z0 = e.position.z
+      l.x1 = entity.pos.x
+      l.y1 = entity.pos.y
+      l.z1 = entity.pos.z
+      l.posAt = performance.now()
     }
     if (entity.yaw) {
-      const da = (entity.yaw - e.rotation.y) % (Math.PI * 2)
-      const dy = 2 * da % (Math.PI * 2) - da
-      new TWEEN.Tween(e.rotation).to({ y: e.rotation.y + dy }, 50).start()
+      const m = e.userData.limbs && this.motion[entity.id]
+      if (m) {
+        // animate() owns a rigged mesh's yaw: the head takes the look packet
+        // now, the body lags after it. A lerp here would fight that.
+        m.targetYaw = entity.yaw
+        if (m.bodyYaw === null) m.bodyYaw = entity.yaw
+      } else {
+        // Shortest arc, so the mesh never spins the long way round when yaw
+        // wraps past ±π.
+        const da = (entity.yaw - e.rotation.y) % (Math.PI * 2)
+        const dy = 2 * da % (Math.PI * 2) - da
+        const l = this.lerps[entity.id] || (this.lerps[entity.id] = {})
+        l.yaw0 = e.rotation.y
+        l.yaw1 = e.rotation.y + dy
+        l.yawAt = performance.now()
+      }
+    }
+    if (entity.pitch !== undefined) {
+      const m = this.motion[entity.id]
+      if (m) m.pitch = entity.pitch
     }
   }
 
@@ -344,7 +390,7 @@ class Entities {
     const now = performance.now()
     const prev = this.motion[id]
     if (!prev) {
-      this.motion[id] = { lastPos: pos, lastTime: now, speed: 0, phase: 0 }
+      this.motion[id] = { lastPos: pos, lastTime: now, speed: 0, phase: 0, pitch: 0, targetYaw: null, bodyYaw: null }
       return
     }
     const dt = (now - prev.lastTime) / 1000
@@ -361,11 +407,41 @@ class Entities {
     prev.lastTime = now
   }
 
-  // Walk/run cycle for player limbs, driven by observed movement speed
-  // rather than a server-sent animation state — mineflayer's entity packets
-  // carry position and yaw only, nothing about the walk cycle itself.
+  // Passive motion for player rigs, driven by observed movement and look
+  // packets rather than a server-sent animation state — mineflayer's entity
+  // packets carry position, yaw and pitch only, nothing about the walk cycle.
   animate (dt) {
     const now = performance.now()
+
+    // Step the movement lerps before the walk cycle below, so the limbs and
+    // the body render this frame's motion together.
+    for (const id in this.lerps) {
+      const l = this.lerps[id]
+      const e = this.entities[id]
+      if (!e) {
+        delete this.lerps[id]
+        continue
+      }
+      let done = true
+      if (l.posAt) {
+        const t = Math.min(1, (now - l.posAt) / SMOOTH_MS)
+        e.position.set(
+          l.x0 + (l.x1 - l.x0) * t,
+          l.y0 + (l.y1 - l.y0) * t,
+          l.z0 + (l.z1 - l.z0) * t
+        )
+        if (t < 1) done = false
+        else l.posAt = 0
+      }
+      if (l.yawAt) {
+        const t = Math.min(1, (now - l.yawAt) / SMOOTH_MS)
+        e.rotation.y = l.yaw0 + (l.yaw1 - l.yaw0) * t
+        if (t < 1) done = false
+        else l.yawAt = 0
+      }
+      if (done) delete this.lerps[id]
+    }
+
     for (const [id, mesh] of Object.entries(this.entities)) {
       const limbs = mesh.userData.limbs
       if (!limbs) continue
@@ -374,23 +450,55 @@ class Entities {
       const stopped = !motion || (now - motion.lastTime) > STOP_AFTER_MS
       const speed = stopped ? 0 : motion.speed
 
-      if (speed < WALK_SPEED_DEADZONE) {
-        limbs.leftArm.rotation.x = 0
-        limbs.rightArm.rotation.x = 0
-        limbs.leftLeg.rotation.x = 0
-        limbs.rightLeg.rotation.x = 0
+      // Swing amplitude eases in and out, so stopping settles the limbs to
+      // rest instead of freezing them mid-stride.
+      const target = speed < WALK_SPEED_DEADZONE
+        ? 0
+        : Math.min(speed / RUN_SPEED_FOR_FULL_SWING, 1) * MAX_SWING_ANGLE
+      let amplitude = (mesh.userData.swingAmplitude || 0)
+      amplitude += (target - amplitude) * Math.min(1, dt * 10)
+      if (target === 0 && amplitude < 0.01) {
+        amplitude = 0
         mesh.userData.walkPhase = 0
-        continue
+      } else {
+        mesh.userData.walkPhase = (mesh.userData.walkPhase || 0) + dt * speed * 3
       }
-
-      const amplitude = Math.min(speed / RUN_SPEED_FOR_FULL_SWING, 1) * MAX_SWING_ANGLE
-      mesh.userData.walkPhase = (mesh.userData.walkPhase || 0) + dt * speed * 3
+      mesh.userData.swingAmplitude = amplitude
       const swing = Math.sin(mesh.userData.walkPhase) * amplitude
 
-      limbs.rightArm.rotation.x = swing
+      // Vanilla's idle "breathing": the arms hang slightly out from the body
+      // and drift a few degrees, so a standing player never reads as a
+      // statue. Phase-shifted by entity id so a crowd doesn't sway in step.
+      const t = now / 1000 + (Number(id) % 16)
+      const idleRoll = Math.cos(t * 1.8) * 0.05 + 0.05
+      const idlePitch = Math.sin(t * 1.34) * 0.05
+
+      limbs.rightArm.rotation.x = swing + idlePitch
+      limbs.leftArm.rotation.x = -swing - idlePitch
+      limbs.rightArm.rotation.z = -idleRoll
+      limbs.leftArm.rotation.z = idleRoll
       limbs.leftLeg.rotation.x = swing
-      limbs.leftArm.rotation.x = -swing
       limbs.rightLeg.rotation.x = -swing
+
+      if (!motion) continue
+
+      // Look pitch goes straight to the head (mineflayer pitch is positive
+      // looking up, and so is bone +x with the model facing -z), lightly
+      // smoothed since it only arrives per look packet.
+      limbs.head.rotation.x += (motion.pitch - limbs.head.rotation.x) * Math.min(1, dt * 15)
+
+      // The head takes the look yaw at once; the body chases it — eagerly
+      // while walking, otherwise only when the neck runs out of travel.
+      if (motion.targetYaw !== null) {
+        const diff = wrapAngle(motion.targetYaw - motion.bodyYaw)
+        if (amplitude > 0.05) {
+          motion.bodyYaw += diff * Math.min(1, dt * 8)
+        } else if (Math.abs(diff) > MAX_NECK) {
+          motion.bodyYaw += (diff - Math.sign(diff) * MAX_NECK) * Math.min(1, dt * 8)
+        }
+        mesh.rotation.y = motion.bodyYaw
+        limbs.head.rotation.y = Math.max(-MAX_NECK, Math.min(MAX_NECK, wrapAngle(motion.targetYaw - motion.bodyYaw)))
+      }
     }
   }
 }

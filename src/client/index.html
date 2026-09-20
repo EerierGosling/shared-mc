@@ -361,13 +361,13 @@
     margin: 0 0 calc(1 * var(--u));
     font-size: calc(var(--px) * 12px); font-weight: normal;
   }
-  /* The server address, for anyone who would rather bring a real client. */
-  #join-server { margin: 0 0 calc(4 * var(--u)); font-size: calc(var(--px) * 7px); color: #555; }
-  #join-server:empty { display: none; }
+  /* Which server to play on: host and port side by side, like the server-list
+     "Direct Connect" screen. The configured default is only the placeholder. */
+  #join-server { display: flex; gap: calc(2 * var(--u)); margin: calc(3 * var(--u)) 0 calc(4 * var(--u)); }
   /* Which build is serving, so a bug report can say which. */
   #join-build { margin: calc(2 * var(--u)) 0 0; font-size: calc(var(--px) * 6px); color: #7f7f7f; }
   #join-build:empty { display: none; }
-  #join-name {
+  #join-name, #join-host, #join-port {
     width: 100%; font: inherit;
     font-size: calc(var(--px) * 10px);
     padding: calc(2 * var(--u));
@@ -376,6 +376,8 @@
     border-color: var(--slot-dark) var(--gui-lit) var(--gui-lit) var(--slot-dark);
     outline: none; text-align: center;
   }
+  #join-host { flex: 1; min-width: 0; text-align: left; }
+  #join-port { width: calc(34 * var(--u)); flex: none; }
   /* Minecraft's world-select list: stacked rows, selection is a white outline. */
   #join-modes { display: flex; flex-direction: column; gap: var(--u); margin-bottom: calc(4 * var(--u)); }
   .mode-row {
@@ -664,7 +666,10 @@
   <div id="join" class="overlay">
     <form id="join-panel" action="#">
       <h1>Shared Minecraft</h1>
-      <p id="join-server"></p>
+      <div id="join-server">
+        <input id="join-host" placeholder="server address" autocomplete="off" spellcheck="false">
+        <input id="join-port" placeholder="25565" inputmode="numeric" maxlength="5" autocomplete="off">
+      </div>
       <div id="join-modes"></div>
       <div id="join-identity">
         <input id="join-name" maxlength="16" placeholder="your name" autocomplete="off" spellcheck="false">

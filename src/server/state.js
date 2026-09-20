@@ -1,6 +1,7 @@
 'use strict'
 const { describeItem } = require('./items')
 const { blockAtCursor } = require('./raycast')
+const { predictPlacement } = require('./placement')
 
 const TICK_MS = 100
 
@@ -72,6 +73,7 @@ class StatePusher {
     for (let i = 0; i < 9; i++) hotbar.push(describeItem(slots[36 + i]))
 
     let targetBlock = null
+    let placeTarget = null
     const block = blockAtCursor(bot, this.config.reach)
     if (block) {
       try {
@@ -81,8 +83,10 @@ class StatePusher {
           displayName: block.displayName,
           diggable: bot.canDigBlock(block)
         }
+        placeTarget = predictPlacement(bot, block)
       } catch (err) {
         targetBlock = null
+        placeTarget = null
       }
     }
 
@@ -108,6 +112,9 @@ class StatePusher {
       hotbar,
       heldItem: describeItem(bot.heldItem),
       targetBlock,
+      // What a right-click would place, precomputed so the browser can draw
+      // the block the instant it is clicked (see client/place.js).
+      placeTarget,
       timeOfDay: bot.time ? bot.time.timeOfDay : 0,
       isRaining: Boolean(bot.isRaining),
       gameMode: bot.game ? bot.game.gameMode : null,

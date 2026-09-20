@@ -20,11 +20,13 @@ const int = (v, d) => {
 
 module.exports = {
   mc: {
-    host: process.env.MC_HOST || 'localhost',
+    // Visitors type the server they want on the join screen. MC_HOST is only
+    // a default for anyone who leaves that blank, and there is none unless set.
+    host: process.env.MC_HOST || null,
     port: int(process.env.MC_PORT, 25565),
-    // What the join screen shows. Under compose MC_HOST is an internal service
-    // name that means nothing outside the network, so it can be overridden.
-    publicHost: process.env.MC_PUBLIC_HOST || process.env.MC_HOST || 'localhost',
+    // What the join screen shows as the placeholder. Under compose MC_HOST is
+    // an internal service name that means nothing outside the network.
+    publicHost: process.env.MC_PUBLIC_HOST || process.env.MC_HOST || null,
     username: process.env.MC_USERNAME || 'StreamBot',
     version: process.env.MC_VERSION || '1.20.4',
     auth: process.env.MC_AUTH || 'offline'
@@ -60,8 +62,11 @@ module.exports = {
     // any other action a visitor can hold down.
     give: int(process.env.LIMIT_GIVE, 30)
   },
-  // Look packets are rate limited per client so a fast mouse can't spam the
-  // Minecraft server hard enough to look like a cheat client.
-  lookIntervalMs: int(process.env.LOOK_INTERVAL_MS, 50),
+  // How often a member's look is applied to the bot; extra samples inside the
+  // window coalesce (latest wins) rather than drop. This does not shield the
+  // Minecraft server — bot.look(force) writes no packet, mineflayer sends
+  // yaw/pitch once per 50ms physics tick regardless — it only bounds per-client
+  // work, so it sits below the tick so every tick snapshots a fresh sample.
+  lookIntervalMs: int(process.env.LOOK_INTERVAL_MS, 15),
   chatIntervalMs: int(process.env.CHAT_INTERVAL_MS, 1000)
 }

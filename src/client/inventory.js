@@ -90,6 +90,11 @@ class InventoryUI {
     else this.open()
   }
 
+  /** Repaint slots drawn before the icon data had loaded (see icons.js). */
+  refresh () {
+    if (this.isOpen) this.render()
+  }
+
   render () {
     const payload = this.payload
     this.body.innerHTML = ''
