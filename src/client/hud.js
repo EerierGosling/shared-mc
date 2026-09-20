@@ -98,12 +98,12 @@ class Hud {
     this.bubbles = iconRow(this.air)
   }
 
-  setStatus (state, message) {
+  setStatus (state, message, server) {
     this.status.dataset.state = state
     this.status.querySelector('[data-role=message]').textContent = message
-    const url = this.status.querySelector('[data-role=url]')
-    url.textContent = window.location.origin + window.location.pathname
-    url.hidden = state !== 'connected'
+    const line = this.status.querySelector('[data-role=server]')
+    if (server && server.host) line.textContent = server.port ? `${server.host}:${server.port}` : server.host
+    line.hidden = state !== 'connected' || !line.textContent
   }
 
   /**

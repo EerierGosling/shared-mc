@@ -166,7 +166,7 @@ socket.on('disconnect', () => {
 })
 
 socket.on('bot:status', status => {
-  hud.setStatus(status.state, describeStatus(status))
+  hud.setStatus(status.state, describeStatus(status), status.server)
   pause.setServer(status.server)
 })
 
