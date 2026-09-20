@@ -3,7 +3,7 @@ const QRCode = require('qrcode')
 const { Gestures, idle } = require('./gestures')
 const posePreview = require('./pose-preview')
 const FaceGestures = require('./face-gestures')
-const PhoneSteps = require('./phone-steps')
+const PhoneMining = require('./phone-mining')
 const StartGesture = require('./start-gesture')
 const { FIELDS, DEFAULTS, load, save } = require('./motion-settings')
 
@@ -14,7 +14,7 @@ module.exports = function setupCameraControls ({ apply, canPlay, onStart, socket
   let settings = load()
   const gestures = new Gestures(settings)
   const faces = new FaceGestures()
-  const steps = new PhoneSteps()
+  const phoneMining = new PhoneMining()
   const startGesture = new StartGesture()
   const panel = document.createElement('section')
   panel.id = 'camera-controls'
@@ -28,7 +28,7 @@ module.exports = function setupCameraControls ({ apply, canPlay, onStart, socket
     <div class="motion-buttons">
       <button type="button" data-action="start">Start camera</button>
       <button type="button" data-action="calibrate">Calibrate neutral pose</button>
-      <button type="button" data-action="motion">Enable phone steps</button>
+      <button type="button" data-action="motion">Enable phone mining</button>
     </div>
     <label>Camera <select data-setting="camera"><option value="user">Front / default</option><option value="environment">Rear camera</option></select></label>
     <div class="motion-buttons motion-primary">
@@ -61,7 +61,7 @@ module.exports = function setupCameraControls ({ apply, canPlay, onStart, socket
         <li>Test standing still for 10 seconds and each gesture 10 times. Change one slider at a time. Enable player control when ready.</li>
       </ol>
       <p>Walking automatically jumps while moving forward. To jump from camera input, both feet and hips must rise.</p>
-      <p>Use a mounted camera for body tracking. For phone steps, pair a separate phone, enable its motion sensor, and carry it with you. Keep the controller page visible and awake.</p>
+      <p>Use a mounted camera for body tracking. For phone mining, pair a separate phone, enable its motion sensor, and swing it deliberately to mine. Keep the controller page visible and awake.</p>
       <p>Calibration and sliders personalize a pretrained detector; they do not train a new AI model. No videos or landmarks are uploaded.</p>
     </details>
     ${companion ? '' : `<details data-role="pairing"><summary>Pair a phone</summary>
@@ -73,7 +73,7 @@ module.exports = function setupCameraControls ({ apply, canPlay, onStart, socket
       <canvas data-role="pair-qr" role="img" aria-label="Scan to open the phone controller with the pairing code" hidden></canvas>
       <strong data-role="pair-code"></strong><a data-role="pair-link"></a>
       <p data-role="pair-status">No phone connected. Codes expire after five minutes and work once.</p>
-      <small>A phone can send camera gestures, accelerometer steps, or both. Recommended: desktop camera + phone steps. Pairing does not create another player.</small>
+      <small>A phone can send camera gestures, accelerometer mining, or both. Recommended: desktop camera + phone mining. Pairing does not create another player.</small>
     </details>`}`
   if (!companion) panel.insertBefore(panel.querySelector('[data-role=pairing]'), panel.querySelector('details'))
   mount.append(panel)
@@ -118,7 +118,7 @@ module.exports = function setupCameraControls ({ apply, canPlay, onStart, socket
     gestures.resetMotion()
     startGesture.reset()
     faces.reset()
-    steps.reset()
+    phoneMining.reset()
     candidate = idle()
     preview.clear()
     faceState = { use: false, jump: false, score: 0 }
@@ -153,7 +153,7 @@ module.exports = function setupCameraControls ({ apply, canPlay, onStart, socket
     practice()
     stopCamera()
     motionEnabled = false
-    $('[data-action=motion]').textContent = 'Enable phone steps'
+    $('[data-action=motion]').textContent = 'Enable phone mining'
     if (!companion) socket?.emit('motion:unpair')
     paired = false
     status.textContent = 'All motion inputs stopped.'
@@ -294,7 +294,7 @@ module.exports = function setupCameraControls ({ apply, canPlay, onStart, socket
   $('[data-action=calibrate]').addEventListener('click', () => { practice(); gestures.calibrate() })
   $('[data-action=arm]').addEventListener('click', () => {
     if (armed) { practice(); return }
-    if (!running && !motionEnabled && !paired) { status.textContent = 'Start a camera, enable phone steps, or pair a phone first.'; return }
+    if (!running && !motionEnabled && !paired) { status.textContent = 'Start a camera, enable phone mining, or pair a phone first.'; return }
     reset()
     armed = true
     onStart()
@@ -307,7 +307,7 @@ module.exports = function setupCameraControls ({ apply, canPlay, onStart, socket
   $('[data-action=stop]').addEventListener('click', stop)
   $('[data-action=hide]').addEventListener('click', () => { panel.hidden = true })
   $('[data-action=motion]').addEventListener('click', async () => {
-    if (motionEnabled) { motionEnabled = false; practice(); $('[data-action=motion]').textContent = 'Enable phone steps'; return }
+    if (motionEnabled) { motionEnabled = false; practice(); $('[data-action=motion]').textContent = 'Enable phone mining'; return }
     const token = generation
     try {
       if (!window.isSecureContext || !window.DeviceMotionEvent) throw new Error('Phone motion needs HTTPS and a supported browser/device')
@@ -316,14 +316,14 @@ module.exports = function setupCameraControls ({ apply, canPlay, onStart, socket
       practice()
       motionEnabled = true
       motionSince = performance.now()
-      $('[data-action=motion]').textContent = 'Disable phone steps'
-      status.textContent = 'Waiting for motion sensor data. Carry this device and walk in place.'
+      $('[data-action=motion]').textContent = 'Disable phone mining'
+      status.textContent = 'Waiting for motion sensor data. Hold this device and make repeated deliberate swings to mine.'
       if (companion) $('[data-action=arm]').click()
     } catch (error) { status.textContent = error.message }
   })
   window.addEventListener('devicemotion', event => {
     if (!motionEnabled || document.hidden || !document.hasFocus()) return
-    steps.update(event, performance.now(), settings.phoneThreshold, settings.walkHold)
+    phoneMining.update(event, performance.now(), settings.phoneThreshold, settings.digHold)
   })
 
   if (!companion && socket) {
@@ -408,14 +408,14 @@ module.exports = function setupCameraControls ({ apply, canPlay, onStart, socket
       ? `Head: ${tracking.head ? 'visible' : 'missing'} · Mining arm: ${tracking.arm ? 'visible' : 'missing'} · Legs: ${tracking.legs ? 'visible' : 'missing'}${candidate.tracked && tracking.legs && !tracking.jumpReady ? ' · Recalibrate with feet visible for jumps' : ''}`
       : 'Waiting for camera landmarks. Green points indicate confident tracking.'
     const local = cameraFresh && candidate.tracked ? candidate : idle()
-    const phone = motionEnabled && steps.active(now)
+    const phone = motionEnabled && phoneMining.active(now)
     const other = paired && now - remoteAt < 350 ? remote : idle()
     const face = cameraFresh && settings.facial ? faceState : { jump: false, use: false }
-    const forward = Boolean(local.forward || phone || other.forward)
+    const forward = Boolean(local.forward || other.forward)
     const state = {
       forward,
       jump: Boolean(local.jump || face.jump || other.jump || (forward && settings.autojump)),
-      digging: Boolean(local.digging || other.digging),
+      digging: Boolean(local.digging || phone || other.digging),
       use: Boolean(face.use || other.use),
       dx: Math.max(-1, Math.min(1, local.dx + other.dx)),
       dy: Math.max(-1, Math.min(1, local.dy + other.dy))
@@ -427,17 +427,17 @@ module.exports = function setupCameraControls ({ apply, canPlay, onStart, socket
       m && `Head: ${m.headX.toFixed(2)}, ${m.headY.toFixed(2)} | dead zone ${settings.deadzone}`,
       m && `Knee: ${m.knee.toFixed(2)} / ${settings.stepThreshold} | arm: ${m.speed.toFixed(2)} / ${settings.swingThreshold}`,
       m && `Jump rise: ${m.rise.toFixed(2)} / ${settings.jumpThreshold}`,
-      motionEnabled && `Phone: ${steps.strength.toFixed(2)} / ${settings.phoneThreshold} m/s²${now - steps.lastSample > 1000 ? ' (no recent sensor data)' : ''}`,
+      motionEnabled && `Phone: ${phoneMining.strength.toFixed(2)} / ${settings.phoneThreshold} m/s²${now - phoneMining.lastSample > 1000 ? ' (no recent sensor data)' : ''}`,
       settings.facial && `Expression: ${faceState.score.toFixed(2)} / ${settings.faceThreshold}`,
       running && `Tracking time: ${Math.round(inferenceMs)} ms. ${cameraFresh ? 'Camera live' : 'Waiting for fresh camera frames'}`
     ].filter(Boolean).join('\n') || 'Start an input to see measurements.'
-    if (motionEnabled && !running && now - motionSince > 3000 && !Number.isFinite(steps.lastSample)) status.textContent = 'No motion data received. Check browser permissions or use camera tracking.'
+    if (motionEnabled && !running && now - motionSince > 3000 && !Number.isFinite(phoneMining.lastSample)) status.textContent = 'No motion data received. Check browser permissions or use camera tracking.'
     if (armed && canPlay() && !document.hidden && document.hasFocus()) {
       // Receiver owns look speed; companion packets stay normalized.
       apply(state, dt * (companion ? 1 : settings.lookSpeed))
     } else {
       apply(idle())
-      if (armed) { gestures.resetMotion(); steps.reset(); faces.reset(); remote = idle(); candidate = idle(); faceState = { use: false, jump: false, score: 0 } }
+      if (armed) { gestures.resetMotion(); phoneMining.reset(); faces.reset(); remote = idle(); candidate = idle(); faceState = { use: false, jump: false, score: 0 } }
     }
   }, 50)
   window.addEventListener('blur', reset)

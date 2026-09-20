@@ -59,7 +59,7 @@ function pair () {
     }
     paired = true
     code.value = ''
-    status.textContent = 'Paired. Tap Enable phone steps to allow motion access and start tracking. Enable player control on the game screen when ready.'
+    status.textContent = 'Paired. Tap Enable phone mining to allow motion access and start tracking. Enable player control on the game screen when ready.'
     disconnect.hidden = false
     show.hidden = false
     controls.show()

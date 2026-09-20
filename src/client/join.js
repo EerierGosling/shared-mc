@@ -61,7 +61,7 @@ class JoinScreen {
       const hints = {
         standard: 'You can change controls from the game menu.',
         camera: 'After joining: allow camera access, calibrate, and practice before enabling control.',
-        hybrid: 'After joining: a QR code appears automatically. Scan it to pair your phone, then enable phone steps.',
+        hybrid: 'After joining: a QR code appears automatically. Scan it to pair your phone, then enable phone mining.',
         phone: 'After joining: scan the pairing QR code on a phone. No second player is created.'
       }
       document.getElementById('join-control-hint').textContent = hints[this.controlMode]

@@ -8,7 +8,7 @@ const FIELDS = {
   jumpThreshold: ['Jump height threshold', 0.08, 0.4, 0.01, 0.18],
   walkHold: ['Walking stop delay (ms)', 250, 1000, 50, 650],
   digHold: ['Mining hold (ms)', 250, 1500, 50, 800],
-  phoneThreshold: ['Phone step threshold (m/s²)', 1, 8, 0.1, 2],
+  phoneThreshold: ['Phone mining threshold (m/s²)', 1, 8, 0.1, 2],
   faceThreshold: ['Smile / mouth threshold', 0.3, 0.95, 0.05, 0.65]
 }
 const DEFAULTS = Object.fromEntries(Object.entries(FIELDS).map(([key, field]) => [key, field[4]]))

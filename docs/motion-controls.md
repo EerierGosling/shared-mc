@@ -2,8 +2,8 @@
 
 ## Choose controls when opening the game
 
-The opening screen offers **Keyboard / mouse / touch**, **Camera gestures**,
-**Camera + paired phone steps**, and **Paired phone controller**. Your selection
+The opening screen offers **Keyboard / mouse / touch**, **Use camera**,
+**Camera + phone**, and **Paired phone controller**. Your selection
 is remembered in this browser. Join the game normally; motion selections open
 setup in **practice mode**, without requesting camera permission until you press
 **Start camera**. You can reopen setup from **Game menu → Motion controls & phone**.
@@ -75,20 +75,20 @@ expressions on some cameras.
    a socket disconnect requires a new code.
 
 Recommended hybrid setup: mount the computer camera for head/arm/body input;
-use the phone for accelerometer steps while carrying it securely. On the phone,
-choose **Enable phone steps** (no camera required), allow motion permission if
-prompted, practice, and enable control. The live measurements show acceleration
-and warn if no samples arrive. Step recognition requires repeated peaks, not a
+use the phone for mining with repeated deliberate swings. Camera knee lifts still control walking. On the phone,
+choose **Enable phone mining** (no camera required), allow motion permission if
+prompted. This enables phone input; enable player control on the game screen when ready. The live measurements show acceleration
+and warn if no samples arrive. Mining recognition requires repeated peaks, not a
 single shake. There is a gravity-filter fallback for devices that only report
 acceleration including gravity.
 
 Alternatively, mount the phone to use its camera as the sole tracker and leave
-accelerometer steps off. A phone moving with your body is a poor stationary
+accelerometer mining off. A phone moving with your body is a poor stationary
 camera: do not expect simultaneous handheld full-body camera tracking and
-accelerometer walking to be reliable.
+accelerometer mining to be reliable.
 
-The desktop merges camera and phone actions. Either source can hold forward,
-jump, or mining; releasing one source does not cancel the other. Head look from
+The desktop merges camera and phone actions. Phone acceleration only mines;
+camera gestures can walk, jump, and mine. When both cameras track gestures, releasing one source does not cancel the other. Head look from
 both sources adds together, so normally use just one camera for steering.
 The receiving game browser's look-speed slider controls final turn speed.
 
@@ -116,8 +116,8 @@ settings to that preset. **Reset sensitivity** restores the defaults.
 | Mining harder blocks keeps restarting | Keep swinging or increase **Mining hold** |
 | Physical jump is missed | Show feet during calibration, recalibrate, then lower jump threshold |
 | A small bounce triggers jump | Increase **Jump height threshold** |
-| Phone steps are missed | Check live sensor readings, then lower **Phone step threshold** |
-| Phone handling triggers walking | Raise phone threshold and carry it in a steadier position |
+| Phone swings are missed | Check live sensor readings, then lower **Phone mining threshold** |
+| Phone handling triggers mining | Raise the phone mining threshold |
 | Expression triggers accidentally | Raise **Smile / mouth threshold**, or disable facial actions |
 | Lost tracking | Improve framing/light; sensitivity cannot recover invisible landmarks |
 
