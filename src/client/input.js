@@ -97,10 +97,10 @@ function setupInput ({ socket, viewer, camera, hud, inventoryUI, advancementsUI,
   const startUse = () => {
     if (useRepeat) return
     socket.emit('action:use')
-    hand.swing()
+    hand.push()
     useRepeat = setInterval(() => {
       socket.emit('action:use', { repeat: true })
-      hand.swing()
+      hand.push()
     }, USE_REPEAT_MS)
   }
 
@@ -182,7 +182,7 @@ function setupInput ({ socket, viewer, camera, hud, inventoryUI, advancementsUI,
       gestureState = state
       if (dt && (state.dx || state.dy)) turn(state.dx * dt, state.dy * dt, 1.8)
       if (startingDig || startingUse) flushLook()
-      if (startingUse) { placePrediction.place(); socket.emit('action:use'); hand.swing() }
+      if (startingUse) { placePrediction.place(); socket.emit('action:use'); hand.push() }
       syncDig()
       if (changed) sendControls()
     }
