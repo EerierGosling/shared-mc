@@ -8,6 +8,7 @@ const { Server } = require('socket.io')
 
 const config = require('./config')
 const Sessions = require('./sessions')
+const { MotionPairing } = require('./motion-pairing')
 const Load = require('./load')
 const metrics = require('./metrics')
 const { precompress, precompressed } = require('./static')
@@ -54,7 +55,7 @@ function findBundle (prefix) {
   if (!match) console.warn(`dist/${prefix}.*.js not found; run npm run build`)
   return match ? `/dist/${match}` : `/dist/${prefix}.js`
 }
-const assets = { bundle: findBundle('bundle'), worker: findBundle('worker') }
+const assets = { bundle: findBundle('bundle'), worker: findBundle('worker'), controller: findBundle('controller') }
 // The page names the hashed bundle and hands the worker's name to it.
 const page = fs.readFileSync(path.join(clientDir, 'index.html'), 'utf8')
   .replace('<script src="/dist/bundle.js"></script>',
@@ -65,6 +66,14 @@ app.get(['/', '/index.html'], (req, res) => {
   res.set('Cache-Control', 'no-cache')
   res.send(page)
 })
+const controllerPage = fs.readFileSync(path.join(clientDir, 'controller.html'), 'utf8')
+  .replace('/dist/controller.js', assets.controller)
+app.get('/controller', (req, res) => {
+  res.set('Content-Type', 'text/html; charset=utf-8')
+  res.set('Cache-Control', 'no-cache')
+  res.send(controllerPage)
+})
+app.get('/motion.css', (req, res) => res.sendFile(path.join(clientDir, 'motion.css')))
 app.use('/dist', precompressed(distDir, FOREVER))
 app.use('/fonts', express.static(path.join(clientDir, 'fonts'), { maxAge: '7d' }))
 
@@ -134,6 +143,7 @@ if (assetVersion) require('./icons')(app, viewerPublic, assetVersion)
 // your own. Sessions owns both; nothing crosses between them but the roster.
 const load = new Load(config.load)
 const sessions = new Sessions(config, io, load)
+const motionPairing = new MotionPairing(id => sessions.modeBySocket.has(id))
 metrics.install(app, sessions, io, load)
 
 // Rosters are per server, so only the browsers on that server hear about a
@@ -146,6 +156,7 @@ function broadcastRoster (key) {
 sessions.onChange = key => broadcastRoster(key)
 
 io.on('connection', socket => {
+  motionPairing.register(socket)
   // No bot yet: the visitor picks a mode first, and only a vetted join creates
   // a login on the Minecraft server.
   socket.join(Sessions.LOBBY)
@@ -204,6 +215,7 @@ server.listen(config.web.port, () => {
 
 const shutdown = () => {
   console.log('shutting down')
+  motionPairing.destroy()
   sessions.destroyAll()
   load.stop()
   server.close(() => process.exit(0))

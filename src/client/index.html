@@ -729,6 +729,7 @@
     border-color: #6fc768 #1f4a1c #1f4a1c #6fc768;
   }
 </style>
+<link rel="stylesheet" href="/motion.css">
 </head>
 <body>
   <canvas id="viewport"></canvas>
@@ -862,6 +863,17 @@
       <div id="join-identity">
         <input id="join-name" maxlength="16" placeholder="your name" autocomplete="off" spellcheck="false">
         <div id="join-skins"></div>
+      </div>
+      <div id="join-controls">
+        <label for="join-control-mode">Controls</label>
+        <select id="join-control-mode">
+          <option value="standard">Keyboard / mouse / touch</option>
+          <option value="camera">Camera gestures</option>
+          <option value="hybrid">Camera + paired phone steps</option>
+          <option value="phone">Paired phone controller</option>
+        </select>
+        <small id="join-control-hint">You can change controls from the game menu.</small>
+        <small><a href="/controller">Use this device as a phone controller</a></small>
       </div>
       <button id="join-button" type="submit" disabled>Play</button>
       <p id="join-error"></p>

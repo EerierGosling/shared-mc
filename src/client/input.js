@@ -1,5 +1,7 @@
 'use strict'
 
+const setupCameraControls = require('./camera-controls')
+
 const KEY_TO_CONTROL = {
   KeyW: 'forward',
   KeyS: 'back',
@@ -40,6 +42,9 @@ const CHAT_HISTORY = 50
 function setupInput ({ socket, viewer, camera, hud, inventoryUI, canvas, hand, join, creative, placePrediction, pause }) {
   const held = Object.create(null)
   let locked = false
+  let cameraControls = null
+  let gestureState = {}
+  let digActive = false
   const isTouchDevice = window.matchMedia('(pointer: coarse)').matches ||
     /[?&]touch\b/.test(window.location.search)
   if (isTouchDevice) document.body.classList.add('touch')
@@ -57,12 +62,12 @@ function setupInput ({ socket, viewer, camera, hud, inventoryUI, canvas, hand, j
   let chatDraft = ''
 
   const uiOpen = () => join.isOpen || inventoryUI.isOpen || hud.chatOpen || hud.dead || pause.isOpen
-  const ownsLook = () => locked || touchLook
+  const ownsLook = () => locked || touchLook || Boolean(cameraControls?.active)
 
   const sendControls = () => {
     const payload = {}
     for (const key of CONTROL_KEYS) {
-      payload[key] = key === 'sprint' ? Boolean(held.sprint || held.autoSprint) : Boolean(held[key])
+      payload[key] = key === 'sprint' ? Boolean(held.sprint || held.autoSprint) : Boolean(held[key] || gestureState[key])
     }
     socket.emit('input:state', payload)
   }
@@ -74,19 +79,16 @@ function setupInput ({ socket, viewer, camera, hud, inventoryUI, canvas, hand, j
     sendControls()
   }
 
-  const startDig = () => {
-    if (held.digging) return
-    held.digging = true
-    socket.emit('action:dig', { active: true })
-    hand.startSwinging()
+  const syncDig = () => {
+    const active = Boolean(held.digging || gestureState.digging)
+    if (active === digActive) return
+    digActive = active
+    socket.emit('action:dig', { active })
+    if (active) hand.startSwinging()
+    else hand.stopSwinging()
   }
-
-  const stopDig = () => {
-    if (!held.digging) return
-    held.digging = false
-    socket.emit('action:dig', { active: false })
-    hand.stopSwinging()
-  }
+  const startDig = () => { held.digging = true; syncDig() }
+  const stopDig = () => { held.digging = false; syncDig() }
 
   // One use on press, then repeats while held: vanilla's hold-to-place. The
   // server treats repeats as place-only, so a chest under the crosshair is
@@ -107,6 +109,7 @@ function setupInput ({ socket, viewer, camera, hud, inventoryUI, canvas, hand, j
   }
 
   const releaseAll = () => {
+    cameraControls?.reset()
     let changed = false
     for (const key of CONTROL_KEYS) {
       if (held[key]) { held[key] = false; changed = true }
@@ -160,10 +163,27 @@ function setupInput ({ socket, viewer, camera, hud, inventoryUI, canvas, hand, j
 
   const selectSlot = slot => socket.emit('hotbar', { slot })
 
+  cameraControls = setupCameraControls({
+    socket,
+    canPlay: () => socket.connected && join.joined && !uiOpen() && !document.hidden && document.hasFocus(),
+    onStart: () => { releaseAll(); pause.close() },
+    apply: (state, dt = 0) => {
+      const changed = CONTROL_KEYS.some(key => Boolean(state[key]) !== Boolean(gestureState[key]))
+      const startingDig = state.digging && !gestureState.digging
+      const startingUse = state.use && !gestureState.use
+      gestureState = state
+      if (dt && (state.dx || state.dy)) turn(state.dx * dt, state.dy * dt, 1.8)
+      if (startingDig || startingUse) flushLook()
+      if (startingUse) { placePrediction.place(); socket.emit('action:use'); hand.swing() }
+      syncDig()
+      if (changed) sendControls()
+    }
+  })
+
   // --- pointer lock ---------------------------------------------------------
 
   canvas.addEventListener('mousedown', event => {
-    if (uiOpen() || isTouchDevice) return
+    if (uiOpen() || isTouchDevice || cameraControls.active) return
     if (!locked) {
       canvas.requestPointerLock()
       return
@@ -212,7 +232,7 @@ function setupInput ({ socket, viewer, camera, hud, inventoryUI, canvas, hand, j
   // simply comes back, rather than leaving a live HUD that ignores the mouse.
   const resume = () => {
     pause.close()
-    if (isTouchDevice) return
+    if (isTouchDevice || cameraControls?.active) return
     let request
     try {
       request = canvas.requestPointerLock()
@@ -306,6 +326,7 @@ function setupInput ({ socket, viewer, camera, hud, inventoryUI, canvas, hand, j
   // --- keyboard -------------------------------------------------------------
 
   window.addEventListener('keydown', event => {
+    if (event.target.closest?.('#camera-controls')) return
     if (join.isOpen || hud.chatOpen) return
 
     // F3 toggles the coordinate readout, as in vanilla.
@@ -427,6 +448,7 @@ function setupInput ({ socket, viewer, camera, hud, inventoryUI, canvas, hand, j
   })
 
   return {
+    showMotion: withPhone => cameraControls.show(withPhone),
     ownsLook,
     releaseAll,
     resume

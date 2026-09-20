@@ -8,11 +8,11 @@ const clientConfig = {
   // Content-hashed so /dist can be cached for a year: a new build is a new
   // URL. The server finds the current names by listing dist/ at startup.
   // Each config cleans its own stale hashes and keeps the other's output,
-  // since both write to dist/ at the same time.
+  // since all three write to dist/ at the same time.
   output: {
     path: path.resolve(__dirname, 'dist'),
     filename: 'bundle.[contenthash].js',
-    clean: { keep: /^(worker\.|blocksStates\/)/ }
+    clean: { keep: /^(worker\.|controller\.|blocksStates\/)/ }
   },
   resolve: {
     // canvas is not a core module, so it needs an alias rather than a
@@ -80,7 +80,7 @@ const workerConfig = {
   output: {
     path: path.resolve(__dirname, 'dist'),
     filename: 'worker.[contenthash].js',
-    clean: { keep: /^(bundle\.|blocksStates\/)/ }
+    clean: { keep: /^(bundle\.|controller\.|blocksStates\/)/ }
   },
   resolve: { fallback: clientConfig.resolve.fallback },
   module: {
@@ -112,4 +112,14 @@ const workerConfig = {
   devtool: 'source-map'
 }
 
-module.exports = [clientConfig, workerConfig]
+const controllerConfig = {
+  ...clientConfig,
+  entry: './src/client/controller.js',
+  output: {
+    path: path.resolve(__dirname, 'dist'),
+    filename: 'controller.[contenthash].js',
+    clean: { keep: /^(bundle\.|worker\.|blocksStates\/)/ }
+  }
+}
+
+module.exports = [clientConfig, workerConfig, controllerConfig]
