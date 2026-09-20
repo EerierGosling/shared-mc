@@ -7,6 +7,8 @@ const { EventEmitter } = require('events')
 
 // One physics tick; entity moves are merged per entity within it.
 const ENTITY_FLUSH_MS = 50
+// Same tick, for the camera position stream.
+const POSITION_MS = 50
 
 /**
  * The emitter WorldView writes to. Everything passes straight through to the
@@ -119,14 +121,29 @@ function attachWorldView (bot, socket, viewDistance, onBlockClicked) {
   }
 
   // 'move' fires for every physics correction — on a busy server that's a
-  // burst of events per tick, per viewer. Coalesce to one packet per tick.
-  let moved = false
-  const onMove = () => { moved = true }
-  const positionTimer = setInterval(() => {
-    if (!moved) return
-    moved = false
+  // burst of events per tick, per viewer. Still one packet per 50ms window,
+  // but on the window's leading edge: the old interval poll cost every camera
+  // update the remainder of its tick (~25ms on average) before anyone saw it.
+  // The trailing timer still puts the resting position on the wire.
+  let lastPositionAt = 0
+  let positionTimer = null
+  const sendPositionNow = () => {
+    lastPositionAt = Date.now()
     sendPosition()
-  }, 50)
+  }
+  const onMove = () => {
+    if (positionTimer) return
+    const wait = POSITION_MS - (Date.now() - lastPositionAt)
+    if (wait <= 0) {
+      sendPositionNow()
+      return
+    }
+    positionTimer = setTimeout(() => {
+      positionTimer = null
+      sendPositionNow()
+    }, wait)
+    positionTimer.unref?.()
+  }
   bot.on('move', onMove)
   sendPosition()
 
@@ -134,7 +151,7 @@ function attachWorldView (bot, socket, viewDistance, onBlockClicked) {
   return () => {
     if (detached) return
     detached = true
-    clearInterval(positionTimer)
+    clearTimeout(positionTimer)
     stream.stop()
     bot.removeListener('move', onMove)
     bot.removeListener('itemDrop', sendDroppedItem)

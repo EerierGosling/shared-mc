@@ -41,8 +41,11 @@ module.exports = {
     attack: int(process.env.LIMIT_ATTACK, 20),
     drop: int(process.env.LIMIT_DROP, 5)
   },
-  // Look packets are rate limited per client so a fast mouse can't spam the
-  // Minecraft server hard enough to look like a cheat client.
-  lookIntervalMs: int(process.env.LOOK_INTERVAL_MS, 50),
+  // How often a member's look is applied to the bot; extra samples inside the
+  // window coalesce (latest wins) rather than drop. This does not shield the
+  // Minecraft server — bot.look(force) writes no packet, mineflayer sends
+  // yaw/pitch once per 50ms physics tick regardless — it only bounds per-client
+  // work, so it sits below the tick so every tick snapshots a fresh sample.
+  lookIntervalMs: int(process.env.LOOK_INTERVAL_MS, 15),
   chatIntervalMs: int(process.env.CHAT_INTERVAL_MS, 1000)
 }

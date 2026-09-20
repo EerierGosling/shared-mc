@@ -52,7 +52,8 @@ class Controller {
     this.bot = null
     this.desired = new Map() // socket.id -> that member's held keys
     this.effective = {}
-    this.lastLookAt = new Map() // socket.id -> timestamp
+    this.lastLookAt = new Map() // socket.id -> timestamp of last applied look
+    this.pendingLooks = new Map() // socket.id -> { yaw, pitch, timer }
     this.lastChatAt = new Map()
     this.diggers = new Set() // socket.ids currently holding the mouse button
     this.lastDigNoticeAt = 0
@@ -74,18 +75,35 @@ class Controller {
     this.diggers.clear()
     this.digHeld = false
     this.digging = false
+    for (const pending of this.pendingLooks.values()) clearTimeout(pending.timer)
+    this.pendingLooks.clear()
   }
 
   register (socket) {
     socket.on('input:state', state => this.setInput(socket.id, state))
     socket.on('input:look', look => this.look(socket.id, look))
-    socket.on('action:dig', payload => this.setDig(socket.id, Boolean(payload && payload.active)))
-    socket.on('action:use', () => this.use())
-    socket.on('action:attack', () => this.attack())
+    // Cursor actions raycast against the bot's current aim, so a look still
+    // waiting out its rate window is applied first — the click meant "there",
+    // not wherever the bot pointed a window ago.
+    socket.on('action:dig', payload => {
+      this._flushLook(socket.id)
+      this.setDig(socket.id, Boolean(payload && payload.active))
+    })
+    socket.on('action:use', () => {
+      this._flushLook(socket.id)
+      this.use()
+    })
+    socket.on('action:attack', () => {
+      this._flushLook(socket.id)
+      this.attack()
+    })
     socket.on('hotbar', payload => this.setHotbar(payload && payload.slot))
     socket.on('drop', () => this.drop())
     socket.on('chat', payload => this.chat(socket.id, payload && payload.text))
-    socket.on('goto', () => this.gotoCursor())
+    socket.on('goto', () => {
+      this._flushLook(socket.id)
+      this.gotoCursor()
+    })
     socket.on('stop', () => this.stopEverything())
   }
 
@@ -93,6 +111,11 @@ class Controller {
   dropSocket (socketId) {
     this.desired.delete(socketId)
     this.lastLookAt.delete(socketId)
+    const pending = this.pendingLooks.get(socketId)
+    if (pending) {
+      clearTimeout(pending.timer)
+      this.pendingLooks.delete(socketId)
+    }
     this.lastChatAt.delete(socketId)
     this._applyEffective()
     // A tab that vanishes mid-click must not leave the bot mining forever.
@@ -128,17 +151,54 @@ class Controller {
 
   look (socketId, look) {
     if (!this.bot || !look) return
-    const now = Date.now()
-    if (now - (this.lastLookAt.get(socketId) || 0) < this.config.lookIntervalMs) return
-    this.lastLookAt.set(socketId, now)
-
     const yaw = Number(look.yaw)
     const pitch = Number(look.pitch)
     if (!Number.isFinite(yaw) || !Number.isFinite(pitch)) return
     const clamped = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, pitch))
+
+    const now = Date.now()
+    const wait = this.config.lookIntervalMs - (now - (this.lastLookAt.get(socketId) || 0))
+    if (wait <= 0) {
+      this.lastLookAt.set(socketId, now)
+      this._applyLook(yaw, clamped)
+      return
+    }
+    // Inside the rate window: coalesce, never drop. Only the latest mouse
+    // sample matters, and dropping the final message of a flick left the bot
+    // aimed somewhere stale until the mouse moved again.
+    const pending = this.pendingLooks.get(socketId)
+    if (pending) {
+      pending.yaw = yaw
+      pending.pitch = clamped
+      return
+    }
+    const entry = { yaw, pitch: clamped, timer: null }
+    entry.timer = setTimeout(() => {
+      this.pendingLooks.delete(socketId)
+      this.lastLookAt.set(socketId, Date.now())
+      this._applyLook(entry.yaw, entry.pitch)
+    }, wait)
+    entry.timer.unref?.()
+    this.pendingLooks.set(socketId, entry)
+  }
+
+  _applyLook (yaw, pitch) {
+    if (!this.bot) return
     // force=true: the browser already applied this rotation locally, so any
-    // server-side smoothing would just fight it.
-    Promise.resolve(this.bot.look(yaw, clamped, true)).catch(() => {})
+    // server-side smoothing would just fight it. No packet is written here
+    // either way — mineflayer snapshots yaw/pitch once per 50ms physics tick,
+    // which is what actually paces what the Minecraft server sees.
+    Promise.resolve(this.bot.look(yaw, pitch, true)).catch(() => {})
+  }
+
+  /** Apply a member's pending look now; cursor actions must not aim into the past. */
+  _flushLook (socketId) {
+    const pending = this.pendingLooks.get(socketId)
+    if (!pending) return
+    clearTimeout(pending.timer)
+    this.pendingLooks.delete(socketId)
+    this.lastLookAt.set(socketId, Date.now())
+    this._applyLook(pending.yaw, pending.pitch)
   }
 
   // --- world interaction ---------------------------------------------------
