@@ -43,7 +43,8 @@ class WorldRenderer {
     this.workers = []
     for (let i = 0; i < numWorkers; i++) {
       // differs from upstream: our own bundle, see worker.js next to this file.
-      const worker = new Worker('dist/worker.js')
+      // Its name carries a content hash, which the page learnt from the server.
+      const worker = new Worker((window.__ASSETS__ && window.__ASSETS__.worker) || 'dist/worker.js')
       worker.onmessage = ({ data }) => {
         if (data.type === 'geometry') {
           let mesh = this.sectionMeshs[data.key]

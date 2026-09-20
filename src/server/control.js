@@ -56,6 +56,8 @@ class Controller {
     this.lastUseAt = 0
     this.digHeld = false
     this.digging = false
+    // When any member last did anything; sessions.js reclaims idle solo bots.
+    this.lastInputAt = Date.now()
     for (const key of CONTROL_KEYS) {
       this.effective[key] = false
       this.applied[key] = false
@@ -80,35 +82,40 @@ class Controller {
   }
 
   register (socket) {
-    socket.on('input:state', state => this.setInput(socket.id, state))
-    socket.on('input:look', look => this.look(socket.id, look))
+    // Every input, whatever it does, counts as the visitor being present.
+    const on = (event, fn) => socket.on(event, (...args) => {
+      this.lastInputAt = Date.now()
+      fn(...args)
+    })
+    on('input:state', state => this.setInput(socket.id, state))
+    on('input:look', look => this.look(socket.id, look))
     // Cursor actions raycast against the bot's current aim, so a look still
     // waiting out its rate window is applied first — the click meant "there",
     // not wherever the bot pointed a window ago.
-    socket.on('action:dig', payload => {
+    on('action:dig', payload => {
       this._flushLook(socket.id)
       this.setDig(socket.id, Boolean(payload && payload.active))
     })
-    socket.on('action:use', payload => {
+    on('action:use', payload => {
       this._flushLook(socket.id)
       this.use(Boolean(payload && payload.repeat))
     })
-    socket.on('action:attack', () => {
+    on('action:attack', () => {
       this._flushLook(socket.id)
       this.attack()
     })
-    socket.on('creative:pick', () => {
+    on('creative:pick', () => {
       this._flushLook(socket.id)
       if (this.creative) this.creative.pickBlock(socket.id)
     })
-    socket.on('hotbar', payload => this.setHotbar(payload && payload.slot))
-    socket.on('drop', () => this.drop())
-    socket.on('chat', payload => this.chat(socket.id, payload && payload.text))
-    socket.on('goto', () => {
+    on('hotbar', payload => this.setHotbar(payload && payload.slot))
+    on('drop', () => this.drop())
+    on('chat', payload => this.chat(socket.id, payload && payload.text))
+    on('goto', () => {
       this._flushLook(socket.id)
       this.gotoCursor()
     })
-    socket.on('stop', () => this.stopEverything())
+    on('stop', () => this.stopEverything())
   }
 
   /** Forget a member who left, and recompute the merge without their keys. */

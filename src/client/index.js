@@ -124,6 +124,14 @@ socket.on('bot:status', status => {
   pause.setServer(status.server)
 })
 
+// The server ended this session (idle too long, or the bot could not stay
+// on its server). Same exit as quitting from the pause menu — a reload back
+// to the join screen — with the reason carried across so it can be shown.
+socket.on('session:expired', ({ reason }) => {
+  try { window.sessionStorage.setItem('join:notice', reason || '') } catch (err) { /* shown nowhere, then */ }
+  window.location.reload()
+})
+
 socket.on('version', version => {
   // The server serves /textures/<version>* and /blocksStates/<version>.json
   // for whatever it runs (aliasing a shipped atlas when needed), so take the
@@ -261,5 +269,6 @@ window.addEventListener('resize', () => {
 function describeStatus (status) {
   if (status.state === 'connected') return status.message
   if (status.state === 'reconnecting') return `bot disconnected (${status.message}) — reconnecting…`
+  if (status.state === 'gone') return `${status.message} — giving up`
   return status.message
 }

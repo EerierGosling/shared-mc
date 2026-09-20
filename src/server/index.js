@@ -1,18 +1,23 @@
 'use strict'
+const fs = require('fs')
 const path = require('path')
 const http = require('http')
 const express = require('express')
 const compression = require('compression')
 const { Server } = require('socket.io')
-const mc = require('minecraft-protocol')
 
 const config = require('./config')
 const Sessions = require('./sessions')
+const Load = require('./load')
+const metrics = require('./metrics')
+const { precompress, precompressed } = require('./static')
 
 const app = express()
 const server = http.createServer(app)
 const io = new Server(server, {
-  maxHttpBufferSize: 1e8,
+  // The browser sends nothing bigger than a chat line; the default 1 MB is
+  // plenty and a larger allowance is just memory a stranger can make us hold.
+  maxHttpBufferSize: 1e5,
   // Chunk JSON compresses ~10x and each viewer downloads the whole view
   // distance on connect. The threshold keeps the 20Hz position/state
   // stream out of zlib.
@@ -20,13 +25,6 @@ const io = new Server(server, {
 })
 
 // --- static assets ---------------------------------------------------------
-// Gzip everything text-shaped before any route sees the response: the two
-// webpack bundles are a couple of MB of javascript each and the blocksStates
-// JSON runs to megabytes, all of which compress several-fold. PNGs are
-// skipped automatically (already compressed) and socket.io traffic has its
-// own perMessageDeflate.
-app.use(compression())
-
 // Order matters. prismarine-viewer ships its own index.html in the same public
 // folder we need for /textures, /blocksStates and /worker.js, so our page is
 // registered first and our bundle lives under /dist to avoid any collision.
@@ -34,18 +32,40 @@ const clientDir = path.join(__dirname, '..', 'client')
 const distDir = path.join(__dirname, '..', '..', 'dist')
 const viewerPublic = path.join(path.dirname(require.resolve('prismarine-viewer/package.json')), 'public')
 
-// gzip for everything below. The block atlas JSON and the client bundle are
-// megabytes of highly repetitive text and shrink several times over; the
-// socket has its own deflate and is untouched by this.
+// The bundles and the block atlas JSON are compressed once, at build or at
+// boot, and served as .br/.gz siblings (static.js). This middleware is only
+// for what is left: the page itself and whatever the viewer's folder holds
+// that nobody precompressed. It skips responses already carrying an encoding.
 app.use(compression())
 
 // Everything under a version or package number is immutable for as long as
-// that number holds, so browsers may keep it; the bundle changes on every
-// build and stays on plain ETag revalidation.
+// that number holds, so browsers may keep it. The bundles carry a content
+// hash in their names, so they can be kept for good.
 const CACHED = { maxAge: '1d' }
+const FOREVER = { maxAge: '1y', immutable: true }
 
-app.get(['/', '/index.html'], (req, res) => res.sendFile(path.join(clientDir, 'index.html')))
-app.use('/dist', express.static(distDir))
+// The built bundle names, with their hashes, found rather than configured so
+// a rebuild needs no restart of anything but the page. Missing bundles are a
+// build problem and are reported as such rather than guessed around.
+function findBundle (prefix) {
+  let names = []
+  try { names = fs.readdirSync(distDir) } catch (err) { /* no build yet */ }
+  const match = names.find(n => new RegExp(`^${prefix}\\.[0-9a-f]+\\.js$`).test(n)) || names.find(n => n === `${prefix}.js`)
+  if (!match) console.warn(`dist/${prefix}.*.js not found; run npm run build`)
+  return match ? `/dist/${match}` : `/dist/${prefix}.js`
+}
+const assets = { bundle: findBundle('bundle'), worker: findBundle('worker') }
+// The page names the hashed bundle and hands the worker's name to it.
+const page = fs.readFileSync(path.join(clientDir, 'index.html'), 'utf8')
+  .replace('<script src="/dist/bundle.js"></script>',
+    `<script>window.__ASSETS__ = ${JSON.stringify(assets)}</script>\n  <script src="${assets.bundle}"></script>`)
+
+app.get(['/', '/index.html'], (req, res) => {
+  res.set('Content-Type', 'text/html; charset=utf-8')
+  res.set('Cache-Control', 'no-cache')
+  res.send(page)
+})
+app.use('/dist', precompressed(distDir, FOREVER))
 app.use('/fonts', express.static(path.join(clientDir, 'fonts'), { maxAge: '7d' }))
 
 // prismarine-viewer only ships atlases for some versions (…, 1.20.1, 1.21.1,
@@ -64,9 +84,23 @@ if (assetVersion && assetVersion !== config.mc.version) {
   console.log(`viewer assets: serving ${assetVersion} atlas as ${config.mc.version}`)
   app.get(`/textures/${config.mc.version}.png`, (req, res) =>
     res.sendFile(path.join(viewerPublic, 'textures', `${assetVersion}.png`), CACHED))
-  app.get(`/blocksStates/${config.mc.version}.json`, (req, res) =>
-    res.sendFile(path.join(viewerPublic, 'blocksStates', `${assetVersion}.json`), CACHED))
   app.use(`/textures/${config.mc.version}`, express.static(path.join(viewerPublic, 'textures', assetVersion), CACHED))
+}
+
+// The block states JSON is 11 MB that every visitor fetches once. It is
+// copied under our version's name into dist/ and compressed there at boot,
+// off the main thread; until that finishes requests fall through to the
+// viewer's own copy and the gzip middleware above.
+if (assetVersion) {
+  const statesDir = path.join(distDir, 'blocksStates')
+  const ours = path.join(statesDir, `${config.mc.version}.json`)
+  const theirs = path.join(viewerPublic, 'blocksStates', `${assetVersion}.json`)
+  app.use('/blocksStates', precompressed(statesDir, CACHED))
+  fs.promises.mkdir(statesDir, { recursive: true })
+    .then(() => fs.promises.copyFile(theirs, ours))
+    .then(() => precompress(ours))
+    .then(() => console.log(`blocksStates/${config.mc.version}.json precompressed`))
+    .catch(err => console.warn(`could not precompress block states: ${err.message}`))
 }
 
 app.use(express.static(viewerPublic, CACHED))
@@ -84,8 +118,8 @@ function pickAssetVersion (version) {
 // HUD sprites and the player skins the join screen offers. Optional: without
 // an asset pack the HUD chrome just goes missing.
 try {
-  const assets = require('minecraft-assets')(config.mc.version)
-  if (assets && assets.directory) app.use('/assets', express.static(assets.directory, CACHED))
+  const mcAssets = require('minecraft-assets')(config.mc.version)
+  if (mcAssets && mcAssets.directory) app.use('/assets', express.static(mcAssets.directory, CACHED))
 } catch (err) {
   console.warn(`no minecraft-assets for ${config.mc.version}; HUD sprites will 404`)
 }
@@ -98,85 +132,70 @@ if (assetVersion) require('./icons')(app, viewerPublic, assetVersion)
 // --- wiring ----------------------------------------------------------------
 // Two ways to play: ride the shared bot with everyone else, or drive one of
 // your own. Sessions owns both; nothing crosses between them but the roster.
-const sessions = new Sessions(config, io)
-sessions.onChange = () => broadcastRoster()
+const load = new Load(config.load)
+const sessions = new Sessions(config, io, load)
+metrics.install(app, sessions, io, load)
 
-function broadcastRoster () {
-  // Rosters are per server, so each browser gets the one for where it is.
-  for (const socket of io.sockets.sockets.values()) socket.emit('roster', sessions.rosterFor(socket))
-  // The join screen shows live occupancy, so anyone still choosing sees the
-  // solo slots fill up as they go.
-  io.emit('join:options', sessions.options())
+// Rosters are per server, so only the browsers on that server hear about a
+// change there. The join screen shows live occupancy, so anyone still
+// choosing sees the bot count move as they go.
+function broadcastRoster (key) {
+  if (key) io.to(Sessions.serverRoom(key)).emit('roster', sessions.roster(key))
+  io.to(Sessions.LOBBY).emit('join:options', sessions.options())
 }
+sessions.onChange = key => broadcastRoster(key)
 
 io.on('connection', socket => {
   // No bot yet: the visitor picks a mode first, and only a vetted join creates
   // a login on the Minecraft server.
+  socket.join(Sessions.LOBBY)
   socket.emit('join:options', sessions.options())
 
   let joining = false
-  socket.on('join', payload => {
+  socket.on('join', async payload => {
     if (joining || sessions.modeBySocket.has(socket.id)) return // already playing
-    const vetted = sessions.vet(payload)
-    if (!vetted.ok) {
-      socket.emit('join:rejected', { reason: vetted.reason })
+    // The address is the visitor's own, so it is pinged before a login is
+    // spent: a typo would otherwise become a bot retrying nothing, forever,
+    // with the browser stuck on "reconnecting".
+    joining = true
+    let result
+    try {
+      result = await sessions.tryJoin(socket, payload)
+    } finally {
+      joining = false
+    }
+    if (!socket.connected) return
+    if (!result.ok) {
+      socket.emit('join:rejected', { reason: result.reason })
       return
     }
-    // The address is the visitor's own, so ping it before spending a login:
-    // a typo would otherwise become a bot retrying nothing, forever, with
-    // the browser stuck on "reconnecting".
-    joining = true
-    const { host, port } = vetted.server
-    mc.ping({ host, port, closeTimeout: 5000 }, (err, result) => {
-      joining = false
-      if (!socket.connected || sessions.modeBySocket.has(socket.id)) return
-      if (err) {
-        socket.emit('join:rejected', { reason: `Could not reach ${host}:${port}.` })
-        return
-      }
-      const players = result && result.players
-      if (players && Number.isFinite(players.max) && players.online >= players.max) {
-        socket.emit('join:rejected', { reason: `${host} is full (${players.online}/${players.max}).` })
-        return
-      }
-      // Re-vetted: someone may have taken the last bot or the name meanwhile.
-      const again = sessions.vet(payload)
-      if (!again.ok) {
-        socket.emit('join:rejected', { reason: again.reason })
-        return
-      }
-      sessions.join(socket, again.mode, again.identity, again.server)
-      socket.emit('join:accepted', { mode: again.mode, server: again.server, ...again.identity })
-      console.log(`${again.identity.username} joined ${again.mode} on ${host}:${port} (${sessions.botCount}/${sessions.capacity} bots, ${sessions.roadtripRiders} riding)`)
-      broadcastRoster()
-    })
+    const { mode, identity, server } = result
+    socket.emit('join:accepted', { mode, server, ...identity })
+    console.log(`${identity.username} joined ${mode} on ${server.host}:${server.port} (${sessions.botCount}/${sessions.capacity} bots, ${sessions.roadtripRiders} riding)`)
+    broadcastRoster(`${server.host}:${server.port}`)
   })
 
   socket.on('latency:ping', sentAt => socket.emit('latency:pong', sentAt))
 
   socket.on('disconnect', () => {
+    const key = sessions.serverBySocket.get(socket.id)
     const left = sessions.leave(socket)
     if (left) {
       console.log(`a ${left.mode} visitor left (${sessions.botCount}/${sessions.capacity} bots, ${sessions.roadtripRiders} riding)`)
-      broadcastRoster()
+      broadcastRoster(key)
     }
   })
 })
 
-// Solo visitors each cost a real login, so the default server's own player
-// cap is the ceiling. Ask it rather than guessing; on failure keep the
-// configured cap. Servers visitors type in are checked for room at join time.
+// The default server, if there is one, is worth a look at boot: it warms the
+// ping cache and puts its player limit in the log next to our own ceiling.
 if (config.mc.host) {
-  mc.ping({ host: config.mc.host, port: config.mc.port }, (err, result) => {
-    if (err || !result || !result.players) {
-      console.warn(`could not read max-players (${err ? err.message : 'no response'}); capacity stays ${sessions.capacity}`)
-      return
-    }
-    sessions.applyServerCapacity(result.players.max)
-    console.log(`server allows ${result.players.max} players; capacity ${sessions.capacity}`)
+  sessions.checkRoom({ host: config.mc.host, port: config.mc.port }).then(room => {
+    if (!room.ok) console.warn(`${config.mc.host}: ${room.reason}; capacity here is ${sessions.capacity} bots`)
+    else console.log(`${config.mc.host} has ${room.online}/${room.max} players; capacity here is ${sessions.capacity} bots`)
   })
 } else {
-  console.log(`no MC_HOST set; visitors choose a server (capacity ${sessions.capacity})`)
+  console.log(`no MC_HOST set; visitors choose a server (capacity ${sessions.capacity} bots)`)
 }
 
 server.listen(config.web.port, () => {
@@ -186,6 +205,7 @@ server.listen(config.web.port, () => {
 const shutdown = () => {
   console.log('shutting down')
   sessions.destroyAll()
+  load.stop()
   server.close(() => process.exit(0))
   setTimeout(() => process.exit(0), 2000).unref()
 }

@@ -5,9 +5,14 @@ const webpack = require('webpack')
 // Node globals. These fallbacks mirror the upstream examples/web_client config.
 const clientConfig = {
   entry: './src/client/index.js',
+  // Content-hashed so /dist can be cached for a year: a new build is a new
+  // URL. The server finds the current names by listing dist/ at startup.
+  // Each config cleans its own stale hashes and keeps the other's output,
+  // since both write to dist/ at the same time.
   output: {
     path: path.resolve(__dirname, 'dist'),
-    filename: 'bundle.js'
+    filename: 'bundle.[contenthash].js',
+    clean: { keep: /^(worker\.|blocksStates\/)/ }
   },
   resolve: {
     // canvas is not a core module, so it needs an alias rather than a
@@ -74,7 +79,8 @@ const workerConfig = {
   entry: './src/client/viewer/worker.js',
   output: {
     path: path.resolve(__dirname, 'dist'),
-    filename: 'worker.js'
+    filename: 'worker.[contenthash].js',
+    clean: { keep: /^(bundle\.|blocksStates\/)/ }
   },
   resolve: { fallback: clientConfig.resolve.fallback },
   module: {

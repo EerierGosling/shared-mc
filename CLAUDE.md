@@ -43,17 +43,53 @@ road trip.
   both modes — do not "simplify" it into a single held-key object.
 - **Only solo visitors cost a login.** Road trip riders share one bot, so they
   are uncapped; solo bots are capped by the Minecraft server's own player
-  limit. `sessions.js` pings the default server at startup (if `MC_HOST` is
-  set) and lowers its cap to `max-players` minus `playerSlotsReserved`, never
-  raising it; a server the visitor typed is pinged at join and refused when
-  its player count is already at its max. Skipping that would let the page
-  lock real players out.
+  limit, asked for by pinging that server at join (see the two ceilings
+  below). Skipping that would let the page lock real players out.
 - **A session's emitter is not always a socket.** Solo sessions speak through
   the member's socket; road trip sessions speak through `io.to(room)`. Anything
   taking that emitter must only ever call `.emit()` on it — `state.js`,
-  `inventory.js` and `primitives.js` all rely on that. World views are the
-  exception and stay per-member, since prismarine's WorldView tracks which
-  chunks that particular client has been sent.
+  `inventory.js`, `primitives.js` and `worldStream.js` all rely on that.
+- **The world stream is per session, not per member** (`worldStream.js`).
+  prismarine's WorldView tracks which chunks "the client" has been sent, and
+  every member of a session watches the same bot from the same place, so the
+  session is the client: one WorldView writing to the session emitter, one
+  entity batch per tick, and `column.toJson()` cached per column until a
+  `blockUpdate`/`chunkColumnLoad` for it. A member who joins after the stream
+  is up gets `catchUp(socket)`: the cached columns, the entities, the
+  position, to that socket alone. Do not go back to a WorldView per member —
+  with thirty riders that was thirty serialisations of every column and
+  thirty copies of the entity firehose before socket.io saw any of it.
+  `/metrics` reports `columnsSerialized` next to `columnsSent`; the first
+  must not move when a rider joins.
+- **Two ceilings on bots, neither is "8".** `MAX_BOTS` is what this process
+  will run across every server its visitors name — a memory and CPU number
+  (default 32) — and `load.js` refuses joins earlier while the event loop's
+  p99 delay or the heap is past its threshold. Room on the Minecraft server
+  itself is asked for at join with a ping cached ten seconds per `host:port`
+  (`Sessions.checkRoom`), counting logins handed out since the ping so a
+  burst cannot all pass on one stale number, and honouring
+  `PLAYER_SLOTS_RESERVED`. A rider joining a road trip that is already up
+  spends no login and is not pinged. `/healthz` goes 503 while shedding so a
+  load balancer stops sending traffic before visitors see the busy message.
+- **Logins are reclaimed.** A solo bot whose visitor has sent no input for
+  `IDLE_TIMEOUT_MS` (10 minutes) is logged out and the tab sent back to the
+  join screen with the reason (`session:expired`, carried across the reload
+  in sessionStorage). `BotHolder` gives up after five reconnect attempts, or
+  at once on a kick that retrying cannot fix (banned, duplicate login, wrong
+  version…), and the session is torn down the same way. Road trips are
+  exempt from the idle rule: they already die when the room empties.
+- **Static assets are compressed once, not per request.** `npm run build`
+  writes `.br`/`.gz` siblings for the content-hashed bundles and `static.js`
+  serves whichever the browser accepts with a year-long immutable cache; the
+  block-states JSON is copied and compressed the same way at boot, off the
+  main thread. `index.html` gets the hashed names injected at startup
+  (`window.__ASSETS__`), which is how the worker finds its own file. The
+  `compression()` middleware only covers what is left. Gzipping the 21 MB
+  worker per visitor on the thread that runs every bot's physics was the
+  single biggest avoidable cost.
+- **Rooms, not loops.** Joined sockets sit in `server:<host:port>` and get
+  that server's roster; unjoined ones sit in `lobby` and get `join:options`.
+  Nothing iterates every socket on every change any more.
 - **Destructive actions are budgeted per visitor** (`limits.js`). Dig, place,
   attack and drop each get an allowance per rolling window, and exceeding it
   emits `action:refused` rather than dropping the action. Keep it that way: a
@@ -237,11 +273,23 @@ wheel hotbar, chat history and `/`, the F3 toggle, ping bars, XP bar, heart
 animations, sneak camera dip, touch controls. Its panorama title background
 was tried and dropped: minecraft-assets ships those PNGs as 1x1 placeholders.
 
-**Open, and the best next lead:** `prismarine-viewer/public/worker.js` is 63 MB
-and `new Viewer(renderer)` spawns four workers, each loading it — roughly 250 MB
-to fetch and parse before a single chunk can mesh. If first render is slow,
-blank, or the tab dies, start there. `WorldRenderer` takes a `numWorkers`
-argument; `Viewer` just never passes it.
+**The mesher worker is our own build.** `src/client/viewer/worker.js` replaces
+prismarine-viewer's 63 MB `public/worker.js` with a 21 MB one (Bedrock data
+stripped) and `worldrenderer.js` starts two instead of four; brotli takes it
+to 0.7 MB on the wire. If first render is slow, the size is no longer where
+to look.
+
+**Scale work landed but is measured only lightly.** Verified against the live
+server with a socket.io script: three road-trip riders received 121 columns
+each while `columnsSerialized` moved by one; a solo bot was reclaimed after
+the idle timeout; a dead address and a full server refuse with a sentence;
+a bot on a server that kicks it gives up after five attempts (or at once on a
+ban) and the tab returns to the join screen. **Not measured:** how many bots
+one process actually holds before `load.js` starts shedding, which is what
+`MAX_BOTS` should be set from — watch `/metrics` on a real box. When one
+process is not enough, sessions are already keyed by `host:port`, which is
+the shard key: N copies of this server and a front that answers `join` with
+which one to reconnect to. Nothing else is shared.
 
 ## Handoff notes
 
