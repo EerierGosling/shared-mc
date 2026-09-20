@@ -153,6 +153,21 @@ const PUSH_ROTATION = [REST_ROTATION[0] + 0.35, REST_ROTATION[1], REST_ROTATION[
 const PUSH_MS = 75
 const PUSH_RETURN_MS = 120
 
+// The arm skin is tinted to signal which action is running, then cleared back
+// to plain skin (white, which leaves the texture untouched since Lambert's
+// color multiplies the map) when the hand settles at rest. A left-click is
+// mining or a bare swing depending on whether the crosshair is on a block —
+// the two are indistinguishable on the wire (both `action:dig`), so the arm's
+// aim (setAimBlock, fed from the state stream) is what tells them apart. A
+// right-click place is always the same green. The values darken the pale skin
+// toward the hue rather than replacing it, so it still reads as an arm.
+const TINT = {
+  rest: 0xffffff,
+  mine: 0xff9a3d,
+  attack: 0xff4d4d,
+  place: 0x5be36a
+}
+
 // The scene's directional light is fixed in world space (see index.js), so a
 // mesh lit by it goes flat or blows out depending purely on which way the
 // world camera happens to be pointed, with no relation to how it actually
@@ -178,6 +193,9 @@ class Hand {
     // flips the normal per-face for back-facing fragments, so the reflected arm
     // still lights the right way.
     const material = new THREE.MeshLambertMaterial({ transparent: true, alphaTest: 0.1, side: THREE.DoubleSide })
+    // Both hands share this one material, so tinting it colours whichever arm
+    // is on screen; the item is a separate model and stays its own colour.
+    this.material = material
     new THREE.TextureLoader().load(TEXTURE_URL, texture => {
       texture.magFilter = THREE.NearestFilter
       texture.minFilter = THREE.NearestFilter
@@ -240,6 +258,9 @@ class Hand {
     this.swinging = false
     this.pushing = false
     this.looping = false
+    // Whether the crosshair is on a block, so a left-click swing can tell a
+    // mine from a bare attack; fed each state tick by setAimBlock().
+    this.aimBlock = false
   }
 
   /** Draw over the finished world frame. Assumes renderer.autoClear is off. */
@@ -304,12 +325,27 @@ class Hand {
     this.shown = visible
   }
 
+  // The block under the crosshair (or null), from the state stream — decides
+  // whether a left-click reads as a mine or an attack when it colours the arm.
+  setAimBlock (block) {
+    this.aimBlock = Boolean(block)
+  }
+
+  // Back to plain skin, but only once nothing is still animating — a place jab
+  // finishing mid-mine must not wipe the mining tint the held loop still wants.
+  _settleTint () {
+    if (!this.looping && !this.pushing) this.material.color.setHex(TINT.rest)
+  }
+
   // Punch-and-return, right hand only (mining/attack). Calls while a swing is
   // already in flight are dropped, so a stray one-shot swing() can't stack a
   // second tween on top of the held mining loop.
   swing () {
     if (this.swinging) return
     this.swinging = true
+    // Set per iteration, not just at startSwinging(), so sweeping the crosshair
+    // off a block onto air (or vice versa) flips mine<->attack on the next punch.
+    this.material.color.setHex(this.aimBlock ? TINT.mine : TINT.attack)
     new TWEEN.Tween(this.rightPivot.rotation)
       .to({ x: SWING_ROTATION[0], y: SWING_ROTATION[1], z: SWING_ROTATION[2] }, SWING_MS)
       .easing(TWEEN.Easing.Quadratic.Out)
@@ -325,6 +361,7 @@ class Hand {
             // fires) and drops every other thrust, halving and stuttering the
             // rate. Chaining guarantees back-to-back thrusts with no gap.
             if (this.looping) this.swing()
+            else this._settleTint()
           })
       )
       .start()
@@ -339,6 +376,7 @@ class Hand {
   push () {
     if (this.pushing) return
     this.pushing = true
+    this.material.color.setHex(TINT.place)
     // Put the left hand out for the motion; retract it when the thrust returns.
     this.left.visible = true
     new TWEEN.Tween(this.leftPivot.position)
@@ -357,7 +395,7 @@ class Hand {
         new TWEEN.Tween(this.leftPivot.rotation)
           .to({ x: REST_ROTATION[0], y: REST_ROTATION[1], z: REST_ROTATION[2] }, PUSH_RETURN_MS)
           .easing(TWEEN.Easing.Quadratic.In)
-          .onComplete(() => { this.pushing = false; this.left.visible = false })
+          .onComplete(() => { this.pushing = false; this.left.visible = false; this._settleTint() })
       )
       .start()
   }

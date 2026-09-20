@@ -237,6 +237,7 @@ socket.on('dig:stop', payload => breaking.stop(payload))
 socket.on('state', state => {
   hud.setState(state)
   hand.setItem(state.heldItem)
+  hand.setAimBlock(state.targetBlock)
   placePrediction.setTarget(state.placeTarget)
   applySkyForTime(viewer, state.timeOfDay, sky)
   setSubmerged(viewer, sky, state.eyeInWater)
