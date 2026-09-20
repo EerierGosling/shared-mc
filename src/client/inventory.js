@@ -49,9 +49,11 @@ class InventoryUI {
     this.payload = null
     this.containerOpen = false
     this.skin = 'steve'
-    // A held-mouse-button path across slots. Released over one slot it's an
-    // ordinary click; released over several it's a stack split (see _endDrag).
+    // A held-mouse-button path across slots while the cursor carries a stack,
+    // vanilla's drag split. Released over one slot it's an ordinary click;
+    // released over several it's a stack split (see _endDrag).
     this.drag = null
+    this.cells = new Map() // slot number -> its element, for the drag preview
 
     socket.on('inventory', payload => {
       this.payload = payload
@@ -114,6 +116,7 @@ class InventoryUI {
   render () {
     const payload = this.payload
     this.body.innerHTML = ''
+    this.cells.clear()
     renderSlot(this.cursorItemEl, payload && payload.cursorItem)
     this.cursorItemEl.classList.toggle('visible', Boolean(payload && payload.cursorItem))
     if (!payload || !payload.window) {
@@ -232,11 +235,14 @@ class InventoryUI {
     const item = slots[slotNumber] || null
     renderSlot(cell, item)
     if (emptyIcon && !item) cell.style.backgroundImage = `url(/assets/items/${emptyIcon}.png)`
+    this.cells.set(slotNumber, cell)
 
-    // Left/right button down starts a drag path; released over just the one
-    // slot it's replayed as a normal click, released over several it's a
-    // stack split (see _endDrag). Shift-click (quick move) fires immediately
-    // instead, same as vanilla - it was never a drag gesture.
+    // A press starts a gesture that ends on release (see _endDrag): over one
+    // slot it is a click on the slot pressed, over several with a stack on
+    // the cursor it is vanilla's drag split. With an empty cursor no path is
+    // collected at all, so a hand that slips onto the next slot on the way up
+    // cannot scatter the stack it is picking up. Shift-click (quick move)
+    // fires at once, same as vanilla - it was never a drag gesture.
     cell.addEventListener('mousedown', event => {
       if (event.button !== 0 && event.button !== 2) return
       event.preventDefault()
@@ -244,14 +250,10 @@ class InventoryUI {
         this.socket.emit('window:click', { slot: slotNumber, mouseButton: 0, mode: 1 })
         return
       }
-      this.drag = { mouseButton: event.button === 2 ? 1 : 0, path: [slotNumber] }
-      cell.classList.add('drag-target')
+      this.drag = { mouseButton: event.button === 2 ? 1 : 0, origin: slotNumber, path: [] }
+      this._dragOver(slotNumber)
     })
-    cell.addEventListener('mouseenter', () => {
-      if (!this.drag || this.drag.path.includes(slotNumber)) return
-      this.drag.path.push(slotNumber)
-      cell.classList.add('drag-target')
-    })
+    cell.addEventListener('mouseenter', () => this._dragOver(slotNumber))
     // The actual click/drag is sent from mousedown/mouseenter above; this
     // only stops the browser's own right-click menu from popping up and
     // swallowing the mouseup _endDrag needs to finish the drag.
@@ -259,20 +261,77 @@ class InventoryUI {
     return cell
   }
 
+  get cursorItem () {
+    return (this.payload && this.payload.cursorItem) || null
+  }
+
+  /** The crafting result slot of the open window, if it has one. */
+  get outputSlot () {
+    const win = this.payload && this.payload.window
+    if (!win) return null
+    if (!this.payload.isContainer) return CRAFT_OUTPUT
+    return WORKBENCH_TYPES.has(win.type) ? WORKBENCH_OUTPUT : null
+  }
+
+  /**
+   * Vanilla adds a slot to the drag only if the held stack can go there: not
+   * the crafting output, and empty or the same item with room. A left drag
+   * gives every slot at least one, so it takes no more slots than items.
+   */
+  _dragOver (slotNumber) {
+    const drag = this.drag
+    const held = this.cursorItem
+    if (!drag || !held || drag.path.includes(slotNumber)) return
+    if (slotNumber === this.outputSlot) return
+    const existing = this.payload.window.slots[slotNumber]
+    if (existing && (existing.name !== held.name || existing.count >= held.stackSize)) return
+    if (drag.mouseButton === 0 && drag.path.length >= held.count) return
+    drag.path.push(slotNumber)
+    this._previewDrag()
+  }
+
+  /**
+   * What the split will leave in each slot and on the cursor, drawn before
+   * the server has been asked, the way vanilla previews it: the held item
+   * ghosted into each slot at its projected count, and the cursor stack
+   * counting down to what stays behind.
+   */
+  _previewDrag () {
+    const { path, mouseButton } = this.drag
+    const held = this.cursorItem
+    const share = mouseButton === 0 ? Math.floor(held.count / path.length) : 1
+    let dealt = 0
+    for (const slot of path) {
+      const existing = this.payload.window.slots[slot]
+      const before = existing ? existing.count : 0
+      const after = Math.min(held.stackSize, before + share)
+      dealt += after - before
+      const cell = this.cells.get(slot)
+      if (!cell) continue
+      renderSlot(cell, { ...held, count: after })
+      cell.classList.add('drag-target')
+    }
+    const left = held.count - dealt
+    renderSlot(this.cursorItemEl, left > 0 ? { ...held, count: left } : null)
+    this.cursorItemEl.classList.toggle('visible', left > 0)
+  }
+
   _endDrag (event) {
     const drag = this.drag
     this.drag = null
     if (!drag) return
-    for (const cell of this.body.querySelectorAll('.slot.drag-target')) cell.classList.remove('drag-target')
+    // Put the preview back the way the server last said; its answer to the
+    // click follows on the next inventory push.
+    this.render()
     // Vanilla's creative bin: let go of a stack over the item list and it is
     // gone. The server ignores this unless it is really in creative, so there
     // is nothing to check here.
     if (event && event.target && event.target.closest && event.target.closest('#creative')) {
-      this.socket.emit('creative:destroy', { slot: drag.path[0] })
+      this.socket.emit('creative:destroy', { slot: drag.origin })
       return
     }
-    if (drag.path.length === 1) {
-      this.socket.emit('window:click', { slot: drag.path[0], mouseButton: drag.mouseButton, mode: 0 })
+    if (drag.path.length < 2) {
+      this.socket.emit('window:click', { slot: drag.origin, mouseButton: drag.mouseButton, mode: 0 })
     } else {
       this.socket.emit('window:drag', { slots: drag.path, mouseButton: drag.mouseButton })
     }

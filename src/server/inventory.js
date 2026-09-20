@@ -140,9 +140,12 @@ class InventoryBridge {
   // before it ever writes a packet. So instead of that mode, this replays the
   // same end result with the single-item-placement click (mode 0, right
   // button) mineflayer already relies on elsewhere (see transfer()'s
-  // one-by-one fallback in mineflayer/lib/plugins/inventory.js): pick up the
-  // dragged-from slot if nothing is held yet, then hand out an equal share -
-  // one item per click - to every other slot the drag passed over.
+  // one-by-one fallback in mineflayer/lib/plugins/inventory.js): hand the
+  // held stack out one item per click to every slot the drag passed over.
+  //
+  // The browser only starts a drag with a stack on the cursor and only adds
+  // slots the stack can go into, but the same rules are applied here against
+  // the bot's own window, since that is the state the clicks will hit.
   async drag (payload) {
     const bot = this.bot
     if (!bot || !payload || !Array.isArray(payload.slots)) return
@@ -150,40 +153,27 @@ class InventoryBridge {
     if (path.length < 2) return
     const rightDrag = payload.mouseButton === 1
     const window = bot.currentWindow || bot.inventory
+    const held = window.selectedItem
+    if (!held) return
 
     try {
-      let destinations = path
-      if (!window.selectedItem) {
-        // Nothing on the cursor yet: the slot the drag started from is the
-        // pickup, not a destination.
-        const [origin, ...rest] = path
-        if (!window.slots[origin]) return
-        await bot.clickWindow(origin, 0, 0)
-        destinations = rest
-      }
-      if (!window.selectedItem || destinations.length === 0) return
-
-      const held = window.selectedItem
-      const targets = destinations.filter(slot => {
+      const targets = path.filter(slot => {
+        if (slot === window.craftingResultSlot) return false
         const existing = window.slots[slot]
-        return !existing || (existing.type === held.type && existing.metadata === held.metadata)
+        return !existing || (existing.type === held.type && existing.metadata === held.metadata && existing.count < held.stackSize)
       })
       if (targets.length === 0) return
 
       // Left drag splits the held stack evenly, leaving any remainder on the
       // cursor, same as vanilla. Right drag always deals out one apiece.
-      // Either way, dragging over more slots than there is to go around just
-      // fills the first slots you dragged over, in that order, one each.
-      const perSlot = rightDrag ? 1 : Math.floor(held.count / targets.length)
-      const fillTargets = perSlot > 0 ? targets : targets.slice(0, held.count)
-      const itemsPerSlot = perSlot > 0 ? perSlot : 1
-      if (fillTargets.length === 0) return
-
-      for (const slot of fillTargets) {
-        for (let i = 0; i < itemsPerSlot; i++) {
+      // Dragging over more slots than there is to go around just fills the
+      // first slots you dragged over, in that order, one each.
+      const share = rightDrag ? 1 : Math.max(1, Math.floor(held.count / targets.length))
+      for (const slot of targets) {
+        for (let i = 0; i < share; i++) {
           if (!window.selectedItem) break
           const existing = window.slots[slot]
-          if (existing && (existing.type !== window.selectedItem.type || existing.metadata !== window.selectedItem.metadata)) break
+          if (existing && existing.count >= existing.stackSize) break
           await bot.clickWindow(slot, 1, 0)
         }
       }

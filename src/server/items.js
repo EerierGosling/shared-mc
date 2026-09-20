@@ -7,6 +7,7 @@ function describeItem (item) {
     name: item.name,
     displayName: item.displayName,
     count: item.count,
+    stackSize: item.stackSize,
     slot: item.slot,
     durabilityUsed: item.durabilityUsed || 0,
     maxDurability: item.maxDurability || 0
