@@ -81,7 +81,7 @@ class InventoryUI {
     return this.root.classList.contains('open')
   }
 
-  /** The paper doll in the player window wears the skin this visitor joined with. */
+  /** The player figure in the inventory window wears the visitor's skin. */
   setSkin (skin) {
     if (skin) this.skin = skin
     if (this.isOpen) this.render()
@@ -137,7 +137,7 @@ class InventoryUI {
     this.body.appendChild(this.chestWindow(win, Math.ceil(end / 9), end))
   }
 
-  /** Armor column, paper doll with the offhand slot, 2x2 crafting, recipe book. */
+  /** Armor column, player figure with the offhand slot, 2x2 crafting, recipe book. */
   playerWindow (slots) {
     const win = this.window('inventory', 166)
     ARMOR.forEach((slotNumber, i) => {
