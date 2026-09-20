@@ -67,6 +67,7 @@ const camera = { yaw: 0, pitch: 0 }
 const skins = new SkinPainter(viewer)
 const join = new JoinScreen(socket, identity => {
   hud.setStatus('connecting', `joining as ${identity.username}…`)
+  inventoryUI.setSkin(identity.skin)
   hand.setVisible(true)
   pause.setServer(identity.server)
   if (join.controlMode !== 'standard') input.showMotion(join.controlMode !== 'camera')
