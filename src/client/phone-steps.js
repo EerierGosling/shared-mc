@@ -1,4 +1,5 @@
 'use strict'
+const { DEFAULTS } = require('./motion-settings')
 class PhoneSteps {
   constructor () { this.reset() }
   reset () {
@@ -9,7 +10,7 @@ class PhoneSteps {
     this.gravity = null
     this.strength = 0
   }
-  update (event, now, threshold = 3, hold = 650) {
+  update (event, now, threshold = DEFAULTS.phoneThreshold, hold = DEFAULTS.walkHold) {
     let a = event.acceleration
     if (!a || ![a.x, a.y, a.z].every(Number.isFinite)) {
       a = event.accelerationIncludingGravity

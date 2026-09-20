@@ -4,6 +4,7 @@ const { Gestures, idle } = require('./gestures')
 const posePreview = require('./pose-preview')
 const FaceGestures = require('./face-gestures')
 const PhoneSteps = require('./phone-steps')
+const StartGesture = require('./start-gesture')
 const { FIELDS, DEFAULTS, load, save } = require('./motion-settings')
 
 const RUNTIME = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.22-rc.20250304'
@@ -14,6 +15,7 @@ module.exports = function setupCameraControls ({ apply, canPlay, onStart, socket
   const gestures = new Gestures(settings)
   const faces = new FaceGestures()
   const steps = new PhoneSteps()
+  const startGesture = new StartGesture()
   const panel = document.createElement('section')
   panel.id = 'camera-controls'
   panel.hidden = true
@@ -35,6 +37,7 @@ module.exports = function setupCameraControls ({ apply, canPlay, onStart, socket
       <button type="button" data-action="hide">Hide panel</button>
     </div>
     <p data-role="mode">Practice mode — gestures do not affect the player.</p>
+    <p data-role="start-hint">After camera calibration, raise both hands above your head and hold for one second to enable player control.</p>
     <p data-role="detected">Detected: idle</p>
     <details data-role="tuning"><summary>Sensitivity & tuning</summary>
       <label>Preset <select data-setting="preset"><option value="normal">Balanced</option><option value="gentle">Small movements</option><option value="deliberate">Deliberate movements</option></select></label>
@@ -113,6 +116,7 @@ module.exports = function setupCameraControls ({ apply, canPlay, onStart, socket
 
   function reset () {
     gestures.resetMotion()
+    startGesture.reset()
     faces.reset()
     steps.reset()
     candidate = idle()
@@ -243,6 +247,13 @@ module.exports = function setupCameraControls ({ apply, canPlay, onStart, socket
         inferenceMs = performance.now() - now
         lastFrame = performance.now()
         status.textContent = candidate.status + (faceLoading ? ' · Loading facial actions…' : '')
+        const start = startGesture.update(result.landmarks[0], now, !armed && candidate.tracked && document.hasFocus())
+        $('[data-role=start-hint]').textContent = armed
+          ? 'Player control is on. Use Return to practice or Stop all inputs to pause.'
+          : startGesture.progress > 0
+            ? `Keep both hands raised… ${Math.round(startGesture.progress * 100)}%`
+            : 'After camera calibration, raise both hands above your head and hold for one second to enable player control.'
+        if (start) $('[data-action=arm]').click()
       }
       timer = setTimeout(tick, 65)
     } catch (error) { fail(error) }

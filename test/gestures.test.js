@@ -152,3 +152,29 @@ test('physical jump needs a new full-body calibration after seated setup', () =>
   assert.equal(state.tracking.jumpReady, false)
   assert.match(state.status, /recalibrate/)
 })
+
+test('small alternating knee lifts walk while tiny shifts stay idle', () => {
+  const g = calibrated()
+  for (let i = 0; i < 4; i++) {
+    const p = pose(); p[i % 2 ? 26 : 25].y -= 0.01
+    assert.equal(g.update(p, 1500 + i * 200).forward, false)
+  }
+  let p = pose(); p[25].y -= 0.025
+  assert.equal(g.update(p, 2300).forward, false)
+  p = pose(); p[26].y -= 0.025
+  assert.equal(g.update(p, 2500).forward, true)
+})
+
+test('moderate arm movement does not mine; deliberate swings still do', () => {
+  const g = calibrated()
+  const p = pose()
+  g.update(p, 1500)
+  p[16].y += 0.03
+  assert.equal(g.update(p, 1550).digging, false)
+  p[16].y += 0.03
+  assert.equal(g.update(p, 1600).digging, false)
+  p[16].y += 0.05
+  assert.equal(g.update(p, 1650).digging, false)
+  p[16].y += 0.05
+  assert.equal(g.update(p, 1700).digging, true)
+})

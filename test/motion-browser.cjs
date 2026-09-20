@@ -115,13 +115,16 @@ async function main () {
           const p = Array.from({length:33}, () => ({x:.5,y:.5,visibility:1}));
           p[0].y=.2; p[11].x=.6;p[12].x=.4;p[11].y=p[12].y=.4;
           p[23].y=p[24].y=.65;p[25].y=p[26].y=.8;p[27].y=p[28].y=.95;
+          if (window.testStartGesture) p[15].y=p[16].y=.05;
           return {landmarks: [p]};
         } }) };
         export const FaceLandmarker = { createFromOptions: async () => ({close(){},detectForVideo(){return {faceBlendshapes:[]}}}) };`
     }))
     await host.locator('[data-action=start]').click()
     await host.waitForFunction(() => document.querySelector('[data-role=status]').textContent.startsWith('Tracking'), { timeout: 10000 })
-    await host.locator('[data-action=arm]').click()
+    await host.evaluate(() => { window.testStartGesture = true })
+    await host.waitForFunction(() => document.querySelector('[data-role=mode]').textContent.includes('Player control enabled'))
+    await host.evaluate(() => { window.testStartGesture = false })
     assert.match(await host.locator('[data-role=mode]').textContent(), /Player control enabled/)
     await host.locator('[data-action=calibrate]').click()
     assert.match(await host.locator('[data-role=mode]').textContent(), /Practice mode/)
