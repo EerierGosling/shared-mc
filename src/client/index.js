@@ -18,6 +18,7 @@ const { createSky, applySkyForTime, setSubmerged, updateWaterFog } = require('./
 const { Entities } = require('./entities')
 const { Hand } = require('./hand')
 const { JoinScreen } = require('./join')
+const PauseMenu = require('./pause')
 const SkinPainter = require('./skins')
 const icons = require('./icons')
 
@@ -65,9 +66,18 @@ const skins = new SkinPainter(viewer)
 const join = new JoinScreen(socket, identity => {
   hud.setStatus('connecting', `joining as ${identity.username}…`)
   hand.setVisible(true)
+  pause.setServer(identity.server)
 })
 
-const input = setupInput({ socket, viewer, camera, hud, inventoryUI, canvas, hand, join, creative, placePrediction })
+// Escape's game menu. Quitting is a reload: the socket drops, the server
+// tears the session down (or just this rider, in a road trip), and the page
+// comes back at the join screen.
+const pause = new PauseMenu({
+  onResume: () => input.resume(),
+  onQuit: () => window.location.reload()
+})
+
+const input = setupInput({ socket, viewer, camera, hud, inventoryUI, canvas, hand, join, creative, placePrediction, pause })
 
 const highlight = new THREE.LineSegments(
   new THREE.EdgesGeometry(new THREE.BoxGeometry(1.002, 1.002, 1.002)),
@@ -109,6 +119,7 @@ socket.on('disconnect', () => {
 
 socket.on('bot:status', status => {
   hud.setStatus(status.state, describeStatus(status))
+  pause.setServer(status.server)
 })
 
 socket.on('version', version => {

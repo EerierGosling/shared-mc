@@ -37,9 +37,12 @@ const CHAT_HISTORY = 50
  * Touch devices get the same messages from on-screen buttons (see #touch in
  * index.html) and steer by dragging the canvas.
  */
-function setupInput ({ socket, viewer, camera, hud, inventoryUI, canvas, hand, join, creative, placePrediction }) {
+function setupInput ({ socket, viewer, camera, hud, inventoryUI, canvas, hand, join, creative, placePrediction, pause }) {
   const held = Object.create(null)
   let locked = false
+  const isTouchDevice = window.matchMedia('(pointer: coarse)').matches ||
+    /[?&]touch\b/.test(window.location.search)
+  if (isTouchDevice) document.body.classList.add('touch')
   // Once a finger has steered the camera this browser's angles win over the
   // server's, the same way pointer lock does for a mouse: there is no lock to
   // release on a phone, and snapping back between drags would be unusable.
@@ -53,7 +56,7 @@ function setupInput ({ socket, viewer, camera, hud, inventoryUI, canvas, hand, j
   let chatHistoryPos = 0
   let chatDraft = ''
 
-  const uiOpen = () => join.isOpen || inventoryUI.isOpen || hud.chatOpen || hud.dead
+  const uiOpen = () => join.isOpen || inventoryUI.isOpen || hud.chatOpen || hud.dead || pause.isOpen
   const ownsLook = () => locked || touchLook
 
   const sendControls = () => {
@@ -192,9 +195,35 @@ function setupInput ({ socket, viewer, camera, hud, inventoryUI, canvas, hand, j
 
   canvas.addEventListener('contextmenu', event => event.preventDefault())
 
+  // Escape is how the browser leaves pointer lock, and Chrome swallows that
+  // keydown rather than delivering it, so losing the lock *is* the pause
+  // signal, exactly as in vanilla. The other overlays (inventory, chat, the
+  // death screen) drop the lock themselves and are already open by the time
+  // this fires, which is what keeps them from also raising the menu.
   document.addEventListener('pointerlockchange', () => {
     locked = document.pointerLockElement === canvas
-    if (!locked) releaseAll()
+    if (locked) return
+    releaseAll()
+    if (join.joined && !uiOpen() && !isTouchDevice) pause.open()
+  })
+
+  // Back to Game: close the menu and take the mouse again. Chrome refuses a
+  // lock for about a second after an Escape exit; if that happens the menu
+  // simply comes back, rather than leaving a live HUD that ignores the mouse.
+  const resume = () => {
+    pause.close()
+    if (isTouchDevice) return
+    let request
+    try {
+      request = canvas.requestPointerLock()
+    } catch (err) {
+      pause.open()
+      return
+    }
+    if (request && typeof request.catch === 'function') request.catch(() => pause.open())
+  }
+  document.addEventListener('pointerlockerror', () => {
+    if (join.joined && !uiOpen() && !isTouchDevice) pause.open()
   })
 
   document.addEventListener('mousemove', event => {
@@ -212,10 +241,6 @@ function setupInput ({ socket, viewer, camera, hud, inventoryUI, canvas, hand, j
   }, { passive: true })
 
   // --- touch ----------------------------------------------------------------
-
-  const isTouchDevice = window.matchMedia('(pointer: coarse)').matches ||
-    /[?&]touch\b/.test(window.location.search)
-  if (isTouchDevice) document.body.classList.add('touch')
 
   // Dragging the canvas looks around. Only the first finger steers, so a
   // second one on a button does not yank the camera.
@@ -264,6 +289,7 @@ function setupInput ({ socket, viewer, camera, hud, inventoryUI, canvas, hand, j
         button.classList.toggle('on', on)
       } else if (action === 'chat') hud.openChat()
       else if (action === 'inventory') inventoryUI.toggle()
+      else if (action === 'menu') pause.open()
     }
     const release = () => {
       button.classList.remove('down')
@@ -289,6 +315,14 @@ function setupInput ({ socket, viewer, camera, hud, inventoryUI, canvas, hand, j
       return
     }
 
+    if (pause.isOpen) {
+      // Firefox delivers the Escape that released the lock as well, right
+      // after pointerlockchange has opened the menu; a second press is what
+      // closes it, so a fresh menu ignores the one that opened it.
+      if (event.code === 'Escape' && !pause.justOpened) resume()
+      return
+    }
+
     if (event.code === 'KeyE' && !hud.dead) {
       event.preventDefault()
       if (locked) document.exitPointerLock()
@@ -300,6 +334,9 @@ function setupInput ({ socket, viewer, camera, hud, inventoryUI, canvas, hand, j
     }
     if (event.code === 'Escape') {
       if (inventoryUI.isOpen) inventoryUI.close()
+      // Escape with nothing open and no lock held (say, after Esc closed
+      // the inventory) opens the menu the way it does on desktop vanilla.
+      else if (!locked && join.joined && !hud.dead && !isTouchDevice) pause.open()
       return
     }
     if (inventoryUI.isOpen) return
@@ -391,7 +428,8 @@ function setupInput ({ socket, viewer, camera, hud, inventoryUI, canvas, hand, j
 
   return {
     ownsLook,
-    releaseAll
+    releaseAll,
+    resume
   }
 }
 
