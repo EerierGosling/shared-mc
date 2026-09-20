@@ -181,7 +181,7 @@ class JoinScreen {
     }
   }
 
-  /** The paper doll wears `skin`; CSS cuts the sheet up into limbs. */
+  /** The player figure wears `skin`; CSS cuts the sheet up into limbs. */
   setDoll (skin) {
     this.doll.style.setProperty('--skin', `url(${skinUrl(skin)})`)
   }
