@@ -55,9 +55,33 @@ function wrapAngle (a) {
   return ((a + Math.PI) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2) - Math.PI
 }
 
+// Entity.js copies each bone's absolute pivot into bone.position, but a
+// three.js bone's position is relative to its parent: body (pivot y 24) under
+// waist (y 12) lands at y 36 and the head at y 60 model units. The bind pose
+// hides that, since bind() inverts whatever the bones are, but every rotation
+// afterwards turns around the displaced point — a head pitch swung the head
+// around a spot two blocks above the shoulders, and the arms swung from the
+// same height. Re-express the pivots parent-relative and rebind so the
+// animation below rotates about the real joints.
+const PLAYER_BONE_DEFS = entitiesData.player.geometry.default.bones
+function fixPlayerRig (skinned) {
+  const byName = {}
+  for (const def of PLAYER_BONE_DEFS) byName[def.name] = def
+  skinned.skeleton.bones.forEach((bone, i) => {
+    const def = PLAYER_BONE_DEFS[i]
+    const parent = def.parent && byName[def.parent]
+    if (!parent) return
+    const pivot = def.pivot || [0, 0, 0]
+    const parentPivot = parent.pivot || [0, 0, 0]
+    bone.position.set(pivot[0] - parentPivot[0], pivot[1] - parentPivot[1], pivot[2] - parentPivot[2])
+  })
+  skinned.bind(skinned.skeleton)
+}
+
 function getPlayerLimbBones (mesh) {
   const skinned = mesh.children.find(c => c.isSkinnedMesh)
   if (!skinned) return null
+  fixPlayerRig(skinned)
   const bones = skinned.skeleton.bones
   const limbs = {}
   for (const name of LIMB_BONE_NAMES) {
