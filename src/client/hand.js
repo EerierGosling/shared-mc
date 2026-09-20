@@ -12,6 +12,7 @@
 
 const THREE = global.THREE || require('three')
 const TWEEN = require('@tweenjs/tween.js')
+const { createItem, disposeItem } = require('./item-model')
 
 // Same texture prismarine-viewer's mob models use for players in this project
 // (see entities.js) — hardcoded to 1.16.4's asset set rather than whatever
@@ -131,7 +132,11 @@ class Hand {
     this.pivot = new THREE.Group()
     this.pivot.position.set(...REST_POSITION)
     this.pivot.rotation.set(...REST_ROTATION)
+    this.arm = mesh
     this.pivot.add(mesh)
+    this.item = new THREE.Group()
+    this.pivot.add(this.item)
+    this.itemName = null
 
     this.light = new THREE.DirectionalLight(0xffffff, 0.9)
     this.light.position.set(1, 1.5, 0.5)
@@ -156,9 +161,27 @@ class Hand {
   /** Draw over the finished world frame. Assumes renderer.autoClear is off. */
   render (renderer, camera) {
     if (!this.pivot.visible) return
+    if (this.itemName && !this.item.children.length) {
+      const model = createItem(this.itemName)
+      if (model) {
+        model.scale.setScalar(model.userData.block ? 0.48 : 0.75)
+        this.item.position.set(-0.12, 0.12, -0.16)
+        this.item.rotation.set(-0.25, -0.45, model.userData.block ? 0 : -0.25)
+        this.item.add(model)
+        this.arm.visible = false
+      }
+    }
     this.root.matrix.copy(camera.matrixWorld)
     renderer.clearDepth()
     renderer.render(this.scene, camera)
+  }
+
+  setItem (item) {
+    const name = item?.name || null
+    if (name === this.itemName) return
+    this.itemName = name
+    disposeItem(this.item)
+    this.arm.visible = true
   }
 
   // Nothing to hold before a bot is joined; the arm would float over the

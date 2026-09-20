@@ -32,7 +32,7 @@ const viewer = new Viewer(renderer)
 // Swap in our own entity manager before listen() wires it up — it renders the
 // same real mob models but falls back to a body+head shape instead of a flat
 // box for the mobs prismarine-viewer never got geometry for (see entities.js).
-viewer.entities = new Entities(viewer.scene)
+viewer.entities = new Entities(viewer.scene, () => Object.values(viewer.world.sectionMeshs))
 // Debug hook: lets a devtools console or a headless probe poke the scene.
 window.__viewer = viewer
 // Websocket first: the default polling-then-upgrade dance never completes
@@ -182,6 +182,7 @@ socket.on('dig:stop', payload => breaking.stop(payload))
 
 socket.on('state', state => {
   hud.setState(state)
+  hand.setItem(state.heldItem)
   placePrediction.setTarget(state.placeTarget)
   applySkyForTime(viewer, state.timeOfDay, sky)
   setSubmerged(viewer, sky, state.eyeInWater)

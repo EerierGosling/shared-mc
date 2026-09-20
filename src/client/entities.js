@@ -93,87 +93,39 @@ function getPlayerLimbBones (mesh) {
 }
 
 function disposeDeep (o) {
+  if (o.userData.isItemMesh) {
+    disposeItem(o)
+    return
+  }
   dispose3(o)
   for (const child of o.children || []) disposeDeep(child)
 }
 
-// Dropped items ("item" entities) have no model in prismarine-viewer's
-// entities.json — Entity() throws "Unknown entity item" for them — and even
-// if it didn't, mineflayer never tells us *which* item without reading
-// getDroppedItem() server-side (see worldStream.js's extra 'itemName' field).
-// Render them using the same items-then-blocks texture lookup the hotbar
-// already relies on (hud.js) — but a dropped item's *shape* also depends on
-// which of those two resolved: vanilla draws a dropped full block (dirt,
-// sand, …) as a small floating cube, while non-full-cube blocks (torch,
-// flowers, …) and genuine items (tools, ingots, gems, …) stay a flat sprite.
-// minecraft-assets doesn't distinguish those first two cases by path, but
-// the texture itself does: a full-cube block's PNG tiles all six faces and
-// so is fully opaque, whereas a cross/sprite block's PNG carries the shape
-// as real alpha transparency around it (verified: dirt/sand/stone/planks
-// have no alpha channel at all; torch does). Sampling that beats hardcoding
-// a block-name list.
-const textureLoader = new THREE.TextureLoader()
-const itemTextureCache = new Map()
-
-function textureHasTransparency (image) {
-  const canvas = document.createElement('canvas')
-  canvas.width = image.width
-  canvas.height = image.height
-  const ctx = canvas.getContext('2d')
-  ctx.drawImage(image, 0, 0)
-  const { data } = ctx.getImageData(0, 0, canvas.width, canvas.height)
-  for (let i = 3; i < data.length; i += 4) {
-    if (data[i] < 255) return true
-  }
-  return false
-}
-
-function loadItemTexture (name, onLoad) {
-  const cached = itemTextureCache.get(name)
-  if (cached) return onLoad(cached.texture, cached.renderAsCube)
-
-  textureLoader.load(`/assets/items/${name}.png`, texture => {
-    texture.magFilter = THREE.NearestFilter
-    texture.minFilter = THREE.NearestFilter
-    itemTextureCache.set(name, { texture, renderAsCube: false })
-    onLoad(texture, false)
-  }, undefined, () => {
-    textureLoader.load(`/assets/blocks/${name}.png`, texture => {
-      texture.magFilter = THREE.NearestFilter
-      texture.minFilter = THREE.NearestFilter
-      const renderAsCube = !textureHasTransparency(texture.image)
-      itemTextureCache.set(name, { texture, renderAsCube })
-      onLoad(texture, renderAsCube)
-    }, undefined, () => {
-      console.warn(`[entities] no texture found for dropped item "${name}"`)
-    })
-  })
-}
+// The server position stays on the root; only the visual child bobs and spins.
+const { createItem, disposeItem } = require('./item-model')
 
 function buildItemMesh () {
-  const group = new THREE.Object3D()
-  group.position.y += 0.15
-  group.userData.isItemMesh = true
+  const group = new THREE.Group()
+  const visual = new THREE.Group()
+  const shadow = new THREE.Mesh(new THREE.PlaneGeometry(0.65, 0.65), new THREE.ShaderMaterial({
+    transparent: true,
+    depthWrite: false,
+    uniforms: { opacity: { value: 0.25 } },
+    vertexShader: 'varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+    fragmentShader: 'varying vec2 vUv; uniform float opacity; void main() { float a = 1.0 - smoothstep(0.1, 0.5, distance(vUv, vec2(0.5))); gl_FragColor = vec4(0.0, 0.0, 0.0, a * opacity); }'
+  }))
+  shadow.rotation.x = -Math.PI / 2
+  shadow.renderOrder = 1
+  shadow.visible = false
+  group.add(visual, shadow)
+  group.userData = { isItemMesh: true, visual, shadow, shadowAt: -Infinity }
   return group
 }
 
-function buildFlatSprite (texture) {
-  const geometry = new THREE.PlaneGeometry(0.25, 0.25)
-  const material = new THREE.MeshLambertMaterial({ map: texture, transparent: true, alphaTest: 0.1, side: THREE.DoubleSide })
-  return new THREE.Mesh(geometry, material)
-}
-
-function buildBlockCube (texture) {
-  const geometry = new THREE.BoxGeometry(0.25, 0.25, 0.25)
-  const material = new THREE.MeshLambertMaterial({ map: texture })
-  return new THREE.Mesh(geometry, material)
-}
-
-function setItemMeshTexture (mesh, itemName) {
-  loadItemTexture(itemName, (texture, renderAsCube) => {
-    while (mesh.children.length) mesh.remove(mesh.children[0])
-    mesh.add(renderAsCube ? buildBlockCube(texture) : buildFlatSprite(texture))
-  })
+function setItemMeshTexture (mesh, name) {
+  if (mesh.userData.itemName === name) return
+  disposeItem(mesh.userData.visual)
+  mesh.userData.itemName = name
 }
 
 // Vanilla draws a nametag with its 8px font at 1/40 block per pixel: white
@@ -320,8 +272,10 @@ const STOP_AFTER_MS = 250
 const MAX_NECK = 0.9
 
 class Entities {
-  constructor (scene) {
+  constructor (scene, terrain = () => []) {
     this.scene = scene
+    this.terrain = terrain
+    this.shadowRay = new THREE.Raycaster(new THREE.Vector3(), new THREE.Vector3(0, -1, 0), 0, 4)
     this.entities = {}
     // Player meshes by id, for the minimap. Move events don't repeat the
     // entity name, so membership is decided once here at spawn; the smoothed
@@ -364,6 +318,7 @@ class Entities {
     if (!this.entities[entity.id]) {
       const mesh = getEntityMesh(entity, this.scene)
       if (!mesh) return
+      if (entity.pos) mesh.position.set(entity.pos.x, entity.pos.y, entity.pos.z)
       this.entities[entity.id] = mesh
       this.scene.add(mesh)
       if (entity.name === 'player') this.players[entity.id] = mesh
@@ -386,7 +341,7 @@ class Entities {
       l.z1 = entity.pos.z
       l.posAt = performance.now()
     }
-    if (entity.yaw) {
+    if (entity.yaw !== undefined && !e.userData.isItemMesh) {
       const m = e.userData.limbs && this.motion[entity.id]
       if (m) {
         // animate() owns a rigged mesh's yaw: the head takes the look packet
@@ -467,6 +422,34 @@ class Entities {
     }
 
     for (const [id, mesh] of Object.entries(this.entities)) {
+      if (mesh.userData.isItemMesh) {
+        const data = mesh.userData
+        if (data.itemName && !data.visual.children.length) {
+          const model = createItem(data.itemName)
+          if (model) {
+            model.scale.setScalar(model.userData.block ? 0.3 : 0.45)
+            data.visual.add(model)
+          }
+        }
+        const phase = now / 1000 + Number(id) * 0.73
+        data.visual.position.y = 0.25 + Math.sin(phase * 2) * 0.08
+        data.visual.rotation.y = phase * 1.25
+        // Project onto actual terrain (including slabs), never into midair.
+        if (now - data.shadowAt > 250) {
+          data.shadowAt = now
+          this.shadowRay.ray.origin.copy(mesh.position).y += 0.2
+          const hit = this.shadowRay.intersectObjects(this.terrain(), false)[0]
+          data.groundY = hit ? hit.point.y : null
+        }
+        data.shadow.visible = data.groundY !== null && data.groundY !== undefined
+        if (data.shadow.visible) {
+          const height = Math.max(0, mesh.position.y - data.groundY + data.visual.position.y)
+          data.shadow.position.y = data.groundY - mesh.position.y + 0.008
+          data.shadow.material.uniforms.opacity.value = 0.28 / (1 + height * 2)
+          data.shadow.scale.setScalar(1 + height * 0.3)
+        }
+        continue
+      }
       const limbs = mesh.userData.limbs
       if (!limbs) continue
 
