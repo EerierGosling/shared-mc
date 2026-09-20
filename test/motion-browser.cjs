@@ -52,6 +52,11 @@ async function main () {
     host.on('pageerror', error => errors.push(error.message))
     const base = `http://127.0.0.1:${server.address().port}`
     await host.goto(base)
+    await host.getByRole('link', { name: 'Use this device as a controller', exact: true }).click()
+    await host.locator('#pair-code').waitFor({ state: 'visible' })
+    assert.equal(new URL(host.url()).pathname, '/controller')
+    assert.equal(joined.size, 0, 'Opening the controller does not join a player')
+    await host.getByRole('link', { name: 'Back to game' }).click()
     await host.getByRole('radio', { name: 'Use camera', exact: true }).check()
     assert.match(await host.locator('#join-control-hint').textContent(), /allow camera access/)
     await host.getByRole('radio', { name: 'Camera + phone', exact: true }).check()
