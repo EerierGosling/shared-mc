@@ -26,8 +26,9 @@ const MODES = [
 /**
  * The mode-and-identity screen shown before a visitor gets a bot.
  *
- * Laid out like Minecraft's world select: a list of rows you pick from, then a
- * button along the bottom. Choosing Collaborative needs nothing else, since that
+ * Laid out like Minecraft's world select: the server address, a list of rows
+ * you pick from, then a button along the bottom. Choosing Collaborative needs
+ * nothing else, since that
  * character is shared and already named; choosing your own bot reveals the
  * name and skin fields.
  *
@@ -45,7 +46,8 @@ class JoinScreen {
     this.nameInput = document.getElementById('join-name')
     this.skinList = document.getElementById('join-skins')
     this.error = document.getElementById('join-error')
-    this.server = document.getElementById('join-server')
+    this.hostInput = document.getElementById('join-host')
+    this.portInput = document.getElementById('join-port')
     this.build = document.getElementById('join-build')
     this.button = document.getElementById('join-button')
 
@@ -71,9 +73,20 @@ class JoinScreen {
   setOptions (options) {
     this.options = options
     if (!this.isOpen && !this.joined) this.root.classList.add('open')
-    if (options.server) {
-      const { host, port } = options.server
-      this.server.textContent = port === 25565 ? host : `${host}:${port}`
+    // The configured server, if any, is only a placeholder: a blank field
+    // means "that one", and typing over it goes somewhere else.
+    const { host, port } = options.defaultServer || {}
+    this.hostInput.placeholder = host || 'server address'
+    this.portInput.placeholder = port || '25565'
+    if (!this.restoredServer) {
+      this.restoredServer = true
+      try {
+        const last = JSON.parse(window.localStorage.getItem('server') || 'null')
+        if (last && last.host) {
+          this.hostInput.value = last.host
+          this.portInput.value = last.port || ''
+        }
+      } catch (err) { /* no storage; the placeholder stands */ }
     }
     if (options.commit) this.build.textContent = options.commit
     this.renderModes()
@@ -159,7 +172,16 @@ class JoinScreen {
       this.reject('Choose how you want to play.')
       return
     }
-    const payload = { mode: this.mode }
+    const host = this.hostInput.value.trim()
+    const port = this.portInput.value.trim()
+    const fallback = this.options && this.options.defaultServer && this.options.defaultServer.host
+    if (!host && !fallback) {
+      this.reject('Enter a server address.')
+      this.hostInput.focus()
+      return
+    }
+    try { window.localStorage.setItem('server', JSON.stringify({ host, port })) } catch (err) { /* per-visitor nicety only */ }
+    const payload = { mode: this.mode, host, port }
     if (this.mode === 'solo') {
       const username = this.nameInput.value.trim()
       if (!username) {

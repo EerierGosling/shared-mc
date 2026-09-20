@@ -37,7 +37,7 @@ const CHAT_HISTORY = 50
  * Touch devices get the same messages from on-screen buttons (see #touch in
  * index.html) and steer by dragging the canvas.
  */
-function setupInput ({ socket, viewer, camera, hud, inventoryUI, canvas, hand, join, placePrediction }) {
+function setupInput ({ socket, viewer, camera, hud, inventoryUI, canvas, hand, join, creative, placePrediction }) {
   const held = Object.create(null)
   let locked = false
   // Once a finger has steered the camera this browser's angles win over the
@@ -47,6 +47,7 @@ function setupInput ({ socket, viewer, camera, hud, inventoryUI, canvas, hand, j
   let lastLookSent = 0
   let lookTimer = null
   let lastForwardTap = 0
+  let lastJumpTap = 0
   let useRepeat = null
   const chatHistory = []
   let chatHistoryPos = 0
@@ -175,6 +176,12 @@ function setupInput ({ socket, viewer, camera, hud, inventoryUI, canvas, hand, j
       // blockUpdate confirms or corrects it.
       placePrediction.place()
       startUse()
+    } else if (event.button === 1) {
+      // Vanilla's pick block. preventDefault stops the browser opening its
+      // middle-click autoscroll instead.
+      event.preventDefault()
+      flushLook()
+      socket.emit('creative:pick')
     }
   })
 
@@ -286,6 +293,9 @@ function setupInput ({ socket, viewer, camera, hud, inventoryUI, canvas, hand, j
       event.preventDefault()
       if (locked) document.exitPointerLock()
       inventoryUI.toggle()
+      // Vanilla's creative screen opens with the search box already taking
+      // keystrokes; nothing else on this overlay wants them.
+      if (inventoryUI.isOpen) creative.focusSearch()
       return
     }
     if (event.code === 'Escape') {
@@ -322,6 +332,16 @@ function setupInput ({ socket, viewer, camera, hud, inventoryUI, canvas, hand, j
       const now = Date.now()
       if (now - lastForwardTap < DOUBLE_TAP_MS) held.autoSprint = true
       lastForwardTap = now
+    }
+    // Double-tapping space is how vanilla toggles creative flight. Asking for
+    // it without the grant only earns a notice in chat: the server kicks a bot
+    // that flies without permission, so the refusal lives on the server.
+    if (control === 'jump') {
+      const now = Date.now()
+      if (now - lastJumpTap < DOUBLE_TAP_MS && creative.canFly) {
+        socket.emit('creative:fly', { active: !creative.flying })
+      }
+      lastJumpTap = now
     }
     held[control] = true
     sendControls()

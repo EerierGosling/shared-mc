@@ -65,6 +65,9 @@ class SkinPainter {
       const texture = this._texture(skin)
       let painted = false
       mesh.traverse(child => {
+        // The nametag is a Sprite hanging off the same mesh, and SpriteMaterial
+        // has a map too; painting it would replace the name with the skin.
+        if (child.isSprite) return
         if (!child.material || !('map' in child.material)) return
         child.material.map = texture
         child.material.needsUpdate = true

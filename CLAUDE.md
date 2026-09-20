@@ -13,8 +13,11 @@ The browser is a real client surface, not a video player: it receives world
 state and renders it, and its input is replayed by whichever bot it drives.
 `README.md` has the file-by-file map and the full socket protocol.
 
-A browser gets nothing until it joins. `src/server/sessions.js` vets the mode
-(and, for solo, a name and skin), then `src/server/session.js` builds the bot,
+A browser gets nothing until it joins. The visitor names the server: `MC_HOST`
+is only a placeholder and a fallback for a blank field, and sessions are
+grouped by `host:port` (one road trip bot per server, rosters per server).
+`src/server/sessions.js` vets the address and the mode (and, for solo, a name
+and skin), `index.js` pings the address before spending a login, then `src/server/session.js` builds the bot,
 controller, state pusher, inventory bridge and world views. **Both modes are
 the same Session class** — the only differences are how many member sockets it
 has and what it speaks through: one socket for solo, a socket.io room for the
@@ -40,9 +43,11 @@ road trip.
   both modes — do not "simplify" it into a single held-key object.
 - **Only solo visitors cost a login.** Road trip riders share one bot, so they
   are uncapped; solo bots are capped by the Minecraft server's own player
-  limit. `sessions.js` pings the server at startup and lowers its cap to
-  `max-players` minus `playerSlotsReserved`, never raising it. Skipping that
-  would let the page lock real players out.
+  limit. `sessions.js` pings the default server at startup (if `MC_HOST` is
+  set) and lowers its cap to `max-players` minus `playerSlotsReserved`, never
+  raising it; a server the visitor typed is pinged at join and refused when
+  its player count is already at its max. Skipping that would let the page
+  lock real players out.
 - **A session's emitter is not always a socket.** Solo sessions speak through
   the member's socket; road trip sessions speak through `io.to(room)`. Anything
   taking that emitter must only ever call `.emit()` on it — `state.js`,
@@ -108,6 +113,27 @@ road trip.
   interface resizes from that one variable — keep new HUD work in those units
   rather than hardcoding px. Sprites need `image-rendering: pixelated`, and the
   pixel font needs antialiasing off, or both go soft.
+- **Creative is granted by the Minecraft server, never asserted by us**
+  (`creative.js`). Both halves are read back off the wire: `bot.game.gameMode`
+  for the mode and the clientbound `abilities` flags for what it permits
+  (`mayFly` 0x04, `instabuild` 0x08). The gate is protective, not cosmetic —
+  probed against `mc.manitej.com`, sending the flying bit without `mayFly`
+  bought about twelve blocks of climb and then
+  `multiplayer.disconnect.flying`, which kills the whole session, not just the
+  flight. mineflayer has no abilities plugin, so that packet is ours to read.
+- **Flight overwrites velocity, it does not disable physics.** `bot.physicsEnabled
+  = false` would skip `simulatePlayer` and let the bot drift through walls, so
+  instead gravity is zeroed and `bot.entity.velocity` is rewritten on every
+  `physicsTick` — prismarine-physics still resolves collisions, and rewriting
+  each tick is what stops drag and leftover control acceleration accumulating.
+  The movement keys are withheld from mineflayer for the duration
+  (`control.js`, `FLIGHT_DRIVEN`) because `applyHeading` would otherwise
+  accelerate against the override; sneak and sprint still go through, since the
+  server wants those poses and they only scale the flight loop. The heading
+  formula is `applyHeading`'s own, and is checked against it at eight yaws.
+- **`bot.physics` is per bot**, so zeroing gravity for one session cannot reach
+  another. Verified rather than assumed — `Physics()` returns a fresh object per
+  `inject`.
 - **Right click held is place-only.** The browser sends `action:use` once on
   press and then `{ repeat: true }` every 200 ms while held; the server treats
   repeats as "keep placing" and skips opening containers and using items, so a
@@ -172,6 +198,18 @@ port. Verified: the bundle builds warning-free; the server boots and serves `/`,
 chunks and thousands of entity updates to a browser; `targetBlock` comes back
 with real block names, which is the proof the raycast reads loaded chunks rather
 than walking off into nothing.
+
+**Creative mode (inventory + flight) is in, and gated.** The refusal path is
+verified end to end against the live server: a solo bot asks to fly, is told no
+in chat, and is still connected fifteen seconds later. The *granted* path is
+covered by a stubbed suite (25 checks: heading against `applyHeading`, the
+withheld keys, a withdrawn grant landing the bot, give/destroy slot choice,
+budgets) but **has never run against a server that actually grants creative** —
+`mc.manitej.com` does not. A non-op there gets `me help list msg tell w random
+teammsg tm trigger` and nothing else, so `/gamemode` is not available; op the
+bot and the creative UI appears by itself. Skipped deliberately: the 5-block
+creative reach, because of the `REACH` clamp note above, and vanilla's hotbar
+presets.
 
 **Not verified: the HUD, visually.** It was built from the real texture
 dimensions and confirmed by asset resolution, but nobody has looked at it in a

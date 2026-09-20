@@ -102,7 +102,8 @@ const sessions = new Sessions(config, io)
 sessions.onChange = () => broadcastRoster()
 
 function broadcastRoster () {
-  io.emit('roster', sessions.roster())
+  // Rosters are per server, so each browser gets the one for where it is.
+  for (const socket of io.sockets.sockets.values()) socket.emit('roster', sessions.rosterFor(socket))
   // The join screen shows live occupancy, so anyone still choosing sees the
   // solo slots fill up as they go.
   io.emit('join:options', sessions.options())
@@ -113,17 +114,42 @@ io.on('connection', socket => {
   // a login on the Minecraft server.
   socket.emit('join:options', sessions.options())
 
+  let joining = false
   socket.on('join', payload => {
-    if (sessions.modeBySocket.has(socket.id)) return // already playing
+    if (joining || sessions.modeBySocket.has(socket.id)) return // already playing
     const vetted = sessions.vet(payload)
     if (!vetted.ok) {
       socket.emit('join:rejected', { reason: vetted.reason })
       return
     }
-    sessions.join(socket, vetted.mode, vetted.identity)
-    socket.emit('join:accepted', { mode: vetted.mode, ...vetted.identity })
-    console.log(`${vetted.identity.username} joined ${vetted.mode} (${sessions.botCount}/${sessions.capacity} bots, ${sessions.roadtripRiders} riding)`)
-    broadcastRoster()
+    // The address is the visitor's own, so ping it before spending a login:
+    // a typo would otherwise become a bot retrying nothing, forever, with
+    // the browser stuck on "reconnecting".
+    joining = true
+    const { host, port } = vetted.server
+    mc.ping({ host, port, closeTimeout: 5000 }, (err, result) => {
+      joining = false
+      if (!socket.connected || sessions.modeBySocket.has(socket.id)) return
+      if (err) {
+        socket.emit('join:rejected', { reason: `Could not reach ${host}:${port}.` })
+        return
+      }
+      const players = result && result.players
+      if (players && Number.isFinite(players.max) && players.online >= players.max) {
+        socket.emit('join:rejected', { reason: `${host} is full (${players.online}/${players.max}).` })
+        return
+      }
+      // Re-vetted: someone may have taken the last bot or the name meanwhile.
+      const again = sessions.vet(payload)
+      if (!again.ok) {
+        socket.emit('join:rejected', { reason: again.reason })
+        return
+      }
+      sessions.join(socket, again.mode, again.identity, again.server)
+      socket.emit('join:accepted', { mode: again.mode, server: again.server, ...again.identity })
+      console.log(`${again.identity.username} joined ${again.mode} on ${host}:${port} (${sessions.botCount}/${sessions.capacity} bots, ${sessions.roadtripRiders} riding)`)
+      broadcastRoster()
+    })
   })
 
   socket.on('latency:ping', sentAt => socket.emit('latency:pong', sentAt))
@@ -137,17 +163,21 @@ io.on('connection', socket => {
   })
 })
 
-// Solo visitors each cost a real login, so the Minecraft server's own player
+// Solo visitors each cost a real login, so the default server's own player
 // cap is the ceiling. Ask it rather than guessing; on failure keep the
-// configured cap.
-mc.ping({ host: config.mc.host, port: config.mc.port }, (err, result) => {
-  if (err || !result || !result.players) {
-    console.warn(`could not read max-players (${err ? err.message : 'no response'}); capacity stays ${sessions.capacity}`)
-    return
-  }
-  sessions.applyServerCapacity(result.players.max)
-  console.log(`server allows ${result.players.max} players; capacity ${sessions.capacity}`)
-})
+// configured cap. Servers visitors type in are checked for room at join time.
+if (config.mc.host) {
+  mc.ping({ host: config.mc.host, port: config.mc.port }, (err, result) => {
+    if (err || !result || !result.players) {
+      console.warn(`could not read max-players (${err ? err.message : 'no response'}); capacity stays ${sessions.capacity}`)
+      return
+    }
+    sessions.applyServerCapacity(result.players.max)
+    console.log(`server allows ${result.players.max} players; capacity ${sessions.capacity}`)
+  })
+} else {
+  console.log(`no MC_HOST set; visitors choose a server (capacity ${sessions.capacity})`)
+}
 
 server.listen(config.web.port, () => {
   console.log(`open http://localhost:${config.web.port}`)

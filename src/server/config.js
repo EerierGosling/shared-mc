@@ -20,11 +20,13 @@ const int = (v, d) => {
 
 module.exports = {
   mc: {
-    host: process.env.MC_HOST || 'localhost',
+    // Visitors type the server they want on the join screen. MC_HOST is only
+    // a default for anyone who leaves that blank, and there is none unless set.
+    host: process.env.MC_HOST || null,
     port: int(process.env.MC_PORT, 25565),
-    // What the join screen shows. Under compose MC_HOST is an internal service
-    // name that means nothing outside the network, so it can be overridden.
-    publicHost: process.env.MC_PUBLIC_HOST || process.env.MC_HOST || 'localhost',
+    // What the join screen shows as the placeholder. Under compose MC_HOST is
+    // an internal service name that means nothing outside the network.
+    publicHost: process.env.MC_PUBLIC_HOST || process.env.MC_HOST || null,
     username: process.env.MC_USERNAME || 'StreamBot',
     version: process.env.MC_VERSION || '1.20.4',
     auth: process.env.MC_AUTH || 'offline'
@@ -55,7 +57,10 @@ module.exports = {
     dig: int(process.env.LIMIT_DIG, 40),
     place: int(process.env.LIMIT_PLACE, 40),
     attack: int(process.env.LIMIT_ATTACK, 20),
-    drop: int(process.env.LIMIT_DROP, 5)
+    drop: int(process.env.LIMIT_DROP, 5),
+    // Creative gives are free items out of nothing, so they are budgeted like
+    // any other action a visitor can hold down.
+    give: int(process.env.LIMIT_GIVE, 30)
   },
   // How often a member's look is applied to the bot; extra samples inside the
   // window coalesce (latest wins) rather than drop. This does not shield the

@@ -64,7 +64,7 @@ class InventoryUI {
       this.cursorItemEl.style.left = `${event.clientX}px`
       this.cursorItemEl.style.top = `${event.clientY}px`
     })
-    document.addEventListener('mouseup', () => this._endDrag())
+    document.addEventListener('mouseup', event => this._endDrag(event))
   }
 
   get isOpen () {
@@ -254,11 +254,18 @@ class InventoryUI {
     return cell
   }
 
-  _endDrag () {
+  _endDrag (event) {
     const drag = this.drag
     this.drag = null
     if (!drag) return
     for (const cell of this.body.querySelectorAll('.slot.drag-target')) cell.classList.remove('drag-target')
+    // Vanilla's creative bin: let go of a stack over the item list and it is
+    // gone. The server ignores this unless it is really in creative, so there
+    // is nothing to check here.
+    if (event && event.target && event.target.closest && event.target.closest('#creative')) {
+      this.socket.emit('creative:destroy', { slot: drag.path[0] })
+      return
+    }
     if (drag.path.length === 1) {
       this.socket.emit('window:click', { slot: drag.path[0], mouseButton: drag.mouseButton, mode: 0 })
     } else {
