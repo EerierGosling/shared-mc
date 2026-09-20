@@ -235,11 +235,17 @@ socket.on('bot:death', info => {
   input.releaseAll()
   if (document.pointerLockElement) document.exitPointerLock()
   inventoryUI.close()
+  advancementsUI.close()
   hud.showDeath(info, () => socket.emit('respawn'))
 })
 socket.on('bot:respawn', () => hud.hideDeath())
 
 socket.on('lights', lights => blockLights.set(lights))
+
+// The bot's advancement tree as deltas (full on join), and one event per
+// advancement newly earned, for the toast.
+socket.on('advancements', delta => advancementsUI.update(delta))
+socket.on('advancement:earned', entry => advancementsUI.earned(entry))
 
 // --- latency readout --------------------------------------------------------
 socket.on('latency:pong', sentAt => hud.setPing(Date.now() - sentAt))
@@ -248,18 +254,12 @@ setInterval(() => socket.emit('latency:ping', Date.now()), 2000)
 // --- render loop ------------------------------------------------------------
 // Two passes share the frame (world, then the hand over it), so the clear is
 // ours to do rather than render()'s.
-  advancementsUI.close()
 renderer.autoClear = false
 let lastFrameTime = performance.now()
 function animate () {
   window.requestAnimationFrame(animate)
   const now = performance.now()
   const dt = (now - lastFrameTime) / 1000
-// The bot's advancement tree as deltas (full on join), and one event per
-// advancement newly earned, for the toast.
-socket.on('advancements', delta => advancementsUI.update(delta))
-socket.on('advancement:earned', entry => advancementsUI.earned(entry))
-
   lastFrameTime = now
   viewer.update()
   breaking.update()

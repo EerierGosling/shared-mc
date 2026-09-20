@@ -21,7 +21,6 @@ npm run dev
 |---|---|---|
 | `MC_HOST` / `MC_PORT` | `localhost` / `25565` | Minecraft server to join |
 | `MC_VERSION` | `1.20.4` | must be in prismarine-viewer's 1.8.8–1.21.4 range |
-| `MC_USERNAME` | `StreamBot` | the bot's name |
 | `MC_AUTH` | `offline` | or `microsoft` |
 | `PORT` | `3000` | web server |
 | `VIEW_DISTANCE` | `6` | chunk radius streamed per browser |
