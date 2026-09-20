@@ -51,6 +51,9 @@ class Controller {
     this.lastLookAt = new Map() // socket.id -> timestamp of last applied look
     this.pendingLooks = new Map() // socket.id -> { yaw, pitch, timer }
     this.lastChatAt = new Map()
+    this.sayQueue = [] // spoken lines waiting their turn on the bot's chat
+    this.sayTimer = null
+    this.lastSaidAt = 0
     this.diggers = new Set() // socket.ids currently holding the mouse button
     this.lastDigNoticeAt = 0
     this.lastUseAt = 0
@@ -79,6 +82,11 @@ class Controller {
     this.digging = false
     for (const pending of this.pendingLooks.values()) clearTimeout(pending.timer)
     this.pendingLooks.clear()
+    // Queued speech is dropped with the bot: by the time a replacement is up
+    // the words are stale, and a torn-down session must leave no timer.
+    clearTimeout(this.sayTimer)
+    this.sayTimer = null
+    this.sayQueue = []
   }
 
   register (socket) {
@@ -461,19 +469,10 @@ class Controller {
   }
 
   chat (socketId, text) {
-    const bot = this.bot
-    if (typeof text !== 'string') return
-    // Vanilla kicks the sender for § or control characters
-    // (multiplayer.disconnect.illegal_characters), and the sender here is the
-    // shared bot, so one pasted colour code would drop everyone.
-    const message = text
-      .replace(/[\r\n]+/g, ' ')
-      .replace(/[§\u0000-\u001f\u007f]/g, '')
-      .trim()
-      .slice(0, MAX_CHAT_LENGTH)
+    const message = cleanChat(text)
     if (!message) return
     // A dropped message must say so; silence here reads as "chat is broken".
-    if (!bot) {
+    if (!this.bot) {
       this.chatLog?.notice(socketId, '* not sent: the bot is not connected')
       return
     }
@@ -482,9 +481,47 @@ class Controller {
       this.chatLog?.notice(socketId, '* not sent: one message per second')
       return
     }
+    this._sendChat(socketId, message, now)
+  }
+
+  /**
+   * A spoken line. Typed chat past the rate limit is refused, because the
+   * typist can see that and wait; a transcript arrives seconds after the
+   * button was let go, and several riders may finish talking together, so
+   * these queue and go out one per chat interval instead. A solo session
+   * queues for its one member.
+   */
+  say (socketId, text) {
+    const message = cleanChat(text)
+    if (!message) return
+    if (!this.bot) {
+      this.chatLog?.notice(socketId, '* not sent: the bot is not connected')
+      return
+    }
+    this.sayQueue.push({ socketId, message })
+    this._drainSay()
+  }
+
+  _drainSay () {
+    if (this.sayTimer || !this.sayQueue.length) return
+    const wait = this.lastSaidAt + this.config.chatIntervalMs - Date.now()
+    if (wait > 0) {
+      this.sayTimer = setTimeout(() => {
+        this.sayTimer = null
+        this._drainSay()
+      }, wait)
+      return
+    }
+    const { socketId, message } = this.sayQueue.shift()
+    if (this.bot) this._sendChat(socketId, message, Date.now())
+    this._drainSay()
+  }
+
+  _sendChat (socketId, message, now) {
     this.lastChatAt.set(socketId, now)
+    this.lastSaidAt = now
     try {
-      bot.chat(message)
+      this.bot.chat(message)
     } catch (err) {
       return
     }
@@ -531,6 +568,18 @@ class Controller {
 }
 
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms))
+
+// Vanilla kicks the sender for § or control characters
+// (multiplayer.disconnect.illegal_characters), and the sender here is the
+// shared bot, so one pasted colour code would drop everyone.
+function cleanChat (text) {
+  if (typeof text !== 'string') return ''
+  return text
+    .replace(/[\r\n]+/g, ' ')
+    .replace(/[§\u0000-\u001f\u007f]/g, '')
+    .trim()
+    .slice(0, MAX_CHAT_LENGTH)
+}
 
 const AIR = new Set(['air', 'cave_air', 'void_air'])
 function isAirState (bot, stateId) {

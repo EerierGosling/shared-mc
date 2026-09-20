@@ -1,6 +1,7 @@
 'use strict'
 
 const setupCameraControls = require('./camera-controls')
+const setupSpeech = require('./speech')
 
 const KEY_TO_CONTROL = {
   KeyW: 'forward',
@@ -108,8 +109,14 @@ function setupInput ({ socket, viewer, camera, hud, inventoryUI, canvas, hand, j
     useRepeat = null
   }
 
+  // Talk is held like mine and use, and only offered when the server has a
+  // transcription key behind it.
+  const speech = setupSpeech({ socket, hud, button: document.querySelector('#touch [data-action=talk]') })
+  socket.on('join:options', options => document.body.classList.toggle('speech', Boolean(options.speech)))
+
   const releaseAll = () => {
     cameraControls?.reset()
+    speech.stop()
     let changed = false
     for (const key of CONTROL_KEYS) {
       if (held[key]) { held[key] = false; changed = true }
@@ -293,7 +300,8 @@ function setupInput ({ socket, viewer, camera, hud, inventoryUI, canvas, hand, j
   canvas.addEventListener('touchcancel', endLookTouch)
 
   // The on-screen buttons. Movement keys are held; sneak toggles, since a
-  // thumb cannot hold it and steer; mine and use are held like mouse buttons.
+  // thumb cannot hold it and steer; mine, use and talk are held like mouse
+  // buttons.
   for (const button of document.querySelectorAll('#touch button')) {
     const control = button.dataset.control
     const action = button.dataset.action
@@ -305,6 +313,7 @@ function setupInput ({ socket, viewer, camera, hud, inventoryUI, canvas, hand, j
       if (control) setControl(control, true)
       else if (action === 'mine') startDig()
       else if (action === 'use') startUse()
+      else if (action === 'talk') speech.start()
       else if (action === 'sneak') {
         const on = !held.sneak
         setControl('sneak', on)
@@ -318,6 +327,7 @@ function setupInput ({ socket, viewer, camera, hud, inventoryUI, canvas, hand, j
       if (control) setControl(control, false)
       else if (action === 'mine') stopDig()
       else if (action === 'use') stopUse()
+      else if (action === 'talk') speech.stop()
     }
     button.addEventListener('pointerdown', press)
     button.addEventListener('pointerup', release)

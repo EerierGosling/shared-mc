@@ -405,6 +405,15 @@ class Sessions {
     }
   }
 
+  /** A spoken line from a member, queued on whichever bot that member drives. */
+  say (socket, text) {
+    const mode = this.modeBySocket.get(socket.id)
+    const key = this.serverBySocket.get(socket.id)
+    if (!mode) return
+    const session = mode === 'solo' ? this.solo.get(socket.id) : this.roadtrips.get(key)
+    if (session) session.controller.say(socket.id, text)
+  }
+
   /** The roster for the server this socket is playing on; nothing before it joins. */
   rosterFor (socket) {
     const key = this.serverBySocket.get(socket.id)
@@ -430,6 +439,8 @@ class Sessions {
       soloAvailable: !this._roomHere(),
       // Placeholder text for the address fields, and what a blank one means.
       defaultServer: { host: this.config.mc.publicHost, port: this.config.mc.port },
+      // Whether the talk button has anything behind it.
+      speech: Boolean(this.config.speech.apiKey),
       commit: this.config.commit
     }
   }

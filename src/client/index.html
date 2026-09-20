@@ -312,6 +312,12 @@
     display: flex; gap: var(--u);
   }
   #touch-menu button { position: static; width: auto; height: calc(14 * var(--u)); padding: 0 calc(3 * var(--u)); }
+  /* Push to talk: shown once the server says it can transcribe, red while the
+     mic is open, dimmed while the words are on their way back. */
+  #touch [data-action=talk] { display: none; }
+  body.speech #touch [data-action=talk] { display: block; }
+  #touch [data-action=talk].on { background: #a03030; border-color: #ff8080 #501010 #501010 #ff8080; }
+  #touch [data-action=talk].busy { opacity: 0.4; }
   body.touch #status { top: calc(18 * var(--u)); }
 
   /* --- join screen ---------------------------------------------------------- */
@@ -694,6 +700,7 @@
   <div id="touch" class="overlay">
     <div id="touch-menu">
       <button type="button" data-action="chat">chat</button>
+      <button type="button" data-action="talk">talk</button>
       <button type="button" data-action="inventory">inventory</button>
       <button type="button" data-action="menu">menu</button>
     </div>

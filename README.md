@@ -22,6 +22,7 @@ npm run dev               # builds the client bundle, then starts the server
 | `PORT` | `3000` | web server |
 | `VIEW_DISTANCE` | `6` | chunk radius streamed per browser |
 | `REACH` | `5` | block reach for dig/place/interact |
+| `DEEPGRAM_API_KEY` | unset | enables the push-to-talk button on touch devices |
 
 ## Controls
 
@@ -36,6 +37,12 @@ npm run dev               # builds the client bundle, then starts the server
 | `T` / `Enter` | chat |
 | `Q` | drop held stack |
 | `G` | pathfind to the block in the crosshair |
+
+On a touch device the same actions are on-screen buttons. With
+`DEEPGRAM_API_KEY` set there is also **talk**: hold it, speak, let go, and the
+words are sent as your chat line. Solo players each have their own line to the
+transcriber; on a road trip every rider's lines queue and go out one per second
+through the shared bot.
 
 ### Motion controls
 

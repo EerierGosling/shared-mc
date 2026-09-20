@@ -9,6 +9,7 @@ const { Server } = require('socket.io')
 const config = require('./config')
 const Sessions = require('./sessions')
 const { MotionPairing } = require('./motion-pairing')
+const { Speech } = require('./speech')
 const Load = require('./load')
 const metrics = require('./metrics')
 const { precompress, precompressed } = require('./static')
@@ -16,8 +17,9 @@ const { precompress, precompressed } = require('./static')
 const app = express()
 const server = http.createServer(app)
 const io = new Server(server, {
-  // The browser sends nothing bigger than a chat line; the default 1 MB is
-  // plenty and a larger allowance is just memory a stranger can make us hold.
+  // The browser sends nothing bigger than a quarter second of Opus (speech.js
+  // drops anything over 64 KB); the default 1 MB is plenty and a larger
+  // allowance is just memory a stranger can make us hold.
   maxHttpBufferSize: 1e5,
   // Chunk JSON compresses ~10x and each viewer downloads the whole view
   // distance on connect. The threshold keeps the 20Hz position/state
@@ -144,6 +146,11 @@ if (assetVersion) require('./icons')(app, viewerPublic, assetVersion)
 const load = new Load(config.load)
 const sessions = new Sessions(config, io, load)
 const motionPairing = new MotionPairing(id => sessions.modeBySocket.has(id))
+const speech = new Speech({
+  apiKey: config.speech.apiKey,
+  isPlayer: id => sessions.modeBySocket.has(id),
+  onTranscript: (socket, text) => sessions.say(socket, text)
+})
 metrics.install(app, sessions, io, load)
 
 // Rosters are per server, so only the browsers on that server hear about a
@@ -157,6 +164,7 @@ sessions.onChange = key => broadcastRoster(key)
 
 io.on('connection', socket => {
   motionPairing.register(socket)
+  speech.register(socket)
   // No bot yet: the visitor picks a mode first, and only a vetted join creates
   // a login on the Minecraft server.
   socket.join(Sessions.LOBBY)

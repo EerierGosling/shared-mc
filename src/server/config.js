@@ -80,5 +80,9 @@ module.exports = {
   // yaw/pitch once per 50ms physics tick regardless — it only bounds per-client
   // work, so it sits below the tick so every tick snapshots a fresh sample.
   lookIntervalMs: int(process.env.LOOK_INTERVAL_MS, 15),
-  chatIntervalMs: int(process.env.CHAT_INTERVAL_MS, 1000)
+  chatIntervalMs: int(process.env.CHAT_INTERVAL_MS, 1000),
+  // Push-to-talk on touch devices. Without a key the button is not shown.
+  speech: {
+    apiKey: process.env.DEEPGRAM_API_KEY || null
+  }
 }
