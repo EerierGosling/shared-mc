@@ -1,9 +1,13 @@
 # shared-mc
 Play Minecraft in the browser! Works with any offline mode servers, but also has an instance running at `mc.manitej.com` that you can join from a normal client.
 
+<img width="1400" height="756" alt="image" src="https://github.com/user-attachments/assets/6f5ab857-1539-46b4-b6fb-35ae6a6f70b6" />
+
+
 Optional: 
 - '~~collaborative~~ chaos mode; control the same player with as a bajillion other people at the same time
 - grass touching mode; punch trees irl with motion-tracking and phone pairing
+
 
 ## Running it
 
