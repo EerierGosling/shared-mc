@@ -52,7 +52,9 @@ class BotHolder extends EventEmitter {
     const { host, port, username, version, auth } = this.mcConfig
     this.emit('log', `connecting to ${host}:${port} as ${username} (${version}, ${auth})`)
 
-    const bot = mineflayer.createBot({ host, port, username, version, auth })
+    // respawn: false so death reaches the browser as a screen with a button;
+    // respawn.js still respawns unattended bots so nothing stays dead.
+    const bot = mineflayer.createBot({ host, port, username, version, auth, respawn: false })
     this.bot = bot
     bot.loadPlugin(pathfinder)
 

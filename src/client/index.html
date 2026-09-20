@@ -179,29 +179,43 @@
   }
 
   /* --- chat ---------------------------------------------------------------- */
+  /* Vanilla: 320px-wide lines whose bottom edge sits 40px up, on a half-black
+     box, each line hidden 10s after it arrived unless the chat is open. */
   #chat {
-    bottom: calc(26 * var(--u)); left: calc(2 * var(--u));
-    width: min(46vw, 480px);
-    display: flex; flex-direction: column;
+    bottom: calc(40 * var(--u)); left: calc(2 * var(--u));
+    width: min(calc(320 * var(--u)), calc(100vw - 4 * var(--u)));
   }
   #chat-log {
-    max-height: 30vh; overflow: hidden;
+    max-height: calc(10 * 9 * var(--u)); overflow: hidden;
     display: flex; flex-direction: column; justify-content: flex-end;
   }
+  #chat.open #chat-log {
+    max-height: calc(20 * 9 * var(--u)); overflow-y: auto;
+    pointer-events: auto; scrollbar-width: none;
+  }
   #chat-log div {
+    flex: none;
     background: rgba(0, 0, 0, 0.5);
-    padding: 0 var(--u);
+    padding: 0 calc(2 * var(--u)) 0 var(--u);
+    min-height: calc(9 * var(--u)); line-height: calc(9 * var(--u));
     word-break: break-word;
     text-shadow: var(--u) var(--u) 0 var(--shadow);
+    transition: opacity 1s;
   }
-  #chat-log div.system { color: var(--mc-yellow); }
+  /* Faded lines keep their box (display:none would reflow the column) until
+     they scroll off the top; opening the chat brings them all back. */
+  #chat-log div.faded { opacity: 0; transition: opacity 1s; }
+  #chat.open #chat-log div.faded { opacity: 1; transition: none; }
+  #chat-log div.notice { color: var(--mc-yellow); }
+  #chat-log .web-tag { color: var(--mc-gray); }
+  /* The input bar runs the full width of the window 2px off the bottom. */
   #chat-input {
-    display: none; pointer-events: auto; width: 100%;
-    margin-top: var(--u);
-    padding: calc(1.5 * var(--u)) calc(2 * var(--u));
+    display: none; position: fixed; pointer-events: auto;
+    left: calc(2 * var(--u)); right: calc(2 * var(--u)); bottom: calc(2 * var(--u));
+    height: calc(12 * var(--u)); padding: 0 calc(2 * var(--u));
     color: var(--mc-white);
     background: rgba(0, 0, 0, 0.5);
-    border: var(--u) solid #a0a0a0;
+    border: none; border-radius: 0;
     font: inherit; outline: none;
     text-shadow: var(--u) var(--u) 0 var(--shadow);
   }
@@ -304,6 +318,46 @@
   #join-button:disabled { color: #a0a0a0; cursor: default; }
   #join-error { margin-top: calc(3 * var(--u)); font-size: calc(var(--px) * 7px); color: #555; }
   #join-error.bad { color: #a83232; }
+
+  /* --- death screen -------------------------------------------------------- */
+  /* Vanilla fills the screen with a 0x60500000 -> 0xA0803030 gradient, draws
+     the title at 2x, the cause and score under it, and a 200x20 button. */
+  #death {
+    inset: 0; display: none; pointer-events: auto;
+    background: linear-gradient(rgba(80, 0, 0, 0.38), rgba(128, 48, 48, 0.63));
+    flex-direction: column; align-items: center; text-align: center;
+  }
+  #death.open { display: flex; }
+  body.dead #crosshair { display: none; }
+  /* The tint covers the world, not the map: keep it readable while dead. */
+  body.dead #minimap { z-index: 1; }
+  #death-title {
+    margin: calc(60 * var(--u)) 0 0;
+    font-size: calc(var(--px) * 16px); font-weight: normal; line-height: 1;
+    text-shadow: calc(2 * var(--u)) calc(2 * var(--u)) 0 var(--shadow);
+  }
+  #death-cause { margin-top: calc(17 * var(--u)); min-height: calc(9 * var(--u)); }
+  #death-score { margin-top: calc(6 * var(--u)); }
+  #death-score b { color: var(--mc-yellow); font-weight: normal; }
+  #death-countdown { margin-top: calc(6 * var(--u)); color: var(--mc-gray); }
+  /* The vanilla widget: 200x20 texture, highlighted variant on hover. */
+  .mc-button {
+    width: calc(200 * var(--u)); height: calc(20 * var(--u));
+    margin-top: calc(24 * var(--u));
+    padding: 0; border: 0; cursor: pointer;
+    background: url('/assets/gui/sprites/widget/button.png') 0 0 / 100% 100%;
+    image-rendering: pixelated;
+    color: var(--mc-white); font: inherit;
+    text-shadow: var(--u) var(--u) 0 var(--shadow);
+  }
+  .mc-button:hover, .mc-button:focus-visible {
+    background-image: url('/assets/gui/sprites/widget/button_highlighted.png');
+    color: var(--mc-yellow); outline: none;
+  }
+  .mc-button:disabled {
+    background-image: url('/assets/gui/sprites/widget/button_disabled.png');
+    color: var(--mc-gray); cursor: default;
+  }
 
   /* --- inventory ----------------------------------------------------------- */
   #inventory {
@@ -426,7 +480,15 @@
 
   <div id="chat" class="overlay">
     <div id="chat-log"></div>
-    <input id="chat-input" maxlength="256" placeholder="say something&hellip;" autocomplete="off">
+  </div>
+  <input id="chat-input" maxlength="256" placeholder="say something&hellip; (/nick name)" autocomplete="off">
+
+  <div id="death" class="overlay">
+    <h1 id="death-title" class="shadowed">You died!</h1>
+    <div id="death-cause" class="shadowed"></div>
+    <div id="death-score" class="shadowed"></div>
+    <button id="respawn" class="mc-button">Respawn</button>
+    <div id="death-countdown" class="shadowed"></div>
   </div>
 
   <div id="hint" class="overlay tooltip shadowed">

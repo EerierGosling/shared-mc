@@ -70,7 +70,7 @@ function setupInput ({ socket, viewer, camera, hud, inventoryUI, canvas, hand, j
   // --- pointer lock ---------------------------------------------------------
 
   canvas.addEventListener('mousedown', event => {
-    if (join.isOpen || inventoryUI.isOpen || hud.chatOpen) return
+    if (join.isOpen || inventoryUI.isOpen || hud.chatOpen || hud.dead) return
     if (!locked) {
       canvas.requestPointerLock()
       return
@@ -113,7 +113,7 @@ function setupInput ({ socket, viewer, camera, hud, inventoryUI, canvas, hand, j
   window.addEventListener('keydown', event => {
     if (join.isOpen || hud.chatOpen) return
 
-    if (event.code === 'KeyE') {
+    if (event.code === 'KeyE' && !hud.dead) {
       event.preventDefault()
       if (locked) document.exitPointerLock()
       inventoryUI.toggle()
@@ -131,6 +131,8 @@ function setupInput ({ socket, viewer, camera, hud, inventoryUI, canvas, hand, j
       hud.openChat()
       return
     }
+    // Dead players can still chat, and nothing else.
+    if (hud.dead) return
 
     const digit = event.code.match(/^Digit([1-9])$/)
     if (digit) {
@@ -170,7 +172,10 @@ function setupInput ({ socket, viewer, camera, hud, inventoryUI, canvas, hand, j
     event.stopPropagation()
     if (event.key === 'Enter') {
       const text = hud.chatInput.value.trim()
-      if (text) socket.emit('chat', { text })
+      // /nick is ours, not Minecraft's: it names this browser in the shared log.
+      const nick = text.match(/^\/nick\s+(\S+)/)
+      if (nick) socket.emit('chat:name', { name: nick[1] })
+      else if (text) socket.emit('chat', { text })
       hud.closeChat()
     } else if (event.key === 'Escape') {
       hud.closeChat()
