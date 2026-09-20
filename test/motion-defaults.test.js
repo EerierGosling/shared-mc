@@ -30,6 +30,15 @@ test('saved old defaults upgrade once while custom values survive', t => {
   assert.equal(custom.phoneThreshold, 1.5)
 })
 
+test('camera choice persists as a facing mode or a device id', () => {
+  assert.equal(normalize({}).camera, 'user')
+  assert.equal(normalize({ camera: 'environment' }).camera, 'environment')
+  assert.equal(normalize({ camera: 'a1b2c3' }).camera, 'a1b2c3')
+  assert.equal(normalize({ camera: '' }).camera, 'user')
+  assert.equal(normalize({ camera: 42 }).camera, 'user')
+  assert.equal(normalize({ camera: 'x'.repeat(129) }).camera, 'user')
+})
+
 test('phone threshold slider and saved settings stay within 0.1 to 2 m/s²', () => {
   assert.equal(FIELDS.phoneThreshold[1], 0.1)
   assert.equal(FIELDS.phoneThreshold[2], 2)
