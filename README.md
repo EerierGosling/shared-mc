@@ -46,7 +46,7 @@ control.
 - Head movement steers; arm swings mine; walking in place moves forward with autojump.
 - Physical jumps jump; optional facial actions map smiles to use/place and an open mouth to jump.
 - Pair a phone by scanning the generated QR code (or entering a single-use code).
-  Use desktop camera tracking plus phone accelerometer steps, or a mounted phone camera.
+  Use desktop camera tracking plus phone accelerometer mining, or a mounted phone camera.
 - Saved sensitivity sliders, presets, live measurements, and practice mode help tune detection.
 - Use a phone-accessible HTTPS address. `localhost` on a phone does not reach your desktop.
 

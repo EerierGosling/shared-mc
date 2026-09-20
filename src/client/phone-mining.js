@@ -1,15 +1,16 @@
 'use strict'
-class PhoneSteps {
+const { DEFAULTS } = require('./motion-settings')
+class PhoneMining {
   constructor () { this.reset() }
   reset () {
     this.lastLow = -Infinity
     this.lastPeak = -Infinity
-    this.walkUntil = 0
+    this.digUntil = 0
     this.lastSample = -Infinity
     this.gravity = null
     this.strength = 0
   }
-  update (event, now, threshold = 3, hold = 650) {
+  update (event, now, threshold = DEFAULTS.phoneThreshold, hold = DEFAULTS.digHold) {
     let a = event.acceleration
     if (!a || ![a.x, a.y, a.z].every(Number.isFinite)) {
       a = event.accelerationIncludingGravity
@@ -26,12 +27,12 @@ class PhoneSteps {
     this.strength = Math.hypot(a.x, a.y, a.z)
     if (this.strength < threshold * 0.5) this.lastLow = now
     if (this.strength > threshold && now - this.lastLow < 250 && now - this.lastPeak > 250) {
-      if (now - this.lastPeak < 1200) this.walkUntil = now + hold
+      if (now - this.lastPeak < 1200) this.digUntil = now + hold
       this.lastPeak = now
       this.lastLow = -Infinity
     }
     return this.active(now)
   }
-  active (now) { return now < this.walkUntil && now - this.lastSample < 300 }
+  active (now) { return now < this.digUntil && now - this.lastSample < 300 }
 }
-module.exports = PhoneSteps
+module.exports = PhoneMining

@@ -3,12 +3,12 @@ const FIELDS = {
   lookSpeed: ['Look speed', 0.2, 3, 0.1, 1],
   deadzone: ['Head dead zone', 0.02, 0.3, 0.01, 0.08],
   smoothing: ['Head smoothing', 0, 0.9, 0.05, 0.45],
-  stepThreshold: ['Knee lift threshold', 0.04, 0.4, 0.01, 0.13],
-  swingThreshold: ['Arm speed threshold', 0.5, 6, 0.1, 2.5],
+  stepThreshold: ['Knee lift threshold', 0.04, 0.4, 0.01, 0.08],
+  swingThreshold: ['Arm speed threshold', 0.5, 6, 0.1, 3.5],
   jumpThreshold: ['Jump height threshold', 0.08, 0.4, 0.01, 0.18],
   walkHold: ['Walking stop delay (ms)', 250, 1000, 50, 650],
   digHold: ['Mining hold (ms)', 250, 1500, 50, 800],
-  phoneThreshold: ['Phone step threshold (m/s²)', 1, 8, 0.1, 3],
+  phoneThreshold: ['Phone mining threshold (m/s²)', 1, 8, 0.1, 2],
   faceThreshold: ['Smile / mouth threshold', 0.3, 0.95, 0.05, 0.65]
 }
 const DEFAULTS = Object.fromEntries(Object.entries(FIELDS).map(([key, field]) => [key, field[4]]))
@@ -23,7 +23,18 @@ function normalize (data = {}) {
   return result
 }
 function load () {
-  try { return normalize(JSON.parse(localStorage.getItem('motion-settings-v1') || '{}')) } catch { return { ...DEFAULTS } }
+  try {
+    const data = JSON.parse(localStorage.getItem('motion-settings-v1') || '{}')
+    // Upgrade unchanged defaults once; preserve individually tuned thresholds.
+    if (data && data.defaultsVersion !== 2) {
+      for (const [key, previous] of Object.entries({ stepThreshold: 0.13, swingThreshold: 2.5, phoneThreshold: 3 })) {
+        if (data[key] === previous) data[key] = DEFAULTS[key]
+      }
+    }
+    const settings = normalize(data)
+    save(settings)
+    return settings
+  } catch { return { ...DEFAULTS } }
 }
-function save (settings) { try { localStorage.setItem('motion-settings-v1', JSON.stringify(normalize(settings))) } catch {} }
+function save (settings) { try { localStorage.setItem('motion-settings-v1', JSON.stringify({ ...normalize(settings), defaultsVersion: 2 })) } catch {} }
 module.exports = { FIELDS, DEFAULTS, normalize, load, save }

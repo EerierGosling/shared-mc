@@ -14,14 +14,14 @@
     <p>On the game screen, open Motion Controls and Pair a Phone. Scan its QR code or enter the pairing code below.</p>
     <form id="pair-form">
       <label class="section-label" for="pair-code">Pairing code</label>
-      <input id="pair-code" class="mc-text" type="text" maxlength="20" autocomplete="off" autocapitalize="characters" spellcheck="false" required pattern="[A-Fa-f0-9\s-]{12,20}" placeholder="12-character code">
+      <input id="pair-code" class="mc-text" type="text" maxlength="20" autocomplete="off" autocapitalize="characters" spellcheck="false" required pattern="[A-Za-z0-9\s\-]{6,20}" placeholder="6-character code">
       <button id="pair-connect" class="mc-button" type="submit">Connect to Game</button>
     </form>
     <p id="pair-status" role="status">Connecting to the site…</p>
     <button id="pair-disconnect" class="mc-button" type="button" hidden>Disconnect from Game</button>
     <button id="show-controls" class="mc-button" type="button" hidden>Show Motion Controls</button>
     <div id="motion-mount"></div>
-    <small>Recommended setup: use the computer's camera for head and arm tracking, then enable phone steps here and carry the phone. Alternatively, mount this phone facing you and use its camera.</small>
+    <small>Recommended setup: use the computer's camera for head and arm tracking, then enable phone mining here and swing the phone deliberately to dig. Alternatively, mount this phone facing you and use its camera.</small>
     <small>Keep this page visible. Leaving it or locking the phone releases input. Camera and motion access require HTTPS.</small>
     <a class="mc-button" href="/">Back to Game</a>
   </main>

@@ -22,7 +22,7 @@ async function main () {
   const bundle = prefix => fs.readdirSync(path.join(root, 'dist')).find(name => new RegExp(`^${prefix}\\.[a-f0-9]+\\.js$`).test(name)) || `${prefix}.js`
   app.get('/', (req, res) => res.type('html').send(fs.readFileSync(path.join(root, 'src/client/index.html'), 'utf8')
     .replace('/dist/bundle.js', `/dist/${bundle('bundle')}`)))
-  app.get('/controller', (req, res) => res.type('html').send(fs.readFileSync(path.join(root, 'src/client/controller.html'), 'utf8')
+  app.get(['/controller', '/p'], (req, res) => res.type('html').send(fs.readFileSync(path.join(root, 'src/client/controller.html'), 'utf8')
     .replace('/dist/controller.js', `/dist/${bundle('controller')}`)))
   for (const sheet of ['ui.css', 'motion.css']) app.get(`/${sheet}`, (req, res) => res.sendFile(path.join(root, 'src/client', sheet)))
   app.use('/dist', express.static(path.join(root, 'dist')))
@@ -65,13 +65,14 @@ async function main () {
     await host.evaluate(() => document.getElementById('pause-motion').click())
     await host.locator('#camera-controls').waitFor({ state: 'visible' })
     assert.match(await host.locator('[data-role=mode]').textContent(), /Practice mode/)
+    // Opening the pairing section generates a code by itself.
     await host.locator('[data-role=pairing] > summary').click()
-    await host.locator('[data-action=pair]').click()
     await host.locator('[data-role=pair-qr]').waitFor({ state: 'visible' })
     const code = await host.locator('[data-role=pair-code]').textContent()
-    assert.match(code, /^[A-F0-9]{12}$/)
+    assert.match(code, /^[A-HJ-NP-Z2-9]{6}$/)
     const link = await host.locator('[data-role=pair-link]').getAttribute('href')
     assert.equal(new URL(link).hash, `#${code}`)
+    assert.equal(new URL(link).pathname, '/p')
     assert.ok(await host.locator('[data-role=pair-qr]').evaluate(canvas => canvas.width >= 240 && canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data.some((value, i) => i % 4 !== 3 && value === 0)))
     await host.screenshot({ path: '/private/tmp/shared-mc-pairing.png' })
 
@@ -97,10 +98,11 @@ async function main () {
     await phone.waitForTimeout(80)
     await sendAcceleration(4)
     await phone.waitForTimeout(200)
-    assert.ok(packets.some(state => state.forward && state.jump), 'Phone steps move the player with autojump')
+    assert.ok(packets.some(state => state.digging), 'Phone swings start mining')
+    assert.ok(!packets.some(state => state.forward || state.jump), 'Phone acceleration never walks or autojumps')
     await phone.locator('[data-action=stop]').click()
     await phone.waitForTimeout(200)
-    assert.equal(packets.filter(p => 'forward' in p).at(-1).forward, false)
+    assert.equal(packets.filter(p => 'digging' in p).at(-1).digging, false)
     await phone.locator('[data-role=tuning] > summary').click()
     await phone.locator('[data-setting=stepThreshold]').fill('0.22')
     assert.match(await phone.locator('[data-role=mode]').textContent(), /Practice/)
@@ -118,14 +120,19 @@ async function main () {
           const p = Array.from({length:33}, () => ({x:.5,y:.5,visibility:1}));
           p[0].y=.2; p[11].x=.6;p[12].x=.4;p[11].y=p[12].y=.4;
           p[23].y=p[24].y=.65;p[25].y=p[26].y=.8;p[27].y=p[28].y=.95;
+          if (window.testStartGesture) p[15].y=p[16].y=.05;
           return {landmarks: [p]};
         } }) };
         export const FaceLandmarker = { createFromOptions: async () => ({close(){},detectForVideo(){return {faceBlendshapes:[]}}}) };`
     }))
     await host.locator('[data-action=start]').click()
     await host.waitForFunction(() => document.querySelector('[data-role=status]').textContent.startsWith('Tracking'), { timeout: 10000 })
-    await host.locator('[data-action=arm]').click()
+    await host.evaluate(() => { window.testStartGesture = true })
+    await host.waitForFunction(() => document.querySelector('[data-role=mode]').textContent.includes('Player control enabled'))
+    await host.evaluate(() => { window.testStartGesture = false })
     assert.match(await host.locator('[data-role=mode]').textContent(), /Player control enabled/)
+    // Enabling control closes the menu; reopen the page to keep driving it.
+    await host.evaluate(() => document.getElementById('pause-motion').click())
     await host.locator('[data-action=calibrate]').click()
     assert.match(await host.locator('[data-role=mode]').textContent(), /Practice mode/)
     await host.locator('[data-action=stop]').click()
@@ -153,7 +160,7 @@ async function main () {
       console.log('Live MediaPipe pose and face models initialized successfully with a synthetic camera.')
     }
     assert.deepEqual(errors, [])
-    console.log('Browser checks passed: menu-only panel, QR generation, pairing, phone steps/autojump, stop/unpair, saved settings, calibration and camera cleanup.')
+    console.log('Browser checks passed: menu-only panel, QR generation, pairing, phone mining without walking, stop/unpair, saved settings, start gesture, calibration and camera cleanup.')
   } finally {
     await browser?.close()
     pairing.destroy()

@@ -11,7 +11,7 @@ let paired = false
 let wakeLock = null
 let wakeGeneration = 0
 const hashCode = window.location.hash.slice(1)
-let autoPair = /^[a-f0-9]{12}$/i.test(hashCode)
+let autoPair = /^(?:[a-hj-np-z2-9]{6}|[a-f0-9]{12})$/i.test(hashCode)
 if (autoPair) code.value = hashCode.toUpperCase()
 // Keep the single-use token out of browser history after the page has read it.
 history.replaceState(null, '', window.location.pathname)
@@ -59,7 +59,7 @@ function pair () {
     }
     paired = true
     code.value = ''
-    status.textContent = 'Paired. Tap Phone Steps to allow motion access and start tracking. Enable Player Control on the game screen when ready.'
+    status.textContent = 'Paired. Tap Phone Mining to allow motion access and start tracking. Enable Player Control on the game screen when ready.'
     disconnect.hidden = false
     show.hidden = false
     controls.show()

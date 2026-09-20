@@ -64,7 +64,7 @@ expressions on some cameras.
    addresses generally cannot access camera/motion sensors.
 3. Press **Generate Code**. Scan the QR code using the phone camera, or
    open the displayed link on the phone. The code is already filled in when
-   opening the QR/link. Alternatively, open `/controller` and enter the code.
+   opening the QR/link. Alternatively, open `/p` and enter the code.
 4. Press **Connect to game** on the phone. Codes expire after five minutes and
    work once. Once connected, the QR/code is removed from the game screen.
 5. Choose inputs and practice on the phone, then enable player control on
@@ -75,21 +75,23 @@ expressions on some cameras.
    a socket disconnect requires a new code.
 
 Recommended hybrid setup: mount the computer camera for head/arm/body input;
-use the phone for accelerometer steps while carrying it securely. On the phone,
-turn on **Phone Steps** (no camera required), allow motion permission if
-prompted, practice, and enable control. The live measurements show acceleration
-and warn if no samples arrive. Step recognition requires repeated peaks, not a
-single shake. There is a gravity-filter fallback for devices that only report
-acceleration including gravity.
+use the phone for mining with repeated deliberate swings. Camera knee lifts
+still control walking. On the phone, turn on **Phone Mining** (no camera
+required) and allow motion permission if prompted. This enables phone input;
+enable player control on the game screen when ready. The live measurements
+show acceleration and warn if no samples arrive. Mining recognition requires
+repeated peaks, not a single shake. There is a gravity-filter fallback for
+devices that only report acceleration including gravity.
 
 Alternatively, mount the phone to use its camera as the sole tracker and leave
-accelerometer steps off. A phone moving with your body is a poor stationary
+accelerometer mining off. A phone moving with your body is a poor stationary
 camera: do not expect simultaneous handheld full-body camera tracking and
-accelerometer walking to be reliable.
+accelerometer mining to be reliable.
 
-The desktop merges camera and phone actions. Either source can hold forward,
-jump, or mining; releasing one source does not cancel the other. Head look from
-both sources adds together, so normally use just one camera for steering.
+The desktop merges camera and phone actions. Phone acceleration only mines;
+camera gestures can walk, jump, and mine. When both cameras track gestures,
+releasing one source does not cancel the other. Head look from both sources
+adds together, so normally use just one camera for steering.
 The receiving game browser's look-speed slider controls final turn speed.
 
 ## Tune sensitivity
@@ -116,8 +118,8 @@ settings to that preset. **Reset sensitivity** restores the defaults.
 | Mining harder blocks keeps restarting | Keep swinging or increase **Mining hold** |
 | Physical jump is missed | Show feet during calibration, recalibrate, then lower jump threshold |
 | A small bounce triggers jump | Increase **Jump height threshold** |
-| Phone steps are missed | Check live sensor readings, then lower **Phone step threshold** |
-| Phone handling triggers walking | Raise phone threshold and carry it in a steadier position |
+| Phone swings are missed | Check live sensor readings, then lower **Phone mining threshold** |
+| Phone handling triggers mining | Raise the phone mining threshold |
 | Expression triggers accidentally | Raise **Smile / mouth threshold**, or disable facial actions |
 | Lost tracking | Improve framing/light; sensitivity cannot recover invisible landmarks |
 
