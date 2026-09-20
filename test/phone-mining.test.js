@@ -75,3 +75,13 @@ test('repeated forward strokes keep mining continuously through brief pauses', (
     }
   }
 })
+
+test('gentle forward thrusts mine at the lower default threshold', () => {
+  for (const fallback of [false, true]) {
+    const h = harness(fallback)
+    h.repeat(6, -0.15)
+    assert.ok(h.repeat(4, 0.15).some(Boolean))
+    h.repeat(30)
+    assert.equal(h.sensor.active(h.time()), false)
+  }
+})

@@ -8,6 +8,8 @@ class PhoneMining {
     this.lastSample = -Infinity
     this.gravity = null
     this.gravitySince = null
+    this.rawAnchor = null
+    this.rawStableSince = null
     this.strength = 0
     this.quietSince = null
     this.ready = false
@@ -25,7 +27,16 @@ class PhoneMining {
       if (!this.gravity) { this.gravity = values.slice(); this.gravitySince = now }
       const blend = 1 - Math.exp(-dt / 500)
       this.gravity = this.gravity.map((g, i) => g + blend * (values[i] - g))
-      if (fallback) a = { x: raw.x - this.gravity[0], y: raw.y - this.gravity[1], z: raw.z - this.gravity[2] }
+      if (fallback) {
+        // At low thresholds, gravity-filter decay can look like motion long
+        // after a phone rests. Rebase after a stable raw-sensor window.
+        if (!this.rawAnchor || Math.hypot(...values.map((v, i) => v - this.rawAnchor[i])) > 0.025) {
+          this.rawAnchor = values.slice()
+          this.rawStableSince = now
+        }
+        if (now - this.rawStableSince >= 100) this.gravity = values.slice()
+        a = { x: raw.x - this.gravity[0], y: raw.y - this.gravity[1], z: raw.z - this.gravity[2] }
+      }
     }
     if (!valid(a)) { this.reset(); return false }
     this.lastSample = now
