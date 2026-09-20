@@ -1,5 +1,6 @@
 'use strict'
 const { describeItem } = require('./items')
+const ChatMessage = require('prismarine-chat')
 
 const UPDATE_THROTTLE_MS = 150
 
@@ -70,7 +71,7 @@ class InventoryBridge {
     return {
       id: window.id,
       type: window.type,
-      title: typeof window.title === 'string' ? window.title : String(window.title || ''),
+      title: this._windowTitle(window.title),
       slotCount: window.slots.length,
       // A chest window's own slots come before the player's inventory.
       inventoryStart: typeof window.inventoryStart === 'number' ? window.inventoryStart : null,
@@ -78,6 +79,20 @@ class InventoryBridge {
         const described = describeItem(item)
         return described ? { ...described, slot: index } : null
       })
+    }
+  }
+
+  // mineflayer hands window titles through as raw chat components (e.g.
+  // {"translate":"container.crafting"}), not plain strings - decode them the
+  // same way chat messages are, or `String(...)`ing the object gives the
+  // browser "[object Object]".
+  _windowTitle (title) {
+    if (typeof title === 'string') return title
+    if (!title) return ''
+    try {
+      return new (ChatMessage(this.bot.version))(title).toString()
+    } catch (err) {
+      return ''
     }
   }
 
