@@ -65,7 +65,7 @@ test('hand switches held items and recovers when assets arrive late', () => {
     icons.itemAssets = assets
     hand.render(renderer, camera)
     assert.equal(hand.item.children.length, 1)
-    assert.equal(hand.arm.visible, false)
+    assert.equal(hand.arm.visible, true)
     hand.setItem(null)
     assert.equal(hand.item.children.length, 0)
     assert.equal(hand.arm.visible, true)

@@ -9,6 +9,13 @@ const CONTROL_KEYS = ['forward', 'back', 'left', 'right', 'jump', 'sneak', 'spri
 
 const MAX_CHAT_LENGTH = 256
 
+// prismarine-physics's water branch never reads the sprint control — only the
+// on-ground/airborne branches add the sprint attribute modifier — so holding
+// sprint underwater does nothing on its own. Swim speed there converges to
+// liquidAcceleration / (1 - waterInertia); stacking this on top of the
+// engine's own 0.02 works out to roughly vanilla's ~1.5x dash-swim speed.
+const WATER_SPRINT_ACCEL = 0.01
+
 // A dig that cannot proceed says so at most this often, so a held mouse button
 // cannot flood the chat log.
 const DIG_NOTICE_MS = 4000
@@ -65,6 +72,7 @@ class Controller {
       this.effective[key] = false
       this.applied[key] = false
     }
+    this._swimTick = this._swimTick.bind(this)
   }
 
   setBot (bot) {
@@ -72,10 +80,12 @@ class Controller {
     this.diggers.clear()
     this.digHeld = false
     this.digging = false
+    this.bot.on('physicsTick', this._swimTick)
     this._applyEffective(true)
   }
 
   clearBot () {
+    if (this.bot) this.bot.removeListener('physicsTick', this._swimTick)
     this.bot = null
     this.diggers.clear()
     this.digHeld = false
@@ -87,6 +97,40 @@ class Controller {
     clearTimeout(this.sayTimer)
     this.sayTimer = null
     this.sayQueue = []
+  }
+
+  /**
+   * Dash-swim: hand-adds the sprint acceleration prismarine-physics's water
+   * branch has no code for, the same way creative.js's flight loop hand-writes
+   * velocity for a branch of its own. Runs after physics has simulated the
+   * tick, so this stacks with (rather than fights) the water inertia it just
+   * applied.
+   */
+  _swimTick () {
+    const bot = this.bot
+    if (!bot || !bot.entity || !bot.entity.isInWater) return
+    // Flight already owns velocity for the tick; fighting it here would just
+    // add jitter to a bot that isn't governed by prismarine-physics anyway.
+    if (this.creative && this.creative.flying) return
+    const c = this.effective
+    if (!c.sprint || c.sneak) return
+    let forward = 0
+    let strafe = 0
+    if (c.forward) forward += 1
+    if (c.back) forward -= 1
+    if (c.right) strafe += 1
+    if (c.left) strafe -= 1
+    let speed = Math.sqrt(strafe * strafe + forward * forward)
+    if (speed < 0.01) return
+    speed = WATER_SPRINT_ACCEL / Math.max(speed, 1)
+    strafe *= speed
+    forward *= speed
+    // Same yaw convention as prismarine-physics's own applyHeading.
+    const yaw = Math.PI - bot.entity.yaw
+    const sin = Math.sin(yaw)
+    const cos = Math.cos(yaw)
+    bot.entity.velocity.x -= strafe * cos + forward * sin
+    bot.entity.velocity.z += forward * cos - strafe * sin
   }
 
   register (socket) {

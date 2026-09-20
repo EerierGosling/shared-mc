@@ -91,13 +91,38 @@ function buildArmGeometry () {
 // through its own narrow, fixed-FOV projection, independent of the world
 // camera's FOV/aspect. We share one camera (viewer.camera, vertical FOV 75°)
 // for both, so a shoulder placed at vanilla's y=-0.6 at that distance falls
-// outside our frustum's bottom edge and the whole arm renders off-screen —
-// confirmed by an actual render, not guessed. SCALE shrinks the arm so it
-// reads at a similar apparent size without needing to sit so far down/out
-// that it clips.
-const SCALE = 0.6
-const REST_POSITION = [0.45, -0.32, -0.55]
-const REST_ROTATION = [0.25, Math.PI / 4, -0.1]
+// outside our frustum's bottom edge and the whole arm renders off-screen.
+// SCALE shrinks the arm (and, since it hangs off the same pivot, the held
+// item) around REST_POSITION so it reads at a similar apparent size without
+// needing to sit so far down/out that it clips.
+const SCALE = 0.8
+const REST_POSITION = [0.6``, -0.6, -0.55]
+// X here is the arm's pitch: how far it's raised off a straight hang, which
+// is what actually reads as "the arm" rather than a floating block — 35°
+// up, the vanilla-ish raised-fist angle.
+const REST_ROTATION = [.4*Math.PI - Math.PI / 5, -.3+2*Math.PI / 4, Math.PI / 2]
+// Roll around the arm's own shoulder-to-hand axis. This has to land on the
+// mesh's local Y before REST_ROTATION is applied — at that point the mesh's
+// local Y *is* the shoulder-to-hand line (addCube built it relative to
+// PIVOT), where REST_ROTATION's own Y term no longer is, since by then X has
+// already tilted the arm out of Y and Y rotates it in world-space instead.
+// Positive Y is counter-clockwise looking from the shoulder down at the
+// hand, so clockwise from that view is negative.
+const ARM_TWIST = -20 * Math.PI / 180
+
+// Where the arm's hand end sits in the pivot's local space: bottom-center of
+// the base arm cube (addCube already made that relative to PIVOT), rotated
+// by ARM_TWIST the same way the mesh geometry is, since the mesh itself has
+// no position offset of its own. A held block is anchored here so swapping
+// the arm out for the item doesn't jump the hand to a different spot.
+const HAND_X = (CUBES[0].origin[0] - PIVOT[0] + CUBES[0].size[0] / 2) / 16
+const HAND_Y = (CUBES[0].origin[1] - PIVOT[1]) / 16
+const HAND_Z = (CUBES[0].origin[2] - PIVOT[2] + CUBES[0].size[2] / 2) / 16
+const ARM_BOTTOM = [
+  HAND_X * Math.cos(ARM_TWIST) + HAND_Z * Math.sin(ARM_TWIST),
+  HAND_Y,
+  -HAND_X * Math.sin(ARM_TWIST) + HAND_Z * Math.cos(ARM_TWIST)
+]
 const SWING_ROTATION = [1.3, -0.1, -0.2]
 // 3x the original swing speed.
 const SWING_MS = 35
@@ -132,6 +157,7 @@ class Hand {
     })
 
     const mesh = new THREE.Mesh(buildArmGeometry(), material)
+    mesh.rotation.y = ARM_TWIST
 
     this.pivot = new THREE.Group()
     this.pivot.position.set(...REST_POSITION)
@@ -169,11 +195,17 @@ class Hand {
     if (this.itemName && !this.item.children.length) {
       const model = createItem(this.itemName)
       if (model) {
-        model.scale.setScalar(model.userData.block ? 0.48 : 0.75)
-        this.item.position.set(-0.12, 0.12, -0.16)
-        this.item.rotation.set(-0.25, -0.45, model.userData.block ? 0 : -0.25)
+        if (model.userData.block) {
+          // Half the previous 0.48, anchored where the arm's hand was.
+          model.scale.setScalar(0.24)
+          this.item.position.set(...ARM_BOTTOM)
+          this.item.rotation.set(-0.25, -0.45, 0)
+        } else {
+          model.scale.setScalar(0.75)
+          this.item.position.set(-0.12, 0.12, -0.16)
+          this.item.rotation.set(-0.25, -0.45, -0.25)
+        }
         this.item.add(model)
-        this.arm.visible = false
       }
     }
     this.root.matrix.copy(camera.matrixWorld)
@@ -186,7 +218,6 @@ class Hand {
     if (name === this.itemName) return
     this.itemName = name
     disposeItem(this.item)
-    this.arm.visible = true
   }
 
   // Nothing to hold before a bot is joined; the arm would float over the
