@@ -60,6 +60,7 @@ class Hud {
     this.respawnAt = 0
     this.ping = null
     this.lastState = null
+    this.creative = { available: false, flying: false }
     this.lastVitalsKey = null
     this.lastHotbarKey = null
     this.pingByName = new Map() // username -> its bars element
@@ -146,6 +147,18 @@ class Hud {
     this.renderStats()
   }
 
+  /**
+   * What the Minecraft server has granted, straight from creative.js. The
+   * body class is what reveals the creative lines in the controls hint, so
+   * nobody is told about flight on a server that will not allow it.
+   */
+  setCreative (state) {
+    this.creative = state || { available: false, flying: false }
+    document.body.classList.toggle('creative', Boolean(this.creative.available))
+    document.body.classList.toggle('can-fly', Boolean(this.creative.mayFly))
+    this.renderStats()
+  }
+
   setState (state) {
     const previous = this.lastState
     this.lastState = state
@@ -193,10 +206,16 @@ class Hud {
     const { x, y, z } = state.position
     const target = state.targetBlock ? state.targetBlock.name : '—'
     const ping = this.ping === null ? '—' : `${this.ping}ms`
+    // The game mode is worth a line of its own: creative is granted by the
+    // Minecraft server, so when the creative UI is missing this says why.
+    const mode = state.gameMode
+      ? `mode ${escapeHtml(state.gameMode)}${this.creative.flying ? ' · flying' : ''}\n`
+      : ''
     this.stats.innerHTML =
       `<b>${escapeHtml(state.username || 'bot')}</b>  ${ping}\n` +
       `xyz  ${x.toFixed(1)} ${y.toFixed(1)} ${z.toFixed(1)}\n` +
       `look ${escapeHtml(target)}\n` +
+      mode +
       `${state.playerCount} player(s) online`
   }
 

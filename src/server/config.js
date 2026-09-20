@@ -57,7 +57,10 @@ module.exports = {
     dig: int(process.env.LIMIT_DIG, 40),
     place: int(process.env.LIMIT_PLACE, 40),
     attack: int(process.env.LIMIT_ATTACK, 20),
-    drop: int(process.env.LIMIT_DROP, 5)
+    drop: int(process.env.LIMIT_DROP, 5),
+    // Creative gives are free items out of nothing, so they are budgeted like
+    // any other action a visitor can hold down.
+    give: int(process.env.LIMIT_GIVE, 30)
   },
   // How often a member's look is applied to the bot; extra samples inside the
   // window coalesce (latest wins) rather than drop. This does not shield the
