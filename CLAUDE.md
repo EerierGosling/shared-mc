@@ -107,6 +107,35 @@ road trip.
   interface resizes from that one variable — keep new HUD work in those units
   rather than hardcoding px. Sprites need `image-rendering: pixelated`, and the
   pixel font needs antialiasing off, or both go soft.
+- **Right click held is place-only.** The browser sends `action:use` once on
+  press and then `{ repeat: true }` every 200 ms while held; the server treats
+  repeats as "keep placing" and skips opening containers and using items, so a
+  held button cannot reopen a chest or eat twice. Placement goes through
+  `_placeBlockWithOptions` with the face point the ray hit (slabs, stairs and
+  trapdoors orient from it) and `forceLook: 'ignore'`, because `placeBlock()`
+  alone snaps the bot's head at the block and fights the mouse.
+- **A dig is aborted the moment the crosshair leaves its block.** mineflayer
+  would finish the one it started; `control.js` watches the target during
+  the dig and calls `stopDigging()` so a sweep across a wall does not break
+  blocks the player already moved off.
+- **The bot's own view distance follows `VIEW_DISTANCE`.** mineflayer's
+  default is 'far' and every bot decodes and holds every chunk it is sent,
+  which with several solo bots up was most of the process's memory spent on
+  terrain no browser is shown. `session.js` asks for the streamed radius
+  plus one.
+- **`compression()` only covers HTTP.** The socket has its own deflate
+  (`perMessageDeflate` in `index.js`); the middleware is for the block-state
+  JSON, the bundle and the 21 MB worker, which gzips to about 2 MB.
+- **Touch controls are gated on `(pointer: coarse)`**, plus `?touch` on the URL
+  to force them on a desktop for testing. They speak the same messages as the
+  keyboard; a finger dragging the canvas owns the camera the way pointer lock
+  does for a mouse (`ownsLook()` in `input.js`).
+- **three.js layers do not isolate lights.** A light is collected whenever
+  the *camera's* layers include it, then applied to every mesh drawn. The
+  hand viewmodel once sat on layer 1 with its own two lights and they lit the
+  whole world, blowing snow out to a flat sheet. Anything that needs its own
+  lighting gets its own scene and a second `renderer.render()` pass
+  (`hand.js`), which is also why `renderer.autoClear` is off in `index.js`.
 - The bot object is **replaced** on reconnect. Anything holding a reference gets
   it through `setBot()` / `clearBot()` from the `BotHolder` events. Don't cache
   `bot` at module scope.
@@ -146,7 +175,18 @@ than walking off into nothing.
 **Not verified: the HUD, visually.** It was built from the real texture
 dimensions and confirmed by asset resolution, but nobody has looked at it in a
 browser. Proportions and layering are arithmetic, not observation. Look at it
-before trusting it.
+before trusting it. That now includes the XP bar, the damage blink and
+low-health jitter on the hearts, the held-item name popup, the ping bars
+in the player list and the touch buttons.
+
+**prismarine-web-client has been mined.** It runs mineflayer *inside* the
+browser over a TCP-over-websocket proxy, so most of it (lit HUD components
+bound to the bot object, chat parsed off raw packets, the cursor calling
+`bot.dig` directly, VR, the service worker) does not transplant. What did:
+gzip and cache headers, vanilla placement and hold-to-place, dig retargeting,
+wheel hotbar, chat history and `/`, the F3 toggle, ping bars, XP bar, heart
+animations, sneak camera dip, touch controls. Its panorama title background
+was tried and dropped: minecraft-assets ships those PNGs as 1x1 placeholders.
 
 **Open, and the best next lead:** `prismarine-viewer/public/worker.js` is 63 MB
 and `new Viewer(renderer)` spawns four workers, each loading it — roughly 250 MB

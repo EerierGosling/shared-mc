@@ -44,15 +44,11 @@ const minimap = new Minimap(viewer.entities)
 const breaking = new BreakingAnimation(viewer.scene)
 const placePrediction = new PlacePrediction(viewer, socket)
 
-// First-person hand viewmodel, parented to the camera so it rides along with
-// look direction for free. Swung from input.js while a dig/attack is held.
-// renderer.render(scene, camera) only walks the scene graph — the camera
-// itself is never one of its own children by default — so anything parented
-// to the camera (like the hand) needs the camera added to the scene too, or
-// it sits in an orphan subtree and never draws.
-viewer.scene.add(viewer.camera)
+// First-person hand viewmodel: its own scene and lights, drawn over the world
+// as a second pass in the render loop. Swung from input.js while a dig/attack
+// is held.
 const hand = new Hand()
-hand.attachTo(viewer.camera)
+hand.setVisible(false)
 
 // Local camera angles. The server owns position; we own where we are looking,
 // so mouse movement shows up on screen before the network round trip lands.
@@ -63,6 +59,7 @@ const camera = { yaw: 0, pitch: 0 }
 const skins = new SkinPainter(viewer)
 const join = new JoinScreen(socket, identity => {
   hud.setStatus('connecting', `joining as ${identity.username}…`)
+  hand.setVisible(true)
 })
 
 const input = setupInput({ socket, viewer, camera, hud, inventoryUI, canvas, hand, join, placePrediction })
@@ -140,6 +137,7 @@ socket.on('version', version => {
   }
 })
 
+let lastPos = null
 socket.on('position', ({ pos, yaw, pitch }) => {
   // While we hold pointer lock our own angles win; otherwise ride along with
   // whoever is currently driving.
@@ -147,6 +145,7 @@ socket.on('position', ({ pos, yaw, pitch }) => {
     camera.yaw = yaw
     camera.pitch = pitch
   }
+  lastPos = pos
   viewer.setFirstPersonCamera(pos, camera.yaw, camera.pitch)
   minimap.setCenter(pos)
 })
@@ -158,6 +157,14 @@ socket.on('state', state => {
   hud.setState(state)
   placePrediction.setTarget(state.placeTarget)
   applySkyForTime(viewer, state.timeOfDay, sky)
+  // The camera dips while sneaking. Viewer only applies the flag on the next
+  // position packet, and a bot sneaking in place never sends one, so reapply
+  // the last position ourselves.
+  const sneaking = Boolean(state.sneaking)
+  if (viewer.isSneaking !== sneaking) {
+    viewer.isSneaking = sneaking
+    if (lastPos) viewer.setFirstPersonCamera(lastPos, camera.yaw, camera.pitch)
+  }
   if (state.targetBlock) {
     const { x, y, z } = state.targetBlock.position
     highlight.position.set(x + 0.5, y + 0.5, z + 0.5)
@@ -191,6 +198,9 @@ socket.on('latency:pong', sentAt => hud.setPing(Date.now() - sentAt))
 setInterval(() => socket.emit('latency:ping', Date.now()), 2000)
 
 // --- render loop ------------------------------------------------------------
+// Two passes share the frame (world, then the hand over it), so the clear is
+// ours to do rather than render()'s.
+renderer.autoClear = false
 let lastFrameTime = performance.now()
 function animate () {
   window.requestAnimationFrame(animate)
@@ -202,7 +212,9 @@ function animate () {
   viewer.entities.animate(dt)
   minimap.setYaw(camera.yaw)
   minimap.render(renderer, viewer.scene)
+  renderer.clear()
   renderer.render(viewer.scene, viewer.camera)
+  hand.render(renderer, viewer.camera)
 }
 animate()
 

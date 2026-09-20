@@ -26,9 +26,10 @@ const { attachWorldView } = require('./worldStream')
  * setBot/clearBot rather than anything caching it.
  */
 class Session {
-  constructor ({ mode, identity, config, emitter, io }) {
+  constructor ({ mode, identity, config, emitter, io, onPlayers }) {
     this.mode = mode // 'solo' | 'roadtrip'
     this.identity = identity // { username, skin }
+    this.onPlayers = onPlayers || (() => {}) // the server's tab list changed
     this.config = config
     this.emitter = emitter
     this.io = io
@@ -48,7 +49,13 @@ class Session {
     this.lights = new LightTracker(emitter)
     this.inventory = new InventoryBridge(emitter)
 
-    this.holder = new BotHolder({ ...config.mc, username: identity.username })
+    this.holder = new BotHolder({
+      ...config.mc,
+      username: identity.username,
+      // One chunk past what WorldView streams: its ring is exclusive, and the
+      // pathfinder and the cursor raycast both like a little margin.
+      viewDistance: Math.max(2, config.viewDistance + 1)
+    })
     this.holder.on('log', message => console.log(`[${identity.username}] ${message}`))
     this.holder.on('ready', bot => this._onReady(bot))
     this.holder.on('down', reason => this._onDown(reason))
@@ -121,6 +128,10 @@ class Session {
     this.statePusher.setBot(bot)
     this.lights.setBot(bot)
     this.inventory.setBot(bot)
+    // The roster lists everyone on the server, not just our bots, and this
+    // bot's tab list is where that comes from. Listeners die with the bot.
+    bot.on('playerJoined', () => this.onPlayers())
+    bot.on('playerLeft', () => this.onPlayers())
     this._detachAll()
     for (const socket of this.socketsById.values()) this._attachMember(socket)
     this._setStatus('connected', `playing as ${bot.username}`)
@@ -135,6 +146,7 @@ class Session {
     this.respawner.clearBot()
     this._detachAll()
     this._setStatus('reconnecting', reason)
+    this.onPlayers()
   }
 
   /** Must leave no bot behind: this now runs whenever the last member goes. */

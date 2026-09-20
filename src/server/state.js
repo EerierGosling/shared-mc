@@ -97,6 +97,10 @@ class StatePusher {
       food: bot.food,
       oxygen: bot.oxygenLevel,
       xpLevel: bot.experience ? bot.experience.level : 0,
+      xpProgress: bot.experience ? round(bot.experience.progress || 0, 3) : 0,
+      // The camera dips while sneaking (Viewer.isSneaking); merged across the
+      // session's members, so it has to come from here rather than the browser.
+      sneaking: Boolean(bot.controlState && bot.controlState.sneak),
       position: {
         x: round(bot.entity.position.x),
         y: round(bot.entity.position.y),
@@ -115,9 +119,22 @@ class StatePusher {
       isRaining: Boolean(bot.isRaining),
       gameMode: bot.game ? bot.game.gameMode : null,
       dimension: bot.game ? bot.game.dimension : null,
-      playerCount: Object.keys(bot.players || {}).length
+      playerCount: Object.keys(bot.players || {}).length,
+      players: playerList(bot)
     }
   }
+}
+
+// The Tab list: everyone the server reports, not just this site's visitors.
+// Capped like vanilla's own overlay, and sorted so a ping tick does not
+// reorder it.
+const MAX_LISTED_PLAYERS = 80
+function playerList (bot) {
+  return Object.values(bot.players || {})
+    .filter(p => p && p.username)
+    .sort((a, b) => a.username.localeCompare(b.username))
+    .slice(0, MAX_LISTED_PLAYERS)
+    .map(p => ({ username: p.username, ping: Number.isFinite(p.ping) ? p.ping : null }))
 }
 
 module.exports = StatePusher

@@ -15,8 +15,23 @@ const MC_COLOURS = {
 // both ten icons covering twenty points, so each icon is worth two.
 const HUD = '/assets/gui/sprites/hud/'
 const ICON_COUNT = 10
-const HEART = { empty: HUD + 'heart/container.png', half: HUD + 'heart/half.png', full: HUD + 'heart/full.png' }
+const HEART = {
+  empty: HUD + 'heart/container.png',
+  half: HUD + 'heart/half.png',
+  full: HUD + 'heart/full.png',
+  // The white variants vanilla flashes for a second after taking damage.
+  emptyBlink: HUD + 'heart/container_blinking.png',
+  halfBlink: HUD + 'heart/half_blinking.png',
+  fullBlink: HUD + 'heart/full_blinking.png'
+}
 const FOOD = { empty: HUD + 'food_empty.png', half: HUD + 'food_half.png', full: HUD + 'food_full.png' }
+// Vanilla: a second of blinking after a hit, in three-tick on/off phases.
+const BLINK_MS = 1000
+const BLINK_PHASE_MS = 150
+// Hearts start jittering at two hearts left.
+const LOW_HEALTH = 4
+// The player list's connection bars, thresholds straight from vanilla.
+const PING_BARS = [[150, 5], [300, 4], [600, 3], [1000, 2], [Infinity, 1]]
 
 const icons = require('./icons')
 
@@ -30,6 +45,9 @@ class Hud {
     this.health = el('health')
     this.food = el('food')
     this.hotbar = el('hotbar')
+    this.heldName = el('held-name')
+    this.xpFill = el('xp-fill')
+    this.xpLevel = el('xp-level')
     this.chat = el('chat')
     this.chatLog = el('chat-log')
     this.chatInput = el('chat-input')
@@ -44,6 +62,13 @@ class Hud {
     this.lastState = null
     this.lastVitalsKey = null
     this.lastHotbarKey = null
+    this.pingByName = new Map() // username -> its bars element
+    this.lastPingsKey = null
+    this.lastHeldKey = null
+    // Health before the hit that started the current blink, so the hearts
+    // that were just lost can flash white the way vanilla's do.
+    this.blink = null // { until, from }
+    this.blinkTimer = null
 
     setInterval(() => this._expireChat(), 500)
     setInterval(() => this._tickDeath(), 250)
@@ -65,19 +90,55 @@ class Hud {
     this.status.textContent = message
   }
 
-  /** Who else is here. Vanilla shows this on Tab; we keep it always visible. */
+  /**
+   * Who else is here. Vanilla shows this on Tab; we keep it always visible.
+   * Each row is badged by how that name got onto the server — a real Minecraft
+   * client, a solo bot from this page, or the shared road trip bot — using
+   * the same sprites the join screen used to describe the two modes. Pings
+   * come separately, off the state stream, since they change every tick and
+   * the roster only on joins and leaves.
+   */
   setRoster (roster) {
     if (!this.players) return
     this.players.innerHTML = ''
-    for (const { username, skin } of roster) {
+    this.pingByName.clear()
+    for (const { username, skin, mode } of roster) {
       const row = document.createElement('div')
       row.className = 'player'
+      row.dataset.mode = mode
       const face = document.createElement('i')
-      face.style.backgroundImage = `url(/assets/entity/player/wide/${skin}.png)`
-      row.appendChild(face)
-      row.appendChild(document.createTextNode(username))
+      face.className = 'face'
+      // A real player's skin is not ours to know; show the default face.
+      face.style.backgroundImage = `url(/assets/entity/player/wide/${skin || 'steve'}.png)`
+      const bars = document.createElement('i')
+      bars.className = 'ping'
+      const badge = document.createElement('i')
+      badge.className = 'badge'
+      row.append(face, document.createTextNode(username), bars, badge)
       this.players.appendChild(row)
+      this.pingByName.set(username, bars)
     }
+    this.lastPingsKey = null
+    this.renderPings()
+  }
+
+  /** Vanilla's connection bars, next to each name. */
+  renderPings () {
+    const list = (this.lastState && this.lastState.players) || []
+    const key = JSON.stringify(list)
+    if (key === this.lastPingsKey) return
+    this.lastPingsKey = key
+    for (const { username, ping } of list) {
+      const bars = this.pingByName.get(username)
+      if (!bars) continue
+      bars.style.backgroundImage = `url(/assets/gui/sprites/icon/${pingSprite(ping)}.png)`
+      bars.title = ping === null ? 'unknown' : `${ping}ms`
+    }
+  }
+
+  /** F3: the coordinate readout. */
+  toggleDebug () {
+    this.stats.classList.toggle('hidden')
   }
 
   setPing (ms) {
@@ -86,7 +147,11 @@ class Hud {
   }
 
   setState (state) {
+    const previous = this.lastState
     this.lastState = state
+    // Vanilla draws no hearts, hunger or XP in creative.
+    document.body.dataset.gamemode = state.gameMode || ''
+    if (previous && state.health < previous.health) this._startBlink(previous.health)
     this.renderStats()
     // The state packet fires whenever anything in it changes — timeOfDay and
     // position alone make that nearly every tick — so each section repaints
@@ -102,6 +167,24 @@ class Hud {
       this.lastHotbarKey = hotbarKey
       this.renderHotbar(state)
     }
+    this.renderPings()
+  }
+
+  _startBlink (from) {
+    // A second hit mid-blink keeps the earlier "before" so all the lost
+    // hearts flash, not only the latest.
+    this.blink = { until: Date.now() + BLINK_MS, from: this.blink ? this.blink.from : from }
+    if (this.blinkTimer) return
+    this.blinkTimer = setInterval(() => {
+      if (this.blink && Date.now() < this.blink.until) {
+        if (this.lastState) this.renderVitals(this.lastState)
+        return
+      }
+      clearInterval(this.blinkTimer)
+      this.blinkTimer = null
+      this.blink = null
+      if (this.lastState) this.renderVitals(this.lastState)
+    }, BLINK_PHASE_MS / 3)
   }
 
   renderStats () {
@@ -118,8 +201,18 @@ class Hud {
   }
 
   renderVitals (state) {
-    paintIcons(this.hearts, state.health, HEART)
+    let blink = null
+    if (this.blink) {
+      const left = this.blink.until - Date.now()
+      blink = { on: Math.floor(left / BLINK_PHASE_MS) % 2 === 1, from: this.blink.from }
+    }
+    paintIcons(this.hearts, state.health, HEART, blink)
+    this.health.classList.toggle('low', state.health <= LOW_HEALTH)
     paintIcons(this.drumsticks, state.food, FOOD)
+
+    const progress = Math.max(0, Math.min(1, Number(state.xpProgress) || 0))
+    this.xpFill.style.width = `calc(${(182 * progress).toFixed(1)} * var(--u))`
+    this.xpLevel.textContent = state.xpLevel > 0 ? String(state.xpLevel) : ''
   }
 
   renderHotbar (state) {
@@ -128,6 +221,26 @@ class Hud {
       slot.classList.toggle('selected', index === state.quickBarSlot)
       renderSlot(slot, item)
     })
+
+    // The held item's name pops up over the hotbar when the selection
+    // changes and fades a couple of seconds later, as in vanilla. Not on the
+    // first snapshot: that is a page load, not a change.
+    const held = state.heldItem
+    const key = `${state.quickBarSlot}:${held ? held.name : ''}`
+    if (key === this.lastHeldKey) return
+    const first = this.lastHeldKey === null
+    this.lastHeldKey = key
+    if (first) return
+    if (!held) {
+      this.heldName.classList.remove('show')
+      return
+    }
+    this.heldName.textContent = held.displayName || held.name
+    this.heldName.classList.remove('fade')
+    this.heldName.classList.add('show')
+    // Force a layout so the removed transition restarts from fully visible.
+    this.heldName.getBoundingClientRect()
+    this.heldName.classList.add('fade')
   }
 
   /** Repaint slots drawn before the icon data had loaded (see icons.js). */
@@ -179,10 +292,13 @@ class Hud {
     }
   }
 
-  openChat () {
+  openChat (prefill = '') {
     this.chat.classList.add('open')
     this.chatInput.classList.add('open')
+    this.chatInput.value = prefill
     this.chatInput.focus()
+    const end = prefill.length
+    this.chatInput.setSelectionRange(end, end)
     this.chatLog.scrollTop = this.chatLog.scrollHeight
   }
 
@@ -282,17 +398,35 @@ function iconRow (parent) {
 /**
  * Paints one row of hearts or drumsticks. Vanilla always draws the empty
  * container first and layers the full or half icon over it, which is what the
- * two stacked background images are doing.
+ * stacked background images are doing.
+ *
+ * While `blink` is on, the containers go white and the hearts the last hit
+ * took away are drawn white underneath the ones still there, so the loss
+ * flashes rather than simply vanishing.
  */
-function paintIcons (cells, value, sprites) {
+function paintIcons (cells, value, sprites, blink = null) {
   const points = Math.max(0, Math.round(value || 0))
+  const on = Boolean(blink && blink.on)
+  const before = on ? Math.max(0, Math.round(blink.from || 0)) : 0
   cells.forEach((cell, i) => {
+    const layers = []
     const remaining = points - i * 2
-    const top = remaining >= 2 ? sprites.full : remaining === 1 ? sprites.half : null
-    cell.style.backgroundImage = top
-      ? `url(${top}), url(${sprites.empty})`
-      : `url(${sprites.empty})`
+    if (remaining >= 2) layers.push(sprites.full)
+    else if (remaining === 1) layers.push(sprites.half)
+    if (on) {
+      const lost = before - i * 2
+      if (lost >= 2) layers.push(sprites.fullBlink)
+      else if (lost === 1) layers.push(sprites.halfBlink)
+    }
+    layers.push(on ? sprites.emptyBlink : sprites.empty)
+    cell.style.backgroundImage = layers.map(url => `url(${url})`).join(', ')
   })
+}
+
+function pingSprite (ping) {
+  if (ping === null || ping === undefined || ping < 0) return 'ping_unknown'
+  for (const [limit, bars] of PING_BARS) if (ping < limit) return `ping_${bars}`
+  return 'ping_1'
 }
 
 /**

@@ -28,6 +28,22 @@ class Sessions {
     this.roadtrip = null // one Session, built on demand
     this.modeBySocket = new Map() // socket.id -> 'solo' | 'roadtrip'
     this.capacity = config.maxBots
+    // Called whenever who-is-online changes for a reason other than a visitor
+    // joining or leaving here: real players coming and going on the server.
+    this.onChange = null
+    this.changeTimer = null
+  }
+
+  /**
+   * Every bot hears the same tab-list update, and a fresh login hears one per
+   * player already there, so bursts are folded into a single broadcast.
+   */
+  _playersChanged () {
+    if (this.changeTimer || !this.onChange) return
+    this.changeTimer = setTimeout(() => {
+      this.changeTimer = null
+      this.onChange()
+    }, 100)
   }
 
   /** Lower the cap to what the server can actually take, never raise it. */
@@ -46,13 +62,11 @@ class Sessions {
     return this.roadtrip ? this.roadtrip.size : 0
   }
 
+  // Includes real players: on an offline-mode server a second login under an
+  // online name kicks the first, so a visitor could knock a real player off.
   nameTaken (username) {
     const wanted = username.toLowerCase()
-    if (this.roadtrip && this.roadtrip.identity.username.toLowerCase() === wanted) return true
-    for (const session of this.solo.values()) {
-      if (session.identity.username.toLowerCase() === wanted) return true
-    }
-    return false
+    return this.roster().some(r => r.username.toLowerCase() === wanted)
   }
 
   /**
@@ -107,7 +121,8 @@ class Sessions {
           identity,
           config: this.config,
           emitter: this.io.to(ROADTRIP_ROOM),
-          io: this.io
+          io: this.io,
+          onPlayers: () => this._playersChanged()
         })
         this.roadtrip.start()
       }
@@ -115,7 +130,14 @@ class Sessions {
       return this.roadtrip
     }
 
-    const session = new Session({ mode, identity, config: this.config, emitter: socket, io: this.io })
+    const session = new Session({
+      mode,
+      identity,
+      config: this.config,
+      emitter: socket,
+      io: this.io,
+      onPlayers: () => this._playersChanged()
+    })
     this.solo.set(socket.id, session)
     session.start()
     session.addMember(socket)
@@ -147,6 +169,7 @@ class Sessions {
   }
 
   destroyAll () {
+    clearTimeout(this.changeTimer)
     for (const session of this.solo.values()) session.destroy()
     this.solo.clear()
     if (this.roadtrip) this.roadtrip.destroy()
@@ -154,7 +177,12 @@ class Sessions {
     this.modeBySocket.clear()
   }
 
-  /** What every browser needs to label and skin the players it can see. */
+  /**
+   * Everyone on the server, as every browser needs them labelled and skinned.
+   * Our own bots come with the skin their visitor picked; `mode: 'player'`
+   * rows are real Minecraft clients read off a bot's tab list, whose skins we
+   * cannot see, so they carry none.
+   */
   roster () {
     const rows = [...this.solo.values()].map(s => ({
       username: s.identity.username,
@@ -169,7 +197,20 @@ class Sessions {
         riders: this.roadtrip.size
       })
     }
+    const ours = new Set(rows.map(r => r.username))
+    for (const username of this._serverPlayers()) {
+      if (!ours.has(username)) rows.push({ username, mode: 'player' })
+    }
     return rows
+  }
+
+  /** Usernames on the server's tab list, from any bot that is logged in. */
+  _serverPlayers () {
+    const sessions = [...this.solo.values()]
+    if (this.roadtrip) sessions.push(this.roadtrip)
+    const live = sessions.find(s => s.bot)
+    if (!live) return []
+    return Object.keys(live.bot.players || {}).sort((a, b) => a.localeCompare(b))
   }
 
   /** What the join screen needs in order to describe the choice. */
@@ -180,7 +221,10 @@ class Sessions {
       botCount: this.botCount,
       roadtripRiders: this.roadtripRiders,
       soloAvailable: this.botCount < this.capacity,
-      taken: this.roster().map(r => r.username)
+      taken: this.roster().map(r => r.username),
+      // Shown on the join screen so a visitor can also connect with a real client.
+      server: { host: this.config.mc.publicHost, port: this.config.mc.port },
+      commit: this.config.commit
     }
   }
 }

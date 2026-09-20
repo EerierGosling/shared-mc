@@ -27,7 +27,8 @@ class SkinPainter {
 
   setRoster (roster) {
     this.skinByName.clear()
-    for (const { username, skin } of roster) this.skinByName.set(username, skin)
+    // Real players arrive without a skin; the viewer's default stays on them.
+    for (const { username, skin } of roster) if (skin) this.skinByName.set(username, skin)
     this.apply()
   }
 
