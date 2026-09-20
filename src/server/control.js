@@ -288,13 +288,9 @@ class Controller {
     try {
       while (this.digHeld && this.bot) {
         const block = this.targetBlock()
-        // Vanilla says nothing when the button is held on air.
-        if (!block) {
-          await sleep(100)
-          continue
-        }
-        if (!this.bot.canDigBlock(block)) {
-          this._digNotice(`* cannot mine ${block.displayName || block.name} from here`)
+        // Vanilla says nothing when the button is held on air or on a block
+        // that cannot be broken; the crack stages simply never appear.
+        if (!block || !this.bot.canDigBlock(block)) {
           await sleep(100)
           continue
         }
