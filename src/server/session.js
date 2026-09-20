@@ -39,7 +39,8 @@ class Session {
     this.members = new Set() // socket ids
     this.detachByMember = new Map() // socket.id -> detach fn
     this.socketsById = new Map()
-    this.status = { state: 'connecting', message: 'joining the server' }
+    this.address = null
+    this.status = { state: 'connecting', message: 'joining the server', server: { ...server, address: null } }
 
     this.primitives = new Primitives(emitter)
     this.budget = new Budget(config.limits)
@@ -128,7 +129,10 @@ class Session {
   }
 
   _setStatus (state, message) {
-    this.status = { state, message }
+    // The pause menu shows where this bot actually is: the address the
+    // visitor typed, and the IP its socket resolved to, which is only known
+    // once a bot is up and can differ between reconnects (round-robin DNS).
+    this.status = { state, message, server: { ...this.server, address: this.address || null } }
     this.emitter.emit('bot:status', this.status)
   }
 
@@ -147,6 +151,8 @@ class Session {
     bot.on('playerLeft', () => this.onPlayers())
     this._detachAll()
     for (const socket of this.socketsById.values()) this._attachMember(socket)
+    const tcp = bot._client && bot._client.socket
+    this.address = (tcp && tcp.remoteAddress) || null
     this._setStatus('connected', `playing as ${bot.username}`)
   }
 
