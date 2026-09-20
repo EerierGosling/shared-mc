@@ -236,11 +236,30 @@ class JoinScreen {
     this.button.disabled = true
     this.error.textContent = 'joining…'
     this.error.classList.remove('bad')
+    this.payload = payload
     this.socket.emit('join', payload)
     lockLandscape()
   }
 
+  /**
+   * A reconnected socket is a stranger to the server: the disconnect tore the
+   * membership (and a solo bot) down, so the same join is sent again. Without
+   * this the tab keeps its last frame and every click goes to the lobby.
+   */
+  rejoin () {
+    if (!this.joined || !this.payload) return false
+    this.socket.emit('join', this.payload)
+    return true
+  }
+
   reject (reason) {
+    // A refused rejoin (the server filled up meanwhile) lands back on the
+    // join screen with the reason, the way an expired session does.
+    if (this.joined) {
+      this.joined = false
+      document.body.classList.remove('joined')
+      this.root.classList.add('open')
+    }
     this.button.disabled = false
     this.error.textContent = reason
     this.error.classList.add('bad')

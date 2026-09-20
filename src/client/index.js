@@ -115,7 +115,20 @@ socket.on('action:refused', ({ kind, retryIn }) => {
   hud.addChat(`* too much ${kind} — wait ${retryIn}s`, 'system')
 })
 
-socket.on('connect', () => hud.setStatus('connecting', 'connected to the stream'))
+socket.on('connect', () => {
+  // socket.io reconnects with a new id, and the server dropped this socket's
+  // membership (and a solo bot) at the disconnect. Left alone, the tab keeps
+  // rendering its last frame while input goes to the lobby: the "cannot mine
+  // or jump after a while" bug. The world is re-sent from scratch, so the
+  // stale columns and entities go first.
+  if (join.joined) {
+    viewer.resetAll()
+    hud.setStatus('connecting', 'reconnected — rejoining…')
+    join.rejoin()
+    return
+  }
+  hud.setStatus('connecting', 'connected to the stream')
+})
 
 socket.on('disconnect', () => {
   hud.setStatus('error', 'lost the stream — retrying…')
