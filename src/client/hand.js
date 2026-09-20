@@ -199,7 +199,11 @@ class Hand {
           // Half the previous 0.48, anchored where the arm's hand was.
           model.scale.setScalar(0.24)
           this.item.position.set(...ARM_BOTTOM)
-          this.item.rotation.set(-0.25, -0.45, 0)
+          // Z here is the block's own face-on spin, before the pivot's
+          // rotation carries it into view — positive is counter-clockwise
+          // as held up and looked at, same convention as ARM_TWIST. 90°
+          // CCW from where it sat (Z=0).
+          this.item.rotation.set(-0.25, -0.45, Math.PI / 2)
         } else {
           model.scale.setScalar(0.75)
           this.item.position.set(...ARM_BOTTOM)
