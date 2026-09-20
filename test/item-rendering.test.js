@@ -55,6 +55,9 @@ test('hand switches held items and recovers when assets arrive late', () => {
   try {
     const { Hand } = require('../src/client/hand')
     const hand = new Hand()
+    // render() no-ops until the hand is shown (as it is on join); nothing is
+    // built over the join screen.
+    hand.setVisible(true)
     const camera = new THREE.PerspectiveCamera()
     const renderer = { clearDepth () {}, render () {} }
     const assets = icons.itemAssets
@@ -65,10 +68,10 @@ test('hand switches held items and recovers when assets arrive late', () => {
     icons.itemAssets = assets
     hand.render(renderer, camera)
     assert.equal(hand.item.children.length, 1)
-    assert.equal(hand.arm.visible, true)
+    assert.equal(hand.right.visible, true)
     hand.setItem(null)
     assert.equal(hand.item.children.length, 0)
-    assert.equal(hand.arm.visible, true)
+    assert.equal(hand.right.visible, true)
   } finally {
     THREE.TextureLoader.prototype.load = originalLoad
   }
