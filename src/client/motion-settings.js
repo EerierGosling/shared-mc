@@ -11,7 +11,7 @@ const FIELDS = {
   // How high the off-hand (the arm not set for mining) must rise above the
   // shoulder — in shoulder-widths — to place a block. Higher asks for a fuller
   // reach overhead, lower places from a smaller lift.
-  placeThreshold: ['Off-hand raise to place', 0.4, 1.5, 0.05, 0.8],
+  placeThreshold: ['Off-hand raise to place', 0.4, 1.5, 0.05, 0.5],
   phoneThreshold: ['Phone mining threshold (m/s²)', 0.1, 2, 0.05, 0.1],
   faceThreshold: ['Smile / mouth threshold', 0.3, 0.95, 0.05, 0.65]
 }
