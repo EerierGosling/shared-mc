@@ -148,7 +148,11 @@ road trip.
   written as texture pixels times `--px`, vanilla's GUI scale, so the whole
   interface resizes from that one variable — keep new HUD work in those units
   rather than hardcoding px. Sprites need `image-rendering: pixelated`, and the
-  pixel font needs antialiasing off, or both go soft.
+  pixel font needs antialiasing off, or both go soft. The inventory, crafting
+  table and chest windows are the same idea one level up: `inventory.js`
+  draws `gui/container/*.png` and places each slot at the sheet's own
+  coordinates, so a slot that looks off by a pixel is a wrong number in that
+  file, not a CSS problem.
 - **Creative is granted by the Minecraft server, never asserted by us**
   (`creative.js`). Both halves are read back off the wire: `bot.game.gameMode`
   for the mode and the clientbound `abilities` flags for what it permits

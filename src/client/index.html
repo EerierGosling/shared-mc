@@ -358,46 +358,76 @@
   body.touch #status { top: calc(18 * var(--u)); }
 
   /* --- join screen ---------------------------------------------------------- */
+  /* Vanilla's options background: the 16px dirt tile drawn at 2x and dimmed to
+     a quarter, which is also what hides the empty sky before any chunk lands. */
   #join {
     inset: 0; display: none; align-items: center; justify-content: center;
-    background: rgba(0, 0, 0, 0.82); pointer-events: auto;
+    padding: calc(4 * var(--u));
+    background:
+      linear-gradient(rgba(0, 0, 0, 0.72), rgba(0, 0, 0, 0.72)),
+      url('/assets/gui/options_background.png') 0 0 / calc(32 * var(--u)) repeat;
+    image-rendering: pixelated;
+    pointer-events: auto;
   }
   #join.open { display: flex; }
+  /* Two columns: where and how on the left, who on the right, one footer. */
   #join-panel {
     background: var(--gui);
     border-style: solid; border-width: calc(2 * var(--u));
     border-color: var(--gui-lit) var(--gui-dim) var(--gui-dim) var(--gui-lit);
-    padding: calc(5 * var(--u));
-    width: calc(150 * var(--u)); max-width: 92vw;
-    color: var(--ink); text-align: center;
+    padding: calc(5 * var(--u)) calc(6 * var(--u));
+    width: calc(300 * var(--u)); max-width: 100%;
+    color: var(--ink);
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) calc(104 * var(--u));
+    grid-template-areas: "head head" "left right" "foot foot";
+    column-gap: calc(8 * var(--u)); row-gap: calc(4 * var(--u));
+  }
+  #join-head {
+    grid-area: head;
+    display: flex; align-items: baseline; justify-content: space-between; gap: calc(4 * var(--u));
+    border-bottom: var(--u) solid var(--slot);
+    padding-bottom: calc(3 * var(--u));
   }
   #join-panel h1 {
-    margin: 0 0 calc(1 * var(--u));
+    margin: 0;
     font-size: calc(var(--px) * 12px); font-weight: normal;
   }
+  /* Which build is serving, so a bug report can say which. */
+  #join-build { margin: 0; font-size: calc(var(--px) * 6px); color: #7f7f7f; }
+  #join-build:empty { display: none; }
+  #join-left { grid-area: left; display: flex; flex-direction: column; gap: calc(2 * var(--u)); min-width: 0; }
+  #join-right { grid-area: right; display: flex; flex-direction: column; gap: calc(2 * var(--u)); min-width: 0; }
+  #join-foot {
+    grid-area: foot;
+    display: flex; align-items: center; justify-content: space-between; gap: calc(4 * var(--u));
+    border-top: var(--u) solid var(--slot);
+    padding-top: calc(4 * var(--u));
+  }
+  /* Beats .section-label's own margin, which is declared later on. */
+  #join-panel .join-label { margin: calc(2 * var(--u)) 0 0; }
+  #join-panel .join-label:first-child { margin-top: 0; }
   /* Which server to play on: host and port side by side, like the server-list
      "Direct Connect" screen. The configured default is only the placeholder. */
-  #join-server { display: flex; gap: calc(2 * var(--u)); margin: calc(3 * var(--u)) 0 calc(4 * var(--u)); }
-  /* Which build is serving, so a bug report can say which. */
-  #join-build { margin: calc(2 * var(--u)) 0 0; font-size: calc(var(--px) * 6px); color: #7f7f7f; }
-  #join-build:empty { display: none; }
+  #join-server { display: flex; gap: calc(2 * var(--u)); }
   #join-name, #join-host, #join-port {
     width: 100%; font: inherit;
-    font-size: calc(var(--px) * 10px);
-    padding: calc(2 * var(--u));
+    font-size: calc(var(--px) * 8px);
+    padding: calc(2 * var(--u)) calc(3 * var(--u));
     color: var(--mc-white); background: #000;
     border-style: solid; border-width: var(--u);
     border-color: var(--slot-dark) var(--gui-lit) var(--gui-lit) var(--slot-dark);
-    outline: none; text-align: center;
+    outline: none;
   }
-  #join-host { flex: 1; min-width: 0; text-align: left; }
-  #join-port { width: calc(34 * var(--u)); flex: none; }
+  #join-name:focus, #join-host:focus, #join-port:focus { border-color: var(--mc-white); }
+  #join-host { flex: 1; min-width: 0; }
+  #join-port { width: calc(36 * var(--u)); flex: none; text-align: center; }
   /* Minecraft's world-select list: stacked rows, selection is a white outline. */
-  #join-modes { display: flex; flex-direction: column; gap: var(--u); margin-bottom: calc(4 * var(--u)); }
+  #join-modes { display: flex; flex-direction: column; gap: var(--u); }
   .mode-row {
     display: flex; align-items: center; gap: calc(3 * var(--u));
     width: 100%; text-align: left; cursor: pointer; font: inherit;
-    padding: calc(2 * var(--u));
+    padding: calc(2 * var(--u)) calc(3 * var(--u));
     color: var(--mc-white); background: #2e2e2e;
     border: calc(1 * var(--u)) solid #101010;
   }
@@ -405,42 +435,92 @@
   .mode-row.selected { border-color: var(--mc-white); background: #43434f; }
   .mode-row.full { color: #7f7f7f; cursor: default; }
   .mode-row .badge { width: calc(16 * var(--u)); height: calc(16 * var(--u)); }
-  .mode-row span { display: flex; flex-direction: column; gap: calc(0.5 * var(--u)); }
+  .mode-row span { display: flex; flex-direction: column; gap: calc(0.5 * var(--u)); flex: 1; min-width: 0; }
   .mode-row b { font-weight: normal; font-size: calc(var(--px) * 9px); }
   .mode-row small { font-size: calc(var(--px) * 6px); color: #a0a0a0; line-height: 1.4; }
   .mode-row.selected small { color: #c6c6c6; }
-
-  /* Name and skin only matter for your own bot, so they stay hidden until then. */
-  #join-identity { display: none; }
-  #join-identity.open { display: block; }
-
-  #join-skins {
-    display: flex; flex-wrap: wrap; justify-content: center;
-    gap: calc(2 * var(--u)); margin: calc(4 * var(--u)) 0;
+  /* Occupancy, at the row's right edge: who is already in, or how many fit. */
+  .mode-row .chip {
+    flex: none; align-self: flex-start;
+    font-size: calc(var(--px) * 6px); color: var(--mc-yellow);
+    text-shadow: var(--u) var(--u) 0 var(--shadow);
   }
-  .skin {
-    width: calc(16 * var(--u)); height: calc(16 * var(--u));
-    padding: 0; cursor: pointer;
-    background-size: calc(128 * var(--u)) calc(128 * var(--u));
-    background-position: calc(-16 * var(--u)) calc(-16 * var(--u));
-    background-color: var(--slot);
+  .mode-row.full .chip { color: var(--mc-red); }
+
+  /* The right column: a player figure in the skin about to be worn, then the
+     name and the other faces once a solo character is being made. */
+  #join-figure {
+    display: flex; justify-content: center;
+    padding: calc(3 * var(--u)) 0;
+    background: var(--slot);
     border-style: solid; border-width: var(--u);
     border-color: var(--slot-dark) var(--gui-lit) var(--gui-lit) var(--slot-dark);
   }
-  .skin.selected { border-color: var(--mc-white); background-color: #fff; }
-  /* Vanilla's button: grey slab, light top-left, dark bottom-right. */
-  #join-button {
-    width: 100%; font: inherit; font-size: calc(var(--px) * 10px);
-    padding: calc(2 * var(--u)); cursor: pointer;
-    color: var(--mc-white); background: #6b6b6b;
-    border-style: solid; border-width: calc(2 * var(--u));
-    border-color: #a0a0a0 #2b2b2b #2b2b2b #a0a0a0;
-    text-shadow: var(--u) var(--u) 0 var(--shadow);
+  /* Front view of a 64x64 skin, 16x32 texels, at --t per texel: head, torso,
+     arms and legs cut out of the sheet by background-position, the second
+     layer (hat, jacket, sleeves) drawn over each at the same size. */
+  .doll {
+    --t: calc(3 * var(--u));
+    position: relative;
+    width: calc(16 * var(--t)); height: calc(32 * var(--t));
   }
-  #join-button:hover:not(:disabled) { background: #7f8caa; }
-  #join-button:disabled { color: #a0a0a0; cursor: default; }
-  #join-error { margin-top: calc(3 * var(--u)); font-size: calc(var(--px) * 7px); color: #555; }
+  .doll i {
+    position: absolute; display: block;
+    background-image: var(--skin);
+    background-size: calc(64 * var(--t)) calc(64 * var(--t));
+    image-rendering: pixelated;
+  }
+  .doll .d-head  { left: calc(4 * var(--t)); top: 0; width: calc(8 * var(--t)); height: calc(8 * var(--t)); background-position: calc(-8 * var(--t)) calc(-8 * var(--t)); }
+  .doll .d-hat   { left: calc(4 * var(--t)); top: 0; width: calc(8 * var(--t)); height: calc(8 * var(--t)); background-position: calc(-40 * var(--t)) calc(-8 * var(--t)); }
+  .doll .d-body  { left: calc(4 * var(--t)); top: calc(8 * var(--t)); width: calc(8 * var(--t)); height: calc(12 * var(--t)); background-position: calc(-20 * var(--t)) calc(-20 * var(--t)); }
+  .doll .d-jacket { left: calc(4 * var(--t)); top: calc(8 * var(--t)); width: calc(8 * var(--t)); height: calc(12 * var(--t)); background-position: calc(-20 * var(--t)) calc(-36 * var(--t)); }
+  .doll .d-arm-r { left: 0; top: calc(8 * var(--t)); width: calc(4 * var(--t)); height: calc(12 * var(--t)); background-position: calc(-44 * var(--t)) calc(-20 * var(--t)); }
+  .doll .d-sleeve-r { left: 0; top: calc(8 * var(--t)); width: calc(4 * var(--t)); height: calc(12 * var(--t)); background-position: calc(-44 * var(--t)) calc(-36 * var(--t)); }
+  .doll .d-arm-l { left: calc(12 * var(--t)); top: calc(8 * var(--t)); width: calc(4 * var(--t)); height: calc(12 * var(--t)); background-position: calc(-36 * var(--t)) calc(-52 * var(--t)); }
+  .doll .d-sleeve-l { left: calc(12 * var(--t)); top: calc(8 * var(--t)); width: calc(4 * var(--t)); height: calc(12 * var(--t)); background-position: calc(-52 * var(--t)) calc(-52 * var(--t)); }
+  .doll .d-leg-r { left: calc(4 * var(--t)); top: calc(20 * var(--t)); width: calc(4 * var(--t)); height: calc(12 * var(--t)); background-position: calc(-4 * var(--t)) calc(-20 * var(--t)); }
+  .doll .d-pants-r { left: calc(4 * var(--t)); top: calc(20 * var(--t)); width: calc(4 * var(--t)); height: calc(12 * var(--t)); background-position: calc(-4 * var(--t)) calc(-36 * var(--t)); }
+  .doll .d-leg-l { left: calc(8 * var(--t)); top: calc(20 * var(--t)); width: calc(4 * var(--t)); height: calc(12 * var(--t)); background-position: calc(-20 * var(--t)) calc(-52 * var(--t)); }
+  .doll .d-pants-l { left: calc(8 * var(--t)); top: calc(20 * var(--t)); width: calc(4 * var(--t)); height: calc(12 * var(--t)); background-position: calc(-4 * var(--t)) calc(-52 * var(--t)); }
+  /* Nobody chosen yet: the doll waits in the dark. */
+  #join:not([data-mode]) .doll { opacity: 0.35; }
+
+  /* Name and skin only matter for your own bot, so they stay hidden until then. */
+  #join-identity { display: none; flex-direction: column; gap: calc(2 * var(--u)); }
+  #join[data-mode="solo"] #join-identity { display: flex; }
+  /* Nine faces, three by three, each the 8x8 head of its sheet at 30 texels. */
+  #join-skins {
+    display: grid; grid-template-columns: repeat(3, calc(30 * var(--u)));
+    justify-content: space-between;
+    gap: calc(2 * var(--u));
+  }
+  .skin {
+    width: calc(30 * var(--u)); height: calc(30 * var(--u));
+    padding: 0; cursor: pointer;
+    background-size: calc(240 * var(--u)) calc(240 * var(--u));
+    background-position: calc(-30 * var(--u)) calc(-30 * var(--u));
+    background-color: var(--slot);
+    border-style: solid; border-width: var(--u);
+    border-color: var(--slot-dark) var(--gui-lit) var(--gui-lit) var(--slot-dark);
+    image-rendering: pixelated;
+  }
+  .skin:hover { background-color: #c5c5c5; }
+  .skin.selected { border-color: var(--mc-white); background-color: #fff; }
+  #join-error { margin: 0; flex: 1; min-width: 0; font-size: calc(var(--px) * 7px); color: #555; }
   #join-error.bad { color: #a83232; }
+  /* The vanilla 200x20 widget, half width: the footer's right-hand end. */
+  #join-button { margin: 0; width: calc(100 * var(--u)); flex: none; }
+
+  /* Phones: one column. */
+  @media (max-width: 640px) {
+    #join-panel {
+      grid-template-columns: minmax(0, 1fr);
+      grid-template-areas: "head" "left" "right" "foot";
+      padding: calc(4 * var(--u));
+    }
+    #join-foot { flex-direction: column; align-items: stretch; }
+    #join-button { width: 100%; }
+  }
 
   /* --- game menu ----------------------------------------------------------- */
   /* Vanilla's pause screen: the world dimmed, "Game menu" up top, a stack of
@@ -531,22 +611,12 @@
   }
   #inventory.open { display: flex; }
 
-  /* Vanilla container chrome: light bevel top-left, dark bevel bottom-right. */
-  #inventory-panel {
-    background: var(--gui);
-    border-style: solid;
-    border-width: calc(2 * var(--u));
-    border-color: var(--gui-lit) var(--gui-dim) var(--gui-dim) var(--gui-lit);
-    padding: calc(3 * var(--u));
-    min-width: calc(176 * var(--u));
-    color: var(--ink);
+  #inventory-panel { display: flex; flex-direction: column; align-items: center; color: var(--ink); }
+  #inventory-hint {
+    margin: calc(2 * var(--u)) 0 0;
+    font-size: calc(var(--px) * 6px); color: var(--mc-gray);
+    text-shadow: var(--u) var(--u) 0 var(--shadow);
   }
-  #inventory-panel h2 {
-    margin: 0 0 calc(2 * var(--u));
-    font-size: calc(var(--px) * 8px); font-weight: normal;
-    display: flex; justify-content: space-between; align-items: baseline;
-  }
-  #inventory-panel h2 small { color: #7f7f7f; font-size: calc(var(--px) * 6px); }
   .section-label {
     color: #7f7f7f; margin: 0 0 var(--u);
     font-size: calc(var(--px) * 6px);
@@ -576,7 +646,15 @@
   /* Hidden outright until the Minecraft server grants creative: creative.js
      adds .open, so a survival session never sees a control it cannot use. */
   #creative { display: none; }
-  #creative.open { display: block; margin-bottom: calc(3 * var(--u)); }
+  /* Vanilla container chrome: light bevel top-left, dark bevel bottom-right. */
+  #creative.open {
+    display: block; margin-bottom: calc(3 * var(--u));
+    width: calc(176 * var(--u)); box-sizing: border-box;
+    background: var(--gui);
+    border-style: solid; border-width: calc(2 * var(--u));
+    border-color: var(--gui-lit) var(--gui-dim) var(--gui-dim) var(--gui-lit);
+    padding: calc(3 * var(--u));
+  }
   #creative-head { display: flex; align-items: baseline; gap: calc(2 * var(--u)); }
   #creative-head .section-label { margin: 0; }
   #creative-note { margin-left: auto !important; }
@@ -606,47 +684,58 @@
   }
   #cursor-item.visible { display: flex; }
 
-  /* --- crafting row: armor, player bust, offhand, 2x2 crafting ------------- */
-  .crafting-row { display: flex; align-items: flex-start; gap: calc(4 * var(--u)); margin-bottom: calc(3 * var(--u)); }
-  .grid.grid-1 { grid-template-columns: repeat(1, calc(18 * var(--u))); margin-bottom: 0; }
-  .grid.grid-2 { grid-template-columns: repeat(2, calc(18 * var(--u))); margin-bottom: 0; }
-  .grid.grid-3 { grid-template-columns: repeat(3, calc(18 * var(--u))); margin-bottom: 0; }
-
-  .player-frame {
+  /* --- container windows ---------------------------------------------------- */
+  /* The real gui/container sheet (256x256, window in its top-left 176 wide)
+     at GUI scale; inventory.js sets the height and lays slots over it at the
+     sheet's own coordinates. */
+  .window {
     position: relative;
-    width: calc(40 * var(--u)); height: calc(52 * var(--u));
-    background: var(--slot);
-    border-style: solid; border-width: var(--u);
-    border-color: var(--slot-dark) var(--gui-lit) var(--gui-lit) var(--slot-dark);
+    width: calc(176 * var(--u));
+    background-size: calc(256 * var(--u)) calc(256 * var(--u));
+    background-repeat: no-repeat;
+    image-rendering: pixelated;
   }
-  .player-figure {
-    position: absolute; left: 50%; top: calc(4 * var(--u));
-    transform: translateX(-50%);
-    width: calc(18 * var(--u)); height: calc(44 * var(--u));
+  /* A chest is two cuts of generic_54.png: the top rows, then the player half
+     from y=126 of the sheet (vanilla's blit). */
+  .window-lower {
+    position: absolute; left: 0;
+    width: calc(176 * var(--u)); height: calc(96 * var(--u));
+    background: inherit;
+    background-position: 0 calc(-126 * var(--u));
   }
-  .player-figure i { position: absolute; display: block; }
-  .p-hair { top: 0; left: calc(3 * var(--u)); width: calc(12 * var(--u)); height: calc(4 * var(--u)); background: #4a3728; }
-  .p-head { top: calc(4 * var(--u)); left: calc(3 * var(--u)); width: calc(12 * var(--u)); height: calc(12 * var(--u)); background: #f0b48c; }
-  .p-body { top: calc(16 * var(--u)); left: calc(3 * var(--u)); width: calc(12 * var(--u)); height: calc(16 * var(--u)); background: #17a5a0; }
-  .p-arm { top: calc(16 * var(--u)); width: calc(3 * var(--u)); height: calc(16 * var(--u)); background: #f0b48c; }
-  .p-arm-l { left: 0; }
-  .p-arm-r { right: 0; }
-  .p-leg { top: calc(32 * var(--u)); width: calc(6 * var(--u)); height: calc(12 * var(--u)); background: #3b5bdb; }
-  .p-leg-l { left: calc(3 * var(--u)); }
-  .p-leg-r { left: calc(9 * var(--u)); }
-  .offhand-wrap { position: absolute; right: calc(-1 * var(--u)); bottom: calc(-1 * var(--u)); }
-
-  .crafting-col { display: flex; flex-direction: column; }
-  .crafting-main { display: flex; align-items: center; gap: calc(3 * var(--u)); margin-bottom: calc(3 * var(--u)); }
-  .crafting-arrow { font-size: calc(var(--px) * 10px); color: var(--ink); padding: 0 var(--u); }
-
-  /* --- crafting table: recipe-book stand-in, 3x3 grid, output --------------- */
-  .workbench-icon {
+  .window .slot {
+    position: absolute;
     width: calc(18 * var(--u)); height: calc(18 * var(--u));
-    flex: none;
-    background: #4a9c46;
-    border-style: solid; border-width: var(--u);
-    border-color: #6fc768 #1f4a1c #1f4a1c #6fc768;
+    background-size: calc(16 * var(--u)) calc(16 * var(--u));
+    background-position: center; background-repeat: no-repeat;
+    cursor: pointer; color: var(--ink);
+  }
+  .window .slot-large { width: calc(26 * var(--u)); height: calc(26 * var(--u)); }
+  /* Vanilla's hover: a half-white square over the 16x16 item area. */
+  .window .slot::after {
+    content: ''; position: absolute; inset: var(--u);
+    background: rgba(255, 255, 255, 0); pointer-events: none;
+  }
+  .window .slot-large::after { inset: calc(5 * var(--u)); }
+  .window .slot:hover::after, .window .slot.drag-target::after { background: rgba(255, 255, 255, 0.5); }
+  .window-label {
+    position: absolute;
+    font-size: calc(var(--px) * 8px); line-height: 1; color: var(--ink);
+    white-space: nowrap;
+  }
+  .recipe-book {
+    position: absolute;
+    width: calc(20 * var(--u)); height: calc(18 * var(--u));
+    background: url('/assets/gui/sprites/recipe_book/button.png') 0 0 / contain no-repeat;
+    image-rendering: pixelated;
+  }
+  /* The black frame in inventory.png is 50x70 at (26,8); the doll is 16x32
+     texels, so two screen pixels per texel fills it the way vanilla's
+     scale-30 player does. */
+  .window-doll {
+    --t: calc(2 * var(--u));
+    position: absolute;
+    left: calc(35 * var(--u)); top: calc(11 * var(--u));
   }
 </style>
 <link rel="stylesheet" href="/motion.css">
@@ -743,11 +832,42 @@
 
   <div id="join" class="overlay">
     <form id="join-panel" action="#">
-      <h1>Shared Minecraft</h1>
-      <div id="join-server">
-        <input id="join-host" placeholder="server address" autocomplete="off" spellcheck="false">
-        <input id="join-port" placeholder="25565" inputmode="numeric" maxlength="5" autocomplete="off">
-      </div>
+      <header id="join-head">
+        <h1>Shared Minecraft</h1>
+        <p id="join-build"></p>
+      </header>
+      <section id="join-left">
+        <p class="section-label join-label">Server</p>
+        <div id="join-server">
+          <input id="join-host" placeholder="server address" autocomplete="off" spellcheck="false">
+          <input id="join-port" placeholder="25565" inputmode="numeric" maxlength="5" autocomplete="off">
+        </div>
+        <p class="section-label join-label">How to play</p>
+        <div id="join-modes"></div>
+      </section>
+      <section id="join-right">
+        <p class="section-label join-label">Your character</p>
+        <div id="join-figure">
+          <div id="join-doll" class="doll">
+            <i class="d-arm-r"></i><i class="d-sleeve-r"></i>
+            <i class="d-arm-l"></i><i class="d-sleeve-l"></i>
+            <i class="d-leg-r"></i><i class="d-pants-r"></i>
+            <i class="d-leg-l"></i><i class="d-pants-l"></i>
+            <i class="d-body"></i><i class="d-jacket"></i>
+            <i class="d-head"></i><i class="d-hat"></i>
+          </div>
+        </div>
+        <div id="join-identity">
+          <input id="join-name" maxlength="16" placeholder="your name" autocomplete="off" spellcheck="false">
+          <div id="join-skins"></div>
+        </div>
+      </section>
+      <footer id="join-foot">
+        <p id="join-error"></p>
+        <button id="join-button" class="mc-button" type="submit" disabled>Play</button>
+      </footer>
+    </form>
+  </div>
       <div id="join-modes"></div>
       <div id="join-identity">
         <input id="join-name" maxlength="16" placeholder="your name" autocomplete="off" spellcheck="false">
@@ -772,7 +892,6 @@
 
   <div id="inventory" class="overlay">
     <div id="inventory-panel">
-      <h2><span id="inventory-title">Inventory</span> <small>E or Esc to close</small></h2>
       <!-- Creative only. Kept above the inventory so a stack dragged up out of
            a slot and released here is destroyed, as it is in vanilla. -->
       <div id="creative">
@@ -785,6 +904,7 @@
         <p class="section-label">click for a stack, right-click for one, drop a stack here to destroy it</p>
       </div>
       <div id="inventory-body"></div>
+      <p id="inventory-hint">E or Esc to close</p>
     </div>
     <div id="cursor-item" class="slot"></div>
   </div>

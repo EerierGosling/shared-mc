@@ -14,12 +14,12 @@ const MODES = [
   {
     id: 'roadtrip',
     title: 'Collaborative',
-    blurb: 'Everyone drives one character together.'
+    blurb: 'Very chaotic. Control a player at the same time as everyone else.'
   },
   {
     id: 'solo',
     title: 'Solo',
-    blurb: 'Spawn a character of your own on the same world.'
+    blurb: 'Control your own player.'
   }
 ]
 
@@ -50,6 +50,7 @@ class JoinScreen {
     this.portInput = document.getElementById('join-port')
     this.build = document.getElementById('join-build')
     this.button = document.getElementById('join-button')
+    this.doll = document.getElementById('join-doll')
 
     this.controlSelect = document.getElementById('join-control-mode')
     try {
@@ -73,6 +74,7 @@ class JoinScreen {
     this.skin = 'steve'
     this.options = null
     this.renderedSkins = false
+    this.setDoll(this.skin)
 
     socket.on('join:options', options => this.setOptions(options))
     socket.on('join:rejected', ({ reason }) => this.reject(reason))
@@ -143,14 +145,18 @@ class JoinScreen {
       const title = document.createElement('b')
       title.textContent = mode.title
       const sub = document.createElement('small')
-      sub.textContent = mode.id === 'roadtrip'
-        ? `${mode.blurb} (${roadtripRiders} playing)`
-        : full
-          ? `All ${capacity} bots are in use.`
-          : `${mode.blurb} (${capacity - botCount} free)`
+      sub.textContent = full ? `All ${capacity} bots are in use.` : mode.blurb
       text.appendChild(title)
       text.appendChild(sub)
       row.appendChild(text)
+
+      // Occupancy on the right edge, in the row's own terms.
+      const chip = document.createElement('em')
+      chip.className = 'chip'
+      chip.textContent = mode.id === 'roadtrip'
+        ? `${roadtripRiders} playing`
+        : full ? 'full' : `${capacity - botCount} free`
+      row.appendChild(chip)
 
       row.addEventListener('click', () => this.pick(mode.id))
       this.modeList.appendChild(row)
@@ -169,17 +175,25 @@ class JoinScreen {
         this.skin = skin
         for (const el of this.skinList.children) el.classList.remove('selected')
         button.classList.add('selected')
+        this.setDoll(skin)
       })
       this.skinList.appendChild(button)
     }
+  }
+
+  /** The player figure wears `skin`; CSS cuts the sheet up into limbs. */
+  setDoll (skin) {
+    this.doll.style.setProperty('--skin', `url(${skinUrl(skin)})`)
   }
 
   pick (mode) {
     this.mode = mode
     this.notice = null
     this.renderModes()
-    // Only your own bot needs a name and a face; the shared one already has both.
-    this.identity.classList.toggle('open', mode === 'solo')
+    // Only your own bot needs a name and a face; the shared one already has
+    // both, so the right column just shows it.
+    this.root.dataset.mode = mode
+    this.setDoll(mode === 'solo' ? this.skin : (this.options && this.options.skins && this.options.skins[0]) || 'steve')
     this.button.disabled = false
     this.button.textContent = mode === 'roadtrip' ? 'Join in' : 'Play'
     if (mode === 'solo') this.nameInput.focus()
