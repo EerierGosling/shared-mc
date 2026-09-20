@@ -14,6 +14,10 @@ RUN npm run build
 ARG COMMIT=unknown
 ENV COMMIT=$COMMIT
 ENV PORT=3000
+ENV NODE_ENV=production
 EXPOSE 3000
 
-CMD ["node", "src/server/index.js"]
+# Every bot's world copy lives on the heap; the default old-space cap (about
+# 2 GB on a 64-bit build) is what MAX_BOTS is sized against. Raise both
+# together if the container gets more memory.
+CMD ["node", "--max-old-space-size=2048", "src/server/index.js"]
