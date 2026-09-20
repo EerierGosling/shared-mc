@@ -10,8 +10,8 @@
 // holding the item and throwing the mining punch (swing()). The left is the
 // very same arm and rest pose reflected across the screen's centre by a parent
 // group scaled -1 on X (see the Hand constructor), and it stays hidden until a
-// block is placed — push() puts both hands out together for that one motion,
-// then the left retracts again.
+// block is placed — push() thrusts the left hand out on its own for that one
+// motion, then retracts it, while the right stays put holding the item.
 //
 // The mesh is parented directly to the camera, so its position/rotation are
 // always in camera-local space (-Z forward, +X right, +Y up) no matter how the
@@ -139,14 +139,15 @@ const SWING_ROTATION = [1.3, -0.1, -0.2]
 const SWING_MS = 100
 const RETURN_MS = 150
 
-// Placing is a two-handed jab toward the crosshair: the left hand (hidden the
-// rest of the time) is put out alongside the right for one forward thrust and
-// then retracts. The pivot moves in (toward screen centre), up a touch and
-// forward (-Z), with extra shoulder pitch to extend the forearm. It is authored
-// in the right hand's local space; the left mirrors it for free (its pivot lives
-// under a -1 X scale), so both hands converge symmetrically. The whole thrust
-// fits inside USE_REPEAT_MS (input.js, 200 ms) so hold-to-place reads as one
-// clean jab per block rather than the left hand flickering mid-motion.
+// Placing is a single left-hand jab toward the crosshair: the left hand (hidden
+// the rest of the time) is put out on its own for one forward thrust and then
+// retracts, while the right hand stays at rest holding the item. The pivot moves
+// in (toward screen centre), up a touch and forward (-Z), with extra shoulder
+// pitch to extend the forearm. The pose is authored in the right hand's local
+// space, but the left pivot lives under a -1 X scale, so carrying that pose onto
+// it mirrors it into a left-hand jab converging on the crosshair for free. The
+// whole thrust fits inside USE_REPEAT_MS (input.js, 200 ms) so hold-to-place
+// reads as one clean jab per block rather than the hand flickering mid-motion.
 const PUSH_POSITION = [0.28, -0.36, -0.8]
 const PUSH_ROTATION = [REST_ROTATION[0] + 0.35, REST_ROTATION[1], REST_ROTATION[2]]
 const PUSH_MS = 75
@@ -203,8 +204,8 @@ class Hand {
     // Left hand: the same arm and the same rest pose, reflected across the
     // screen's vertical centre by a parent scaled -1 on X. Building it as a
     // reflection — rather than as its own mirrored geometry and hand-derived
-    // Euler angles — is what makes the two-handed place cheap: any pose copied
-    // verbatim from the right pivot comes out symmetric for free (see push()).
+    // Euler angles — is what makes the placing jab cheap: the PUSH pose authored
+    // for the right hand comes out symmetric on the left for free (see push()).
     this.left = new THREE.Mesh(geometry, material)
     this.left.rotation.y = ARM_TWIST
     this.leftPivot = new THREE.Group()
@@ -329,41 +330,33 @@ class Hand {
       .start()
   }
 
-  // Placing: a single two-handed thrust toward the crosshair and back — one shot
-  // per placement, not the held punch loop mining uses. Only the right pivot is
-  // tweened (position and shoulder pitch together); the left copies it every
-  // frame, so the reflection stays exact through the whole motion. Overlapping
-  // calls are dropped, so hold-to-place fires a clean push per block rather than
-  // stacking tweens.
+  // Placing: a single left-hand thrust toward the crosshair and back — one shot
+  // per placement, not the held punch loop mining uses. The right hand stays at
+  // rest holding the item; only the left (hidden the rest of the time) is put out
+  // for the jab, so the left pivot is what gets tweened (position and shoulder
+  // pitch together). Overlapping calls are dropped, so hold-to-place fires a
+  // clean push per block rather than stacking tweens.
   push () {
     if (this.pushing) return
     this.pushing = true
-    // Put the second hand out for the motion; retract it when the thrust returns.
+    // Put the left hand out for the motion; retract it when the thrust returns.
     this.left.visible = true
-    const sync = () => {
-      this.leftPivot.position.copy(this.rightPivot.position)
-      this.leftPivot.rotation.copy(this.rightPivot.rotation)
-    }
-    new TWEEN.Tween(this.rightPivot.position)
+    new TWEEN.Tween(this.leftPivot.position)
       .to({ x: PUSH_POSITION[0], y: PUSH_POSITION[1], z: PUSH_POSITION[2] }, PUSH_MS)
       .easing(TWEEN.Easing.Quadratic.Out)
-      .onUpdate(sync)
       .chain(
-        new TWEEN.Tween(this.rightPivot.position)
+        new TWEEN.Tween(this.leftPivot.position)
           .to({ x: REST_POSITION[0], y: REST_POSITION[1], z: REST_POSITION[2] }, PUSH_RETURN_MS)
           .easing(TWEEN.Easing.Quadratic.In)
-          .onUpdate(sync)
       )
       .start()
-    new TWEEN.Tween(this.rightPivot.rotation)
+    new TWEEN.Tween(this.leftPivot.rotation)
       .to({ x: PUSH_ROTATION[0], y: PUSH_ROTATION[1], z: PUSH_ROTATION[2] }, PUSH_MS)
       .easing(TWEEN.Easing.Quadratic.Out)
-      .onUpdate(sync)
       .chain(
-        new TWEEN.Tween(this.rightPivot.rotation)
+        new TWEEN.Tween(this.leftPivot.rotation)
           .to({ x: REST_ROTATION[0], y: REST_ROTATION[1], z: REST_ROTATION[2] }, PUSH_RETURN_MS)
           .easing(TWEEN.Easing.Quadratic.In)
-          .onUpdate(sync)
           .onComplete(() => { this.pushing = false; this.left.visible = false })
       )
       .start()
