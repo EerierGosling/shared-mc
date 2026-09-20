@@ -106,3 +106,17 @@ body {
   color: #7f7f7f; margin: 0 0 var(--u);
   font-size: calc(var(--px) * 6px);
 }
+
+/* Phone controller: a quiet row of links under the primary control buttons, so
+   Disconnect and Back to Game stay reachable without competing with them. */
+.pair-footer {
+  margin-top: calc(3 * var(--u)); text-align: center;
+  font-size: calc(var(--px) * 6px);
+}
+.pair-footer button, .pair-footer a {
+  background: none; border: 0; padding: 0; margin: 0 calc(3 * var(--u));
+  font: inherit; color: #7f7f7f; text-decoration: underline; cursor: pointer;
+}
+.pair-footer button[hidden] { display: none; }
+.pair-footer button:hover, .pair-footer a:hover,
+.pair-footer button:focus-visible, .pair-footer a:focus-visible { color: var(--mc-yellow); outline: none; }

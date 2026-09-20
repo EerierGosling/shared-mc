@@ -5,8 +5,10 @@ const EMPTY = { forward: false, jump: false, digging: false, use: false, dx: 0, 
 function sanitize (value) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null
   if (typeof value.digging !== 'boolean') return null
-  // Phones are accelerometer mining controllers, never camera controllers.
-  return { ...EMPTY, digging: value.digging }
+  // A phone sends the two hand actions — mine and place — and nothing that
+  // moves or aims. Forward, jump and the look deltas stay stripped, so a paired
+  // phone can drive the hands but never steer another player's bot.
+  return { ...EMPTY, digging: value.digging, use: value.use === true }
 }
 
 // A phone sends only derived controls to its owning browser. It never joins a

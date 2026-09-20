@@ -5,11 +5,15 @@ const setupSpeech = require('./speech')
 const socket = io({ transports: ['websocket', 'polling'] })
 const status = document.getElementById('pair-status')
 const code = document.getElementById('pair-code')
+const intro = document.getElementById('pair-intro')
+const form = document.getElementById('pair-form')
 const disconnect = document.getElementById('pair-disconnect')
 const connect = document.getElementById('pair-connect')
-const show = document.getElementById('show-controls')
 const talk = document.getElementById('talk')
 let paired = false
+// iOS gates the accelerometer behind requestPermission inside a user gesture;
+// elsewhere it just works, so there we arm thrust-mining the moment we pair.
+const needsMotionGesture = Boolean(window.DeviceMotionEvent && typeof window.DeviceMotionEvent.requestPermission === 'function')
 // Speech notices replace the pairing status line; the game page gets them as
 // chat, which this page has none of.
 const speech = setupSpeech({ socket, notify: text => { status.textContent = text.replace(/^\* /, '') } })
@@ -47,16 +51,18 @@ const controls = setupPhoneControls({
   onStart: () => { if (paired) keepAwake() },
   onStop: releaseWake,
   apply: state => {
-    if (paired && socket.connected) socket.volatile.emit('motion:state', { digging: state.digging === true })
+    if (paired && socket.connected) socket.volatile.emit('motion:state', { digging: state.digging === true, use: state.use === true })
   }
 })
 function ended (message) {
   paired = false
   controls.stop()
+  controls.hide()
   speech.stop()
   releaseWake()
+  intro.hidden = false
+  form.hidden = false
   disconnect.hidden = true
-  show.hidden = true
   talk.hidden = true
   connect.disabled = !socket.connected
   status.textContent = message
@@ -72,12 +78,16 @@ function pair () {
     }
     paired = true
     code.value = ''
-    status.textContent = 'Paired. Tap Start Mining to allow motion access and start tracking. Enable Player Control on the game screen when ready.'
+    status.textContent = 'Paired. Hold Mine or Place to act; enable Player Control on the game screen when ready.'
+    intro.hidden = true
+    form.hidden = true
     disconnect.hidden = false
-    show.hidden = false
     talk.hidden = !speechEnabled
     controls.show()
-    document.querySelector('[data-action=motion]').scrollIntoView({ block: 'center' })
+    // Arm the accelerometer straight away where no permission prompt stands in
+    // the way; on iOS the first Mine press does it inside a user gesture.
+    if (!needsMotionGesture) controls.start()
+    document.getElementById('motion-mount').scrollIntoView({ block: 'center' })
   })
 }
 document.getElementById('pair-form').addEventListener('submit', event => {
@@ -85,7 +95,6 @@ document.getElementById('pair-form').addEventListener('submit', event => {
   pair()
 })
 disconnect.addEventListener('click', () => { socket.emit('motion:unpair'); ended('Disconnected. Generate a new code to pair again.') })
-show.addEventListener('click', () => controls.show())
 // Held like the game's own mic button: the mic is open only while a finger
 // is down, and anything that takes the finger away (a cancelled pointer, the
 // page going hidden) releases it.

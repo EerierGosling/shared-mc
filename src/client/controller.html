@@ -11,20 +11,21 @@
 <body class="companion mc-dirt">
   <main class="mc-panel">
     <h1>Phone Controller</h1>
-    <p>On the game screen, open Motion Controls → Phone. Scan its QR code or enter the pairing code below.</p>
+    <p id="pair-intro">On the game screen, open Motion Controls → Phone. Scan its QR code or enter the pairing code below.</p>
     <form id="pair-form">
       <label class="section-label" for="pair-code">Pairing code</label>
       <input id="pair-code" class="mc-text" type="text" maxlength="20" autocomplete="off" autocapitalize="characters" spellcheck="false" required pattern="[A-Za-z0-9\s\-]{6,20}" placeholder="6-character code">
       <button id="pair-connect" class="mc-button" type="submit">Connect to Game</button>
     </form>
     <p id="pair-status" role="status">Connecting to the site…</p>
-    <button id="pair-disconnect" class="mc-button" type="button" hidden>Disconnect from Game</button>
-    <button id="show-controls" class="mc-button" type="button" hidden>Show Phone Controls</button>
-    <button id="talk" class="mc-button" type="button" hidden style="touch-action: none; user-select: none">Hold to Talk</button>
+    <button id="talk" class="mc-button" type="button" hidden style="touch-action: none; user-select: none">Push to Talk</button>
     <div id="motion-mount"></div>
-    <small>This controller uses only the phone accelerometer for mining. Keep this page visible and the screen awake. Motion access requires HTTPS.</small>
-    <small>Hold to Talk records this phone's microphone and sends the words as chat from the paired game, where the server has speech to text set up.</small>
-    <a class="mc-button" href="/">Back to Game</a>
+    <div id="pair-footer" class="pair-footer">
+      <button id="pair-disconnect" type="button" hidden>Disconnect</button>
+      <a href="/">Back to Game</a>
+    </div>
+    <small>This controller drives the paired game's hands — Push to Talk, Place and Mine — with a phone-accelerometer thrust that also mines. Keep this page visible and the screen awake. Motion access requires HTTPS.</small>
+    <small>Push to Talk records this phone's microphone and sends the words as chat from the paired game, where the server has speech to text set up.</small>
   </main>
   <script src="/dist/controller.js"></script>
 </body>

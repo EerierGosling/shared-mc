@@ -72,7 +72,9 @@ test('packets are bounded, malformed packets rejected, requests throttled', t =>
   assert.equal(sanitize({ dx: NaN, dy: 0 }), null)
   assert.equal(sanitize({ dx: '1', dy: 0 }), null)
   assert.equal(sanitize(null), null)
-  assert.deepEqual(sanitize({ ...packet, forward: true, jump: true, use: true, dx: 99, dy: -8, socketId: 'other' }), packet)
+  // Mine and place ride through; movement and camera never do.
+  assert.deepEqual(sanitize({ ...packet, forward: true, jump: true, use: true, dx: 99, dy: -8, socketId: 'other' }), { ...packet, use: true })
+  assert.deepEqual(sanitize({ digging: true, use: 'yes' }), packet)
   const { host, phone } = setup(t)
   const { code } = host.request('motion:create')
   assert.equal(host.request('motion:create').code, code)
@@ -94,7 +96,7 @@ test('host disconnect and explicit unpair revoke phone authorization', t => {
   assert.equal(manager.hosts.size, 0)
 })
 
-test('pair before joining; only mining is relayed once the host joins', t => {
+test('pair before joining; only hand actions relayed once the host joins', t => {
   const joined = new Set()
   const manager = new MotionPairing(id => joined.has(id))
   t.after(() => manager.destroy())
@@ -113,7 +115,7 @@ test('pair before joining; only mining is relayed once the host joins', t => {
   assert.equal(manager.hostOf(phone.id), null, 'The phone speaks for nobody before the host joins')
   joined.add(host.id)
   phone.receive('motion:state', gestures)
-  assert.deepEqual(host.sent.at(-1), { event: 'motion:state', payload: packet })
+  assert.deepEqual(host.sent.at(-1), { event: 'motion:state', payload: { ...packet, use: true } })
   assert.equal(manager.hostOf(phone.id), host)
   assert.equal(manager.hostOf(host.id), null)
   phone.receive('motion:unpair')

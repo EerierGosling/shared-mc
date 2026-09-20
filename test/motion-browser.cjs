@@ -37,6 +37,7 @@ async function main () {
     })
     socket.on('input:state', state => packets.push(state))
     socket.on('action:dig', state => packets.push({ digging: state.active }))
+    socket.on('action:use', () => packets.push({ use: true }))
     socket.on('disconnect', () => joined.delete(socket.id))
   })
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve))
@@ -102,8 +103,12 @@ async function main () {
     await host.locator('#camera-controls [data-role=pairing]').evaluate(section => { section.open = true })
     assert.match(await host.locator('#camera-controls [data-role=pair-status]').textContent(), /Phone paired/)
     await host.locator('[data-action=arm]').click()
-    await phone.locator('[data-action=motion]').click()
-    assert.match(await phone.locator('[data-role=mode]').textContent(), /Player control enabled/)
+    await phone.bringToFront()
+    // Pairing arms thrust-mining on its own where no permission prompt stands in
+    // the way (Chromium has none), so no Start Mining tap is needed. Open the
+    // tuning disclosure to reach the accelerometer's own Start/Stop and sliders.
+    assert.match(await phone.locator('[data-role=mode]').textContent(), /Motion mining on/)
+    await phone.locator('[data-role=tuning]').evaluate(section => { section.open = true })
     const sendMotion = (z, count, y = 0.04) => phone.evaluate(async ({ z, count, y }) => {
       for (let i = 0; i < count; i++) {
         window.dispatchEvent(new DeviceMotionEvent('devicemotion', {
@@ -147,9 +152,18 @@ async function main () {
     await phone.mouse.up()
     await phone.waitForTimeout(150)
     assert.equal(packets.filter(p => 'digging' in p).at(-1).digging, false)
-    await phone.locator('[data-role=tuning] > summary').click()
+    // Place: a press sends use, and the host turns its rising edge into one action:use.
+    const placesBefore = packets.filter(p => p.use).length
+    const placeButton = phone.locator('[data-action=place]')
+    const placeBox = await placeButton.boundingBox()
+    await phone.mouse.move(placeBox.x + placeBox.width / 2, placeBox.y + placeBox.height / 2)
+    await phone.mouse.down()
+    await phone.waitForTimeout(150)
+    await phone.mouse.up()
+    await phone.waitForTimeout(150)
+    assert.ok(packets.filter(p => p.use).length > placesBefore, 'Phone Place button places a block')
     await phone.locator('[data-setting=phoneThreshold]').fill('1.2')
-    assert.match(await phone.locator('[data-role=mode]').textContent(), /Mining is off/)
+    assert.match(await phone.locator('[data-role=mode]').textContent(), /Motion mining off/)
     assert.equal(await phone.evaluate(() => JSON.parse(localStorage.getItem('motion-settings-v1')).phoneThreshold), 1.2)
     await phone.screenshot({ path: '/private/tmp/shared-mc-phone.png', fullPage: true })
     await phone.locator('#pair-disconnect').click()
