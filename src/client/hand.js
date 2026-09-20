@@ -124,9 +124,13 @@ const ARM_BOTTOM = [
   -HAND_X * Math.sin(ARM_TWIST) + HAND_Z * Math.cos(ARM_TWIST)
 ]
 const SWING_ROTATION = [1.3, -0.1, -0.2]
-// 3x the original swing speed.
-const SWING_MS = 35
-const RETURN_MS = 65
+// One full strike-and-return every SWING_MS + RETURN_MS, which is how often
+// startSwinging()'s timer throws the next punch while mining is held. ~250 ms
+// (≈4/s) matches vanilla's mining cadence; a quick out, a slower ease back.
+// Cranking these down (an earlier pass ran the whole cycle in 100 ms) reads as
+// a frantic twitch rather than a swing.
+const SWING_MS = 100
+const RETURN_MS = 150
 
 // The scene's directional light is fixed in world space (see index.js), so a
 // mesh lit by it goes flat or blows out depending purely on which way the
@@ -186,7 +190,7 @@ class Hand {
     this.scene.add(this.root)
 
     this.swinging = false
-    this.repeatTimer = null
+    this.looping = false
   }
 
   /** Draw over the finished world frame. Assumes renderer.autoClear is off. */
@@ -248,8 +252,7 @@ class Hand {
   }
 
   // Punch-and-return. Calls while a swing is already in flight are dropped, so
-  // startSwinging()'s repeat interval can just fire on a steady clock without
-  // stacking tweens on top of each other.
+  // a stray one-shot swing() (use/place) can't stack a second tween on top.
   swing () {
     if (this.swinging) return
     this.swinging = true
@@ -260,22 +263,31 @@ class Hand {
         new TWEEN.Tween(this.pivot.rotation)
           .to({ x: REST_ROTATION[0], y: REST_ROTATION[1], z: REST_ROTATION[2] }, RETURN_MS)
           .easing(TWEEN.Easing.Quadratic.In)
-          .onComplete(() => { this.swinging = false })
+          .onComplete(() => {
+            this.swinging = false
+            // Kick the next thrust off this one's completion rather than a
+            // parallel timer. A setInterval equal to the swing duration races
+            // the tween's own onComplete (stepped a frame later than the timer
+            // fires) and drops every other thrust, halving and stuttering the
+            // rate. Chaining guarantees back-to-back thrusts with no gap.
+            if (this.looping) this.swing()
+          })
       )
       .start()
   }
 
   // Keeps punching for as long as a dig/attack is held down, the way vanilla
-  // keeps swinging the arm while mining rather than throwing one punch.
+  // keeps swinging the arm while mining rather than throwing one punch. The
+  // in-flight swing loops itself; stopSwinging just lets the current one finish
+  // its return and settle at rest.
   startSwinging () {
-    if (this.repeatTimer) return
+    if (this.looping) return
+    this.looping = true
     this.swing()
-    this.repeatTimer = setInterval(() => this.swing(), SWING_MS + RETURN_MS)
   }
 
   stopSwinging () {
-    clearInterval(this.repeatTimer)
-    this.repeatTimer = null
+    this.looping = false
   }
 }
 
