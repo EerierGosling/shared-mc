@@ -134,6 +134,16 @@ road trip.
 - **`bot.physics` is per bot**, so zeroing gravity for one session cannot reach
   another. Verified rather than assumed — `Physics()` returns a fresh object per
   `inject`.
+- **Underwater is decided by the eye, not the body.** `state.js` sends
+  `eyeInWater` from vanilla's `isEyeInFluid` rule (eye below the fluid
+  surface of its block, with water above counting as full) rather than
+  mineflayer's `isInWater`, which is true while wading and would fog the
+  screen at knee depth. The browser keys the bubble row, the tiled
+  `misc/underwater.png` film and the fog off it; the fog lives in `sky.js`
+  because the sky dome has no fog term and has to be painted the fog colour
+  by hand, and it is lifted around the minimap pass, which looks down from
+  above the water. `oxygen` is mineflayer's air supply over 15, so the
+  bubbles multiply it back before applying vanilla's ceil arithmetic.
 - **Right click held is place-only.** The browser sends `action:use` once on
   press and then `{ repeat: true }` every 200 ms while held; the server treats
   repeats as "keep placing" and skips opening containers and using items, so a

@@ -12,6 +12,17 @@ const THREE = global.THREE || require('three')
 // `zenith` is straight up. skyDome blends between them per-pixel — a flat
 // scene.background color is what a *box* looks like, not a sky.
 const DAY_LENGTH = 24000
+
+// Vanilla's FogRenderer in water: linear fog from -8 out to 96 blocks times
+// the player's "water vision", which ramps 0 -> 1 over 600 ticks submerged and
+// is floored at 0.25, so the world starts 24 blocks deep and clears to 96 over
+// half a minute. The colour is the default biome waterFogColor; biomes vary
+// it (warm ocean, swamp) but we do not carry the biome to the browser.
+const WATER_FOG_COLOR = 0x050533
+const WATER_FOG_NEAR = -8
+const WATER_FOG_FAR = 96
+const WATER_VISION_MS = 30000
+const WATER_VISION_FLOOR = 0.25
 const CELESTIAL_RADIUS = 400
 const DOME_RADIUS = CELESTIAL_RADIUS * 1.2
 const STAR_COUNT = 1500
@@ -178,7 +189,47 @@ function createSky (viewer) {
   return { dome, stars, sun, moon }
 }
 
+// Whether the camera is underwater and since when; applySkyForTime consults
+// it so a state packet cannot paint the daytime dome back over the fog.
+const water = { submerged: false, since: 0 }
+let lastTimeOfDay = 0
+
+/**
+ * Called with the bot's eyeInWater flag. Entering water fogs the scene at
+ * once; leaving it drops the fog and repaints the sky for the last known
+ * time, rather than waiting up to a tick for the next state packet.
+ */
+function setSubmerged (viewer, sky, submerged) {
+  submerged = Boolean(submerged)
+  if (submerged === water.submerged) return
+  water.submerged = submerged
+  water.since = performance.now()
+  if (!submerged) viewer.scene.fog = null
+  applySkyForTime(viewer, lastTimeOfDay, sky)
+}
+
+/** Per frame: the fog clears with time spent underwater. Cheap when dry. */
+function updateWaterFog (viewer) {
+  if (!water.submerged) return
+  const vision = Math.min(1, (performance.now() - water.since) / WATER_VISION_MS)
+  const far = WATER_FOG_FAR * Math.max(WATER_VISION_FLOOR, vision)
+  if (!viewer.scene.fog) viewer.scene.fog = new THREE.Fog(WATER_FOG_COLOR, WATER_FOG_NEAR, far)
+  else viewer.scene.fog.far = far
+}
+
+// The dome is a custom shader with no fog term, so underwater it is painted
+// the fog colour outright and the sun, moon and stars are hidden — which is
+// what vanilla's sky looks like from below the surface anyway.
+function drownSky (sky) {
+  sky.dome.material.uniforms.bottomColor.value.set(WATER_FOG_COLOR)
+  sky.dome.material.uniforms.topColor.value.set(WATER_FOG_COLOR)
+  sky.stars.material.opacity = 0
+  sky.sun.material.opacity = 0
+  sky.moon.material.opacity = 0
+}
+
 function applySkyForTime (viewer, timeOfDay, sky) {
+  lastTimeOfDay = timeOfDay
   const t = ((timeOfDay % DAY_LENGTH) + DAY_LENGTH) % DAY_LENGTH
   const fraction = t / DAY_LENGTH
   const [from, to] = findSegment(t)
@@ -212,6 +263,10 @@ function applySkyForTime (viewer, timeOfDay, sky) {
 
   sky.moon.position.copy(center).addScaledVector(direction, -CELESTIAL_RADIUS)
   sky.moon.material.opacity = nightFactor
+  if (water.submerged) {
+    drownSky(sky)
+    updateWaterFog(viewer)
+  }
 }
 
-module.exports = { createSky, applySkyForTime }
+module.exports = { createSky, applySkyForTime, setSubmerged, updateWaterFog }

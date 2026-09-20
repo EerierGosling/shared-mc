@@ -14,7 +14,7 @@ const Minimap = require('./minimap')
 const BreakingAnimation = require('./breaking')
 const PlacePrediction = require('./place')
 const setupInput = require('./input')
-const { createSky, applySkyForTime } = require('./sky')
+const { createSky, applySkyForTime, setSubmerged, updateWaterFog } = require('./sky')
 const { Entities } = require('./entities')
 const { Hand } = require('./hand')
 const { JoinScreen } = require('./join')
@@ -40,6 +40,7 @@ window.__viewer = viewer
 const socket = io({ transports: ['websocket', 'polling'] })
 window.__socket = socket
 const hud = new Hud()
+const underwater = document.getElementById('underwater')
 const inventoryUI = new InventoryUI(socket)
 // Hidden until the Minecraft server says the bot really is in creative.
 const creative = new CreativeUI(socket)
@@ -161,6 +162,8 @@ socket.on('state', state => {
   hud.setState(state)
   placePrediction.setTarget(state.placeTarget)
   applySkyForTime(viewer, state.timeOfDay, sky)
+  setSubmerged(viewer, sky, state.eyeInWater)
+  underwater.classList.toggle('on', Boolean(state.eyeInWater))
   // The camera dips while sneaking. Viewer only applies the flag on the next
   // position packet, and a bot sneaking in place never sends one, so reapply
   // the last position ourselves.
@@ -215,7 +218,19 @@ function animate () {
   breaking.update()
   viewer.entities.animate(dt)
   minimap.setYaw(camera.yaw)
+  // The minimap looks down from well above the water, so it takes its pass
+  // with the fog lifted; the ramp then runs for the first-person view.
+  const fog = viewer.scene.fog
+  viewer.scene.fog = null
   minimap.render(renderer, viewer.scene)
+  viewer.scene.fog = fog
+  updateWaterFog(viewer)
+  if (underwater.classList.contains('on')) {
+    // Vanilla scrolls the film by yaw/64 and pitch/64 tiles, in degrees.
+    const tileX = THREE.MathUtils.radToDeg(camera.yaw) / 64
+    const tileY = THREE.MathUtils.radToDeg(camera.pitch) / 64
+    underwater.style.backgroundPosition = `${(tileX * 25).toFixed(2)}vw ${(tileY * 25).toFixed(2)}vh`
+  }
   renderer.clear()
   renderer.render(viewer.scene, viewer.camera)
   hand.render(renderer, viewer.camera)

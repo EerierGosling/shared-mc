@@ -25,6 +25,13 @@ const HEART = {
   fullBlink: HUD + 'heart/full_blinking.png'
 }
 const FOOD = { empty: HUD + 'food_empty.png', half: HUD + 'food_half.png', full: HUD + 'food_full.png' }
+// Air is ten bubbles over a 300-tick supply, and unlike hearts there is no
+// container: spent bubbles are simply not drawn. The last bubble about to go
+// is drawn already bursting.
+const AIR = { full: HUD + 'air.png', bursting: HUD + 'air_bursting.png' }
+const MAX_AIR_TICKS = 300
+// mineflayer hands us the supply divided by 15 (0-20), so undo that here.
+const OXYGEN_TO_TICKS = 15
 // Vanilla: a second of blinking after a hit, in three-tick on/off phases.
 const BLINK_MS = 1000
 const BLINK_PHASE_MS = 150
@@ -46,6 +53,7 @@ class Hud {
     this.stats = el('stats')
     this.health = el('health')
     this.food = el('food')
+    this.air = el('air')
     this.hotbar = el('hotbar')
     this.heldName = el('held-name')
     this.xpFill = el('xp-fill')
@@ -86,6 +94,7 @@ class Hud {
 
     this.hearts = iconRow(this.health)
     this.drumsticks = iconRow(this.food)
+    this.bubbles = iconRow(this.air)
   }
 
   setStatus (state, message) {
@@ -170,7 +179,7 @@ class Hud {
     // position alone make that nearly every tick — so each section repaints
     // only when its own data moved, not whenever a sibling field did. The
     // hotbar one matters most: renderSlot rebuilds nine <img> nodes per call.
-    const vitalsKey = `${state.health},${state.food}`
+    const vitalsKey = `${state.health},${state.food},${state.oxygen},${state.eyeInWater}`
     if (vitalsKey !== this.lastVitalsKey) {
       this.lastVitalsKey = vitalsKey
       this.renderVitals(state)
@@ -228,6 +237,7 @@ class Hud {
     paintIcons(this.hearts, state.health, HEART, blink)
     this.health.classList.toggle('low', state.health <= LOW_HEALTH)
     paintIcons(this.drumsticks, state.food, FOOD)
+    paintBubbles(this.bubbles, state)
 
     const progress = Math.max(0, Math.min(1, Number(state.xpProgress) || 0))
     this.xpFill.style.width = `calc(${(182 * progress).toFixed(1)} * var(--u))`
@@ -439,6 +449,25 @@ function paintIcons (cells, value, sprites, blink = null) {
     }
     layers.push(on ? sprites.emptyBlink : sprites.empty)
     cell.style.backgroundImage = layers.map(url => `url(${url})`).join(', ')
+  })
+}
+
+/**
+ * The air row, straight from vanilla's Gui.renderPlayerHealth: shown while the
+ * eyes are underwater or the supply is still refilling, with
+ * ceil((air - 2) * 10 / 300) whole bubbles and one bursting bubble for the
+ * remainder. The row goes right-to-left like hunger, so the first bubble to
+ * pop is the leftmost one.
+ */
+function paintBubbles (cells, state) {
+  const oxygen = Number.isFinite(state.oxygen) ? state.oxygen : MAX_AIR_TICKS / OXYGEN_TO_TICKS
+  const air = Math.min(MAX_AIR_TICKS, Math.max(0, oxygen * OXYGEN_TO_TICKS))
+  const show = state.eyeInWater || air < MAX_AIR_TICKS
+  const full = show ? Math.max(0, Math.ceil((air - 2) * ICON_COUNT / MAX_AIR_TICKS)) : 0
+  const bursting = show ? Math.ceil(air * ICON_COUNT / MAX_AIR_TICKS) - full : 0
+  cells.forEach((cell, i) => {
+    const sprite = i < full ? AIR.full : i < full + bursting ? AIR.bursting : null
+    cell.style.backgroundImage = sprite ? `url(${sprite})` : 'none'
   })
 }
 

@@ -5,6 +5,39 @@ const { predictPlacement } = require('./placement')
 
 const TICK_MS = 100
 
+// Blocks that carry a full water fluid state without being 'water' themselves
+// (vanilla's FluidTags.WATER covers them and any waterlogged block too).
+const WATER_LIKE = new Set(['bubble_column', 'kelp', 'kelp_plant', 'seagrass', 'tall_seagrass'])
+
+// The height of the water in a block, in the vanilla fluid sense: a source or
+// a waterlogged block holds 8/9, flowing water holds (8 - level)/9, and
+// falling water (level >= 8) counts as a full 8. 0 means no water at all.
+function waterHeight (block) {
+  if (!block) return 0
+  if (block.name === 'water') {
+    const level = Number(block.getProperties().level) || 0
+    return (8 - Math.min(level, 8)) / 9
+  }
+  if (WATER_LIKE.has(block.name) || block.isWaterlogged) return 8 / 9
+  return 0
+}
+
+// Vanilla's Entity.isEyeInFluid: the camera counts as submerged only once the
+// eye is below the fluid surface of its block — and a block with water above
+// it is treated as full, so a swimmer's head surfacing through a source
+// block stops being underwater at the right height rather than a block later.
+// Bubbles, fog and the overlay all key off this, not off being "in water",
+// which mineflayer already tracks for physics and which is true while wading.
+function eyeInWater (bot) {
+  const pos = bot.entity.position
+  if (!Number.isFinite(pos.x) || !Number.isFinite(pos.y) || !Number.isFinite(pos.z)) return false
+  const eye = pos.offset(0, bot.entity.eyeHeight || 1.62, 0)
+  let height = waterHeight(bot.blockAt(eye))
+  if (height === 0) return false
+  if (waterHeight(bot.blockAt(eye.offset(0, 1, 0))) > 0) height = 1
+  return eye.y < Math.floor(eye.y) + height
+}
+
 const round = (n, places = 2) => {
   const factor = Math.pow(10, places)
   return Math.round(n * factor) / factor
@@ -95,7 +128,9 @@ class StatePusher {
       isAlive: bot.isAlive !== false,
       health: round(bot.health || 0, 1),
       food: bot.food,
+      // 0-20; mineflayer scales the 300-tick air supply down by 15.
       oxygen: bot.oxygenLevel,
+      eyeInWater: eyeInWater(bot),
       xpLevel: bot.experience ? bot.experience.level : 0,
       xpProgress: bot.experience ? round(bot.experience.progress || 0, 3) : 0,
       // The camera dips while sneaking (Viewer.isSneaking); merged across the

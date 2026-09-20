@@ -148,9 +148,31 @@
   #health.low i:nth-child(2n) { animation-direction: reverse; }
   #health.low i:nth-child(3n) { animation-duration: 0.1s; }
   @keyframes heart-jitter { to { transform: translateY(var(--u)); } }
-  /* No hearts, hunger or XP in creative. */
+  /* Vanilla stacks the air bubbles 10px above the hunger row, right-aligned
+     to the same 182px, and only while the eyes are underwater or the supply
+     is refilling; hud.js leaves every cell blank otherwise. */
+  #air {
+    bottom: calc(42 * var(--u)); left: 50%; transform: translateX(-50%);
+    width: calc(182 * var(--u));
+    flex-direction: row-reverse;
+  }
+  #air i { margin-right: 0; margin-left: calc(-1 * var(--u)); }
+  /* No hearts, hunger, air or XP in creative. */
   body[data-gamemode="creative"] #hud-bars,
+  body[data-gamemode="creative"] #air,
   body[data-gamemode="creative"] #xp { display: none; }
+
+  /* --- underwater ----------------------------------------------------------- */
+  /* Vanilla's ScreenEffectRenderer.renderWater: misc/underwater.png tiled four
+     times across and down the screen at 10% alpha, scrolled by the camera's
+     yaw and pitch (index.js sets the position). The fog does most of the
+     work; this is the faint bubbly film over it. */
+  #underwater {
+    position: fixed; inset: 0; pointer-events: none; opacity: 0;
+    background: url('/assets/misc/underwater.png') 0 0 / 25% 25% repeat;
+    image-rendering: pixelated;
+  }
+  #underwater.on { opacity: 0.1; }
 
   /* --- experience ----------------------------------------------------------- */
   /* The 182x5 bar sits just above the hotbar; the level number straddles it in
@@ -608,6 +630,8 @@
     <div id="health" class="icon-row"></div>
     <div id="food" class="icon-row"></div>
   </div>
+  <div id="air" class="overlay icon-row"></div>
+  <div id="underwater"></div>
 
   <div id="xp" class="overlay">
     <div id="xp-fill"></div>
