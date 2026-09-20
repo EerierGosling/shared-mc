@@ -1,5 +1,5 @@
 # shared-mc
-Play Minecraft in the browser! Works with any offline mode servers, but also has an instance running at `mc.manitej.com` that you can join from a normal client.
+Play Minecraft in the browser at https://hackcraft.manitej.com! Works with any Java offline mode servers, but also has an instance running at `mc.manitej.com` port 25565 that you can join from a normal client.
 
 <img width="1400" height="756" alt="image" src="https://github.com/user-attachments/assets/6f5ab857-1539-46b4-b6fb-35ae6a6f70b6" />
 
