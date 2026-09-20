@@ -154,6 +154,9 @@ class Session {
     const tcp = bot._client && bot._client.socket
     this.address = (tcp && tcp.remoteAddress) || null
     this._setStatus('connected', `playing as ${bot.username}`)
+    // The tab list arrived before spawn, so the listeners above missed it:
+    // the roster sent at join knew nobody but us until someone else moved.
+    this.onPlayers()
   }
 
   _onDown (reason) {
