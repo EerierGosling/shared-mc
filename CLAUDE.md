@@ -182,8 +182,11 @@ road trip.
   `misc/underwater.png` film and the fog off it; the fog lives in `sky.js`
   because the sky dome has no fog term and has to be painted the fog colour
   by hand, and it is lifted around the minimap pass, which looks down from
-  above the water. `oxygen` is mineflayer's air supply over 15, so the
-  bubbles multiply it back before applying vanilla's ceil arithmetic.
+  above the water. `oxygen` is the air supply over 15, so the bubbles
+  multiply it back before applying vanilla's ceil arithmetic. It is read
+  from `bot.entity.metadata`, **not `bot.oxygenLevel`**: mineflayer 4.39
+  sets that from every entity's `air_supply` metadata, so anyone drowning
+  in view drained the bot's own bubbles.
 - **Right click held is place-only.** The browser sends `action:use` once on
   press and then `{ repeat: true }` every 200 ms while held; the server treats
   repeats as "keep placing" and skips opening containers and using items, so a

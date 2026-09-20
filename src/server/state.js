@@ -38,6 +38,20 @@ function eyeInWater (bot) {
   return eye.y < Math.floor(eye.y) + height
 }
 
+// mineflayer 4.39 sets bot.oxygenLevel from *every* entity_metadata packet
+// carrying air_supply, not only the bot's own, so a player or squid drowning
+// nearby overwrote it. Read the bot entity's own metadata instead, which
+// mineflayer keeps per entity.
+const MAX_AIR = 300
+function airSupply (bot) {
+  const keys = bot.registry && bot.registry.entitiesByName.player
+    ? bot.registry.entitiesByName.player.metadataKeys
+    : null
+  const idx = keys ? keys.indexOf('air_supply') : 1
+  const value = bot.entity.metadata ? bot.entity.metadata[idx] : undefined
+  return Number.isFinite(value) ? value : MAX_AIR
+}
+
 const round = (n, places = 2) => {
   const factor = Math.pow(10, places)
   return Math.round(n * factor) / factor
@@ -130,8 +144,8 @@ class StatePusher {
       isAlive: bot.isAlive !== false,
       health: round(bot.health || 0, 1),
       food: bot.food,
-      // 0-20; mineflayer scales the 300-tick air supply down by 15.
-      oxygen: bot.oxygenLevel,
+      // 0-20, the 300-tick air supply scaled down by 15 like bot.oxygenLevel.
+      oxygen: Math.round(airSupply(bot) / 15),
       eyeInWater: eyeInWater(bot),
       xpLevel: bot.experience ? bot.experience.level : 0,
       xpProgress: bot.experience ? round(bot.experience.progress || 0, 3) : 0,
