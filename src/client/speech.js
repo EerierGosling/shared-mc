@@ -1,25 +1,38 @@
 'use strict'
 
-// Push-to-talk. While the talk button is held the microphone is recorded and
-// each quarter second of encoded audio goes to the server, which has Deepgram
-// transcribe it and sends the words as this player's chat line. The mic is
-// opened on press and released on let go, so the browser's recording
-// indicator is only on while the button is.
+// Push-to-talk. While the talk key or button is held the microphone is
+// recorded and each quarter second of encoded audio goes to the server, which
+// has Deepgram transcribe it and sends the words as this player's chat line.
+// The mic is opened on press and released on let go, so the browser's
+// recording indicator is only on while the key is.
+//
+// Progress is published as classes on <body>: `talking` while the mic is
+// open, `talk-busy` while the last recording is being transcribed. The touch
+// button and the desktop HUD indicator both style off those.
 
 const SLICE_MS = 250
 // Chrome and Firefox record WebM/Opus; Safari only MP4. Deepgram sniffs both.
 const MIME_TYPES = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/ogg;codecs=opus']
 
-function setupSpeech ({ socket, hud, button }) {
+function setupSpeech ({ socket, hud }) {
   let recorder = null
   let stream = null
   // Set on press and cleared on release, so a release that arrives while
   // getUserMedia is still asking for permission is not lost.
   let wanted = false
   let sending = Promise.resolve()
+  // The server says at join whether it holds a transcription key. Checked
+  // before the mic opens so a key press on a server without one does not
+  // light the browser's recording indicator for nothing.
+  let enabled = false
+  socket.on('join:options', options => {
+    enabled = Boolean(options.speech)
+    document.body.classList.toggle('speech', enabled)
+  })
 
   const supported = () => Boolean(navigator.mediaDevices?.getUserMedia && window.MediaRecorder)
   const mimeType = () => MIME_TYPES.find(type => MediaRecorder.isTypeSupported(type))
+  const setTalking = on => document.body.classList.toggle('talking', on)
 
   const releaseMic = () => {
     if (stream) for (const track of stream.getTracks()) track.stop()
@@ -29,18 +42,22 @@ function setupSpeech ({ socket, hud, button }) {
 
   const start = async () => {
     if (wanted) return
+    if (!enabled) {
+      hud.addChat('* speech to text is not set up on this server')
+      return
+    }
     if (!supported()) {
       hud.addChat('* this browser cannot record audio')
       return
     }
     wanted = true
-    button.classList.add('on')
+    setTalking(true)
     try {
       stream = await navigator.mediaDevices.getUserMedia({ audio: true })
     } catch (err) {
       hud.addChat('* microphone access was refused')
       wanted = false
-      button.classList.remove('on')
+      setTalking(false)
       return
     }
     if (!wanted) return releaseMic()
@@ -65,14 +82,14 @@ function setupSpeech ({ socket, hud, button }) {
   const stop = () => {
     if (!wanted) return
     wanted = false
-    button.classList.remove('on')
+    setTalking(false)
     if (recorder && recorder.state !== 'inactive') {
-      button.classList.add('busy')
+      document.body.classList.add('talk-busy')
       recorder.stop()
     } else releaseMic()
   }
 
-  const settle = () => button.classList.remove('busy')
+  const settle = () => document.body.classList.remove('talk-busy')
   socket.on('speech:result', ({ text }) => {
     settle()
     if (!text) hud.addChat('* nothing heard')

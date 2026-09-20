@@ -157,10 +157,10 @@
 .mc-panel .phone-pair { color: var(--ink); }
 .mc-panel .phone-pair small { color: #7f7f7f; }
 .mc-panel .phone-pair a { color: var(--ink); }
-/* The join screen's controller column is too narrow for two buttons a row,
-   and its flex gap already spaces the block from the rows around it. */
-#join-controls .phone-pair { margin-top: 0; }
-#join-controls .phone-pair .motion-buttons { grid-template-columns: 1fr; gap: calc(2 * var(--u)); }
+/* The join menu is too narrow for two buttons a row, and its own gap already
+   spaces the pairing block from the menu items around it. */
+#join-phone .phone-pair { margin-top: 0; }
+#join-phone .phone-pair .motion-buttons { grid-template-columns: 1fr; gap: calc(2 * var(--u)); }
 
 /* --- the camera feed in the HUD --------------------------------------------- */
 /* Left of the minimap, in its translucent frame: 64px tall, a 4:3 frame wide. */

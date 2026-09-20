@@ -109,10 +109,8 @@ function setupInput ({ socket, viewer, camera, hud, inventoryUI, advancementsUI,
     useRepeat = null
   }
 
-  // Talk is held like mine and use, and only offered when the server has a
-  // transcription key behind it.
-  const speech = setupSpeech({ socket, hud, button: document.querySelector('#touch [data-action=talk]') })
-  socket.on('join:options', options => document.body.classList.toggle('speech', Boolean(options.speech)))
+  // Talk is held like mine and use: V on a keyboard, the mic button on touch.
+  const speech = setupSpeech({ socket, hud })
 
   const releaseAll = () => {
     cameraControls?.reset()
@@ -395,6 +393,12 @@ function setupInput ({ socket, viewer, camera, hud, inventoryUI, advancementsUI,
       hud.openChat(event.code === 'Slash' ? '/' : '')
       return
     }
+    // Push to talk: the key's auto-repeat keeps firing keydown while held,
+    // and start() is only wanted on the first one.
+    if (event.code === 'KeyV') {
+      if (!event.repeat) speech.start()
+      return
+    }
     // Dead players can still chat, and nothing else.
     if (hud.dead) return
 
@@ -430,6 +434,9 @@ function setupInput ({ socket, viewer, camera, hud, inventoryUI, advancementsUI,
   })
 
   window.addEventListener('keyup', event => {
+    // Unconditional: whatever opened between press and release (chat, the
+    // menu), letting go of V must close the mic.
+    if (event.code === 'KeyV') speech.stop()
     const control = KEY_TO_CONTROL[event.code]
     if (!control || !held[control]) return
     held[control] = false

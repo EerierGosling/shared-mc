@@ -35,6 +35,9 @@ module.exports = {
     port: int(process.env.PORT, 3000)
   },
   commit: commitHash(),
+  // Where the join screen's build hash links to. Fixed rather than read from
+  // the git remote because Docker images carry no .git.
+  repo: (process.env.REPO_URL || 'https://github.com/eeriergosling/shared-mc').replace(/\/+$/, ''),
   viewDistance: int(process.env.VIEW_DISTANCE, 6),
   // Clamped, not just defaulted. mineflayer's canDigBlock measures eye-to-block
   // *centre* against 5.1, while blockAtCursor measures eye-to-the-face-the-ray-

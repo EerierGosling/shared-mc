@@ -27,25 +27,39 @@ const lockLandscape = async () => {
 // page calls it Collaborative.
 const MODES = [
   {
-    id: 'roadtrip',
-    title: 'Collaborative',
-    blurb: 'Very chaotic. Control a player at the same time as everyone else.'
-  },
-  {
     id: 'solo',
     title: 'Solo',
     blurb: 'Control your own player.'
+  },
+  {
+    id: 'roadtrip',
+    title: 'Collaborative',
+    blurb: 'Very chaotic. Control a player at the same time as everyone else.'
   }
 ]
 
+// One is drawn at random each load, like the yellow line off the logo's corner
+// on the real title screen. Keep them short: the font does not shrink to fit.
+const SPLASHES = [
+  'Also try the real thing!',
+  'Runs in a browser tab!',
+  'Nothing to install!',
+  'Made at HackMIT!',
+  'One player, many hands!',
+  'Now with less latency!',
+  'Bring a friend!',
+  'Steve is shared!',
+  'Look ma, no launcher!',
+  'Pixels, all of them real!'
+]
+
 /**
- * The mode-and-identity screen shown before a visitor gets a bot.
- *
- * Laid out like Minecraft's world select: the server address, a list of rows
- * you pick from, then a button along the bottom. Choosing Collaborative needs
- * nothing else, since that
- * character is shared and already named; choosing your own bot reveals the
- * name and skin fields.
+ * The screen shown before a visitor gets a bot, laid out like the title
+ * screen: the logo, a button per mode where Singleplayer and Multiplayer go,
+ * and the controller link in the Realms slot. Picking a mode swaps the stack
+ * for a world-select style panel with the server address and, for your own
+ * bot, a name and skin; Collaborative needs neither, since that character is
+ * shared and already named.
  *
  * Nothing touches the Minecraft server until this resolves — a browser sitting
  * on this screen costs no player slot.
@@ -61,17 +75,23 @@ class JoinScreen {
     this.nameInput = document.getElementById('join-name')
     this.skinList = document.getElementById('join-skins')
     this.error = document.getElementById('join-error')
+    this.noticeLine = document.getElementById('join-notice')
     this.hostInput = document.getElementById('join-host')
     this.portInput = document.getElementById('join-port')
     this.build = document.getElementById('join-build')
     this.button = document.getElementById('join-button')
+    this.back = document.getElementById('join-back')
     this.doll = document.getElementById('join-doll')
+    this.head = document.getElementById('join-head')
+    this.modeTitle = document.getElementById('join-mode-title')
+    this.modeBlurb = document.getElementById('join-mode-blurb')
 
     this.mode = null
     this.skin = 'steve'
     this.options = null
     this.renderedSkins = false
     this.setDoll(this.skin)
+    document.getElementById('join-splash').textContent = SPLASHES[Math.floor(Math.random() * SPLASHES.length)]
 
     socket.on('join:options', options => this.setOptions(options))
     socket.on('join:rejected', ({ reason }) => this.reject(reason))
@@ -81,6 +101,7 @@ class JoinScreen {
       event.preventDefault()
       this.submit()
     })
+    this.back.addEventListener('click', () => this.unpick())
   }
 
   get isOpen () {
@@ -105,7 +126,19 @@ class JoinScreen {
         }
       } catch (err) { /* no storage; the placeholder stands */ }
     }
-    if (options.commit) this.build.textContent = options.commit
+    // Where vanilla writes "Minecraft 1.20.4", the build that is serving,
+    // the hash linking to its commit on GitHub.
+    this.build.textContent = 'Minecraft (HackMIT Edition) '
+    if (options.commit && options.commit !== 'unknown') {
+      const link = document.createElement('a')
+      link.href = `${options.repo}/commit/${options.commit}`
+      link.target = '_blank'
+      link.rel = 'noopener'
+      link.textContent = options.commit
+      this.build.appendChild(link)
+    } else {
+      this.build.textContent += options.commit || ''
+    }
     this.renderModes()
     if (!this.renderedSkins) {
       this.renderSkins(options.skins)
@@ -124,37 +157,29 @@ class JoinScreen {
     }
   }
 
+  /* One vanilla button per mode, in the Singleplayer and Multiplayer slots. */
   renderModes () {
     const { roadtripRiders, botCount, capacity, soloAvailable } = this.options
     this.modeList.innerHTML = ''
     for (const mode of MODES) {
       const full = mode.id === 'solo' && !soloAvailable
-      const row = document.createElement('button')
-      row.type = 'button'
-      row.className = 'mode-row' + (this.mode === mode.id ? ' selected' : '') + (full ? ' full' : '')
-      row.disabled = full
+      const button = document.createElement('button')
+      button.type = 'button'
+      button.className = 'mc-button'
+      button.disabled = full
+      button.title = full ? `All ${capacity} bots are in use.` : mode.blurb
+      button.appendChild(document.createTextNode(mode.title))
 
-      row.appendChild(modeBadge(mode.id))
-
-      const text = document.createElement('span')
-      const title = document.createElement('b')
-      title.textContent = mode.title
-      const sub = document.createElement('small')
-      sub.textContent = full ? `All ${capacity} bots are in use.` : mode.blurb
-      text.appendChild(title)
-      text.appendChild(sub)
-      row.appendChild(text)
-
-      // Occupancy on the right edge, in the row's own terms.
+      // Occupancy at the right end, in the button's own terms.
       const chip = document.createElement('em')
       chip.className = 'chip'
       chip.textContent = mode.id === 'roadtrip'
         ? `${roadtripRiders} playing`
         : full ? 'full' : `${capacity - botCount} free`
-      row.appendChild(chip)
+      button.appendChild(chip)
 
-      row.addEventListener('click', () => this.pick(mode.id))
-      this.modeList.appendChild(row)
+      button.addEventListener('click', () => this.pick(mode.id))
+      this.modeList.appendChild(button)
     }
   }
 
@@ -181,17 +206,34 @@ class JoinScreen {
     this.doll.style.setProperty('--skin', `url(${skinUrl(skin)})`)
   }
 
+  /* Swap the button stack for the setup panel, headed by what was picked. */
   pick (mode) {
+    const chosen = MODES.find(m => m.id === mode)
     this.mode = mode
     this.notice = null
-    this.renderModes()
+    this.root.dataset.mode = mode
+    const old = this.head.querySelector('.badge')
+    if (old) old.remove()
+    this.head.prepend(modeBadge(mode))
+    this.modeTitle.textContent = chosen.title
+    this.modeBlurb.textContent = chosen.blurb
     // Only your own bot needs a name and a face; the shared one already has
     // both, so the right column just shows it.
-    this.root.dataset.mode = mode
     this.setDoll(mode === 'solo' ? this.skin : (this.options && this.options.skins && this.options.skins[0]) || 'steve')
     this.button.disabled = false
     this.button.textContent = mode === 'roadtrip' ? 'Join in' : 'Play'
     if (mode === 'solo') this.nameInput.focus()
+    else this.hostInput.focus()
+    this.refreshHint()
+  }
+
+  /* Back to the button stack; whatever was typed is kept for next time. */
+  unpick () {
+    this.mode = null
+    delete this.root.dataset.mode
+    this.error.textContent = ''
+    this.error.classList.remove('bad')
+    this.setDoll(this.skin)
     this.refreshHint()
   }
 
@@ -200,11 +242,10 @@ class JoinScreen {
     if (!this.mode) {
       // Stays until a mode is picked, so a join:options refresh from someone
       // else joining does not wipe it before it has been read.
-      this.error.textContent = this.notice || 'Choose how you want to play.'
-      this.error.classList.toggle('bad', Boolean(this.notice))
-      this.button.disabled = true
+      this.noticeLine.textContent = this.notice || ''
       return
     }
+    this.noticeLine.textContent = ''
     this.error.textContent = `${this.options.botCount} of ${this.options.capacity} bots in use`
     this.error.classList.remove('bad')
   }

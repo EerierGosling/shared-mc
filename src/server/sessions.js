@@ -441,7 +441,8 @@ class Sessions {
       defaultServer: { host: this.config.mc.publicHost, port: this.config.mc.port },
       // Whether the talk button has anything behind it.
       speech: Boolean(this.config.speech.apiKey),
-      commit: this.config.commit
+      commit: this.config.commit,
+      repo: this.config.repo
     }
   }
 }

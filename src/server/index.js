@@ -78,6 +78,8 @@ app.get(['/controller', '/p'], (req, res) => {
 for (const sheet of ['ui.css', 'motion.css']) app.get(`/${sheet}`, (req, res) => res.sendFile(path.join(clientDir, sheet)))
 app.use('/dist', precompressed(distDir, FOREVER))
 app.use('/fonts', express.static(path.join(clientDir, 'fonts'), { maxAge: '7d' }))
+// The title screen's backdrop; minecraft-assets ships the panorama as 1x1s.
+app.use('/title', express.static(path.join(clientDir, 'title'), { maxAge: '7d' }))
 
 // prismarine-viewer only ships atlases for some versions (…, 1.20.1, 1.21.1,
 // …). Rounding DOWN to the previous atlas loses every block added since —
