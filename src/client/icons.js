@@ -199,4 +199,13 @@ function shadedTile (t, sw, sh, shade, tint) {
   return tile
 }
 
-module.exports = { init, iconFor }
+/**
+ * A block's resolved blocksStates entry, or null until the models load. The
+ * particle system reads each block's `particle` texture rect from here rather
+ * than fetching the 10 MB models file a second time.
+ */
+function blockState (name) {
+  return (states && states[name]) || null
+}
+
+module.exports = { init, iconFor, blockState }
