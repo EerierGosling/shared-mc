@@ -195,6 +195,16 @@ road trip.
   would finish the one it started; `control.js` watches the target during
   the dig and calls `stopDigging()` so a sweep across a wall does not break
   blocks the player already moved off.
+- **mineflayer's `dig()` resolves whether or not the server let it.** A
+  refused dig (spawn protection, a claim, adventure mode) is answered with a
+  `block_change` reasserting the block; mineflayer ignores it, clears the
+  block locally when its own timer ends and resolves, so the browser saw
+  the block vanish with no drop and walked into an invisible wall. Verified
+  against `mc.manitej.com`: everything within the spawn-protection radius
+  behaves this way. `_digLoop` watches the raw `block_change` packet for the
+  target and puts the server's state back after the dig resolves, rather
+  than aborting on the reassert, because some servers echo the block at dig
+  start and still break it.
 - **The bot's own view distance follows `VIEW_DISTANCE`.** mineflayer's
   default is 'far' and every bot decodes and holds every chunk it is sent,
   which with several solo bots up was most of the process's memory spent on

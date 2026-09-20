@@ -24,7 +24,7 @@ async function main () {
     .replace('/dist/bundle.js', `/dist/${bundle('bundle')}`)))
   app.get(['/controller', '/p'], (req, res) => res.type('html').send(fs.readFileSync(path.join(root, 'src/client/controller.html'), 'utf8')
     .replace('/dist/controller.js', `/dist/${bundle('controller')}`)))
-  app.get('/motion.css', (req, res) => res.sendFile(path.join(root, 'src/client/motion.css')))
+  for (const sheet of ['ui.css', 'motion.css']) app.get(`/${sheet}`, (req, res) => res.sendFile(path.join(root, 'src/client', sheet)))
   app.use('/dist', express.static(path.join(root, 'dist')))
   app.use('/fonts', express.static(path.join(root, 'src/client/fonts')))
   app.use('/assets', express.static(require('minecraft-assets')('1.20.4').directory))
@@ -57,13 +57,16 @@ async function main () {
     assert.equal(new URL(host.url()).pathname, '/controller')
     assert.equal(joined.size, 0, 'Opening the controller does not join a player')
     await host.getByRole('link', { name: 'Back to game' }).click()
-    await host.getByRole('radio', { name: 'Use camera', exact: true }).check()
-    assert.match(await host.locator('#join-control-hint').textContent(), /allow camera access/)
-    await host.getByRole('radio', { name: 'Camera + phone', exact: true }).check()
     await host.getByRole('button', { name: /Collaborative/ }).click()
     await host.locator('#join-button').click()
+    await host.waitForFunction(() => document.getElementById('join').classList.contains('open') === false)
+    assert.equal(await host.locator('#camera-controls').isVisible(), false, 'Joining does not open motion controls')
+    // The game menu is the only way in; Escape needs pointer lock, so press its button directly.
+    await host.evaluate(() => document.getElementById('pause-motion').click())
     await host.locator('#camera-controls').waitFor({ state: 'visible' })
     assert.match(await host.locator('[data-role=mode]').textContent(), /Practice mode/)
+    // Opening the pairing section generates a code by itself.
+    await host.locator('[data-role=pairing] > summary').click()
     await host.locator('[data-role=pair-qr]').waitFor({ state: 'visible' })
     const code = await host.locator('[data-role=pair-code]').textContent()
     assert.match(code, /^[A-HJ-NP-Z2-9]{6}$/)
@@ -138,12 +141,15 @@ async function main () {
         } }) };
         export const FaceLandmarker = { createFromOptions: async () => ({close(){},detectForVideo(){return {faceBlendshapes:[]}}}) };`
     }))
+    await host.evaluate(() => document.getElementById('pause-motion').click())
     await host.locator('[data-action=start]').click()
     await host.waitForFunction(() => document.querySelector('[data-role=status]').textContent.startsWith('Tracking'), { timeout: 10000 })
     await host.evaluate(() => { window.testStartGesture = true })
     await host.waitForFunction(() => document.querySelector('[data-role=mode]').textContent.includes('Player control enabled'))
     await host.evaluate(() => { window.testStartGesture = false })
     assert.match(await host.locator('[data-role=mode]').textContent(), /Player control enabled/)
+    // Enabling control closes the menu; reopen the page to keep driving it.
+    await host.evaluate(() => document.getElementById('pause-motion').click())
     await host.locator('[data-action=calibrate]').click()
     assert.match(await host.locator('[data-role=mode]').textContent(), /Practice mode/)
     await host.locator('[data-action=stop]').click()
@@ -154,6 +160,7 @@ async function main () {
       await host.reload()
       await host.getByRole('button', { name: /Collaborative/ }).click()
       await host.locator('#join-button').click()
+      await host.evaluate(() => document.getElementById('pause-motion').click())
       await host.locator('[data-action=start]').click()
       await host.waitForFunction(() => {
         const text = document.querySelector('[data-role=status]').textContent
@@ -169,25 +176,8 @@ async function main () {
       await host.locator('[data-action=stop]').click()
       console.log('Live MediaPipe pose and face models initialized successfully with a synthetic camera.')
     }
-    await host.reload()
-    assert.equal(await host.getByRole('radio', { name: 'Camera + phone', exact: true }).isChecked(), true)
-    // Pairing must also work when opened manually after choosing camera only.
-    await host.getByRole('radio', { name: 'Use camera', exact: true }).check()
-    await host.getByRole('button', { name: /Collaborative/ }).click()
-    await host.locator('#join-button').click()
-    await host.locator('[data-role=pairing] > summary').click()
-    await host.locator('[data-role=pair-qr]').waitFor({ state: 'visible', timeout: 7000 })
-    const manualCode = await host.locator('[data-role=pair-code]').textContent()
-    assert.match(manualCode, /^[A-HJ-NP-Z2-9]{6}$/)
-    await host.locator('[data-action=pair]').click()
-    await host.waitForFunction(previous => {
-      const code = document.querySelector('[data-role=pair-code]').textContent
-      return code && code !== previous && !document.querySelector('[data-role=pair-qr]').hidden
-    }, manualCode)
-    assert.ok(!(await host.locator('[data-role=pair-status]').textContent()).includes('retry'))
-    assert.match(await host.locator('[data-role=pair-code]').textContent(), /^[A-HJ-NP-Z2-9]{6}$/)
     assert.deepEqual(errors, [])
-    console.log('Browser checks passed: opening selection, QR generation, pairing, phone mining without walking, stop/unpair, saved settings, calibration and camera cleanup.')
+    console.log('Browser checks passed: menu-only panel, QR generation, pairing, phone mining without walking, stop/unpair, saved settings, start gesture, calibration and camera cleanup.')
   } finally {
     await browser?.close()
     pairing.destroy()

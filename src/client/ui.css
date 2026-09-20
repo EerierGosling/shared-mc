@@ -1,0 +1,108 @@
+/* Shared between the game page and the phone controller page: the GUI scale,
+   the palette and the vanilla widgets. index.html keeps everything that only
+   the game page draws. */
+
+/* Monocraft (SIL OFL) stands in for Minecraft's own font, which we cannot
+   redistribute. See fonts/Monocraft-OFL.txt. */
+@font-face {
+  font-family: 'Monocraft';
+  src: url('/fonts/Monocraft.ttf') format('truetype');
+  font-display: swap;
+}
+
+:root {
+  /* Vanilla's GUI scale. Every measurement is written in texture pixels
+     multiplied by this, so the whole interface rescales from here. Vanilla
+     picks this from the window size too; see the media query below. */
+  --px: 2;
+  --u: calc(var(--px) * 1px);
+
+  /* Minecraft draws text with a hard 1px shadow at 25% brightness. */
+  --shadow: #3f3f3f;
+
+  /* Container GUI palette, straight off the vanilla widget textures. */
+  --gui: #c6c6c6;
+  --gui-lit: #ffffff;
+  --gui-dim: #555555;
+  --slot: #8b8b8b;
+  --slot-dark: #373737;
+  --ink: #404040;
+  /* Ink for a state, on the light panel where the chat colours are unreadable. */
+  --ink-green: #2e7d2e;
+  --ink-red: #a83232;
+
+  /* Vanilla's in-chat colour codes, used for status text. */
+  --mc-white: #ffffff;
+  --mc-gray: #aaaaaa;
+  --mc-green: #55ff55;
+  --mc-yellow: #ffff55;
+  --mc-red: #ff5555;
+}
+
+@media (min-width: 1800px) and (min-height: 1000px) {
+  :root { --px: 3; }
+}
+
+* { box-sizing: border-box; }
+
+body {
+  font-family: 'Monocraft', ui-monospace, Menlo, Consolas, monospace;
+  font-size: calc(var(--px) * 8px);
+  line-height: 1.25;
+  /* Pixel fonts must not be antialiased or the glyph edges go soft. */
+  -webkit-font-smoothing: none;
+  font-smooth: never;
+}
+
+/* Vanilla's options background: the 16px dirt tile drawn at 2x and dimmed to
+   a quarter. */
+.mc-dirt {
+  background:
+    linear-gradient(rgba(0, 0, 0, 0.72), rgba(0, 0, 0, 0.72)),
+    url('/assets/gui/options_background.png') 0 0 / calc(32 * var(--u)) repeat;
+  image-rendering: pixelated;
+}
+
+/* Vanilla container chrome: light bevel top-left, dark bevel bottom-right. */
+.mc-panel {
+  background: var(--gui);
+  border-style: solid; border-width: calc(2 * var(--u));
+  border-color: var(--gui-lit) var(--gui-dim) var(--gui-dim) var(--gui-lit);
+  color: var(--ink);
+}
+
+/* The vanilla widget: 200x20 texture, highlighted variant on hover. */
+.mc-button {
+  width: calc(200 * var(--u)); height: calc(20 * var(--u));
+  margin-top: calc(24 * var(--u));
+  padding: 0; border: 0; cursor: pointer;
+  background: url('/assets/gui/sprites/widget/button.png') 0 0 / 100% 100%;
+  image-rendering: pixelated;
+  color: var(--mc-white); font: inherit;
+  text-shadow: var(--u) var(--u) 0 var(--shadow);
+}
+.mc-button:hover, .mc-button:focus-visible {
+  background-image: url('/assets/gui/sprites/widget/button_highlighted.png');
+  color: var(--mc-yellow); outline: none;
+}
+.mc-button:disabled {
+  background-image: url('/assets/gui/sprites/widget/button_disabled.png');
+  color: var(--mc-gray); cursor: default;
+}
+
+/* Vanilla's text field: black, inset bevel, white when focused. */
+.mc-text {
+  width: 100%; font: inherit;
+  font-size: calc(var(--px) * 8px);
+  padding: calc(2 * var(--u)) calc(3 * var(--u));
+  color: var(--mc-white); background: #000;
+  border-style: solid; border-width: var(--u);
+  border-color: var(--slot-dark) var(--gui-lit) var(--gui-lit) var(--slot-dark);
+  outline: none;
+}
+.mc-text:focus { border-color: var(--mc-white); }
+
+.section-label {
+  color: #7f7f7f; margin: 0 0 var(--u);
+  font-size: calc(var(--px) * 6px);
+}

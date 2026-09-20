@@ -4,56 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Shared Minecraft</title>
+<!-- The GUI scale, palette and vanilla widgets, shared with /controller. -->
+<link rel="stylesheet" href="/ui.css">
+<link rel="stylesheet" href="/motion.css">
 <style>
-  /* Monocraft (SIL OFL) stands in for Minecraft's own font, which we cannot
-     redistribute. See fonts/Monocraft-OFL.txt. */
-  @font-face {
-    font-family: 'Monocraft';
-    src: url('/fonts/Monocraft.ttf') format('truetype');
-    font-display: swap;
-  }
-
-  :root {
-    /* Vanilla's GUI scale. Every HUD measurement below is written in texture
-       pixels multiplied by this, so the whole interface rescales from here.
-       Vanilla picks this from the window size too; see the media query below. */
-    --px: 2;
-    --u: calc(var(--px) * 1px);
-
-    /* Minecraft draws text with a hard 1px shadow at 25% brightness. */
-    --shadow: #3f3f3f;
-
-    /* Container GUI palette, straight off the vanilla widget textures. */
-    --gui: #c6c6c6;
-    --gui-lit: #ffffff;
-    --gui-dim: #555555;
-    --slot: #8b8b8b;
-    --slot-dark: #373737;
-    --ink: #404040;
-
-    /* Vanilla's in-chat colour codes, used for status text. */
-    --mc-white: #ffffff;
-    --mc-gray: #aaaaaa;
-    --mc-green: #55ff55;
-    --mc-yellow: #ffff55;
-    --mc-red: #ff5555;
-  }
-
-  @media (min-width: 1800px) and (min-height: 1000px) {
-    :root { --px: 3; }
-  }
-
-  * { box-sizing: border-box; }
-
   html, body {
     margin: 0; height: 100%; overflow: hidden;
     background: #000; color: var(--mc-white);
-    font-family: 'Monocraft', ui-monospace, Menlo, Consolas, monospace;
-    font-size: calc(var(--px) * 8px);
-    line-height: 1.25;
-    /* Pixel fonts must not be antialiased or the glyph edges go soft. */
-    -webkit-font-smoothing: none;
-    font-smooth: never;
   }
 
   /* Every sprite here is a 9-to-22px texture blown up several times over;
@@ -358,26 +315,18 @@
   body.touch #status { top: calc(18 * var(--u)); }
 
   /* --- join screen ---------------------------------------------------------- */
-  /* Vanilla's options background: the 16px dirt tile drawn at 2x and dimmed to
-     a quarter, which is also what hides the empty sky before any chunk lands. */
+  /* The dirt tile is also what hides the empty sky before any chunk lands. */
   #join {
     inset: 0; display: none; align-items: center; justify-content: center;
     padding: calc(4 * var(--u));
-    background:
-      linear-gradient(rgba(0, 0, 0, 0.72), rgba(0, 0, 0, 0.72)),
-      url('/assets/gui/options_background.png') 0 0 / calc(32 * var(--u)) repeat;
-    image-rendering: pixelated;
     pointer-events: auto;
   }
   #join.open { display: flex; }
   /* Two columns: where and how on the left, who on the right, one footer. */
   #join-panel {
-    background: var(--gui);
-    border-style: solid; border-width: calc(2 * var(--u));
-    border-color: var(--gui-lit) var(--gui-dim) var(--gui-dim) var(--gui-lit);
     padding: calc(5 * var(--u)) calc(6 * var(--u));
     width: calc(300 * var(--u)); max-width: 100%;
-    color: var(--ink);
+    max-height: 100%; overflow-y: auto;
     display: grid;
     grid-template-columns: minmax(0, 1fr) calc(104 * var(--u));
     grid-template-areas: "head head" "left right" "foot foot";
@@ -404,22 +353,12 @@
     border-top: var(--u) solid var(--slot);
     padding-top: calc(4 * var(--u));
   }
-  /* Beats .section-label's own margin, which is declared later on. */
+  /* The id outweighs .section-label's own margin in ui.css. */
   #join-panel .join-label { margin: calc(2 * var(--u)) 0 0; }
   #join-panel .join-label:first-child { margin-top: 0; }
   /* Which server to play on: host and port side by side, like the server-list
      "Direct Connect" screen. The configured default is only the placeholder. */
   #join-server { display: flex; gap: calc(2 * var(--u)); }
-  #join-name, #join-host, #join-port {
-    width: 100%; font: inherit;
-    font-size: calc(var(--px) * 8px);
-    padding: calc(2 * var(--u)) calc(3 * var(--u));
-    color: var(--mc-white); background: #000;
-    border-style: solid; border-width: var(--u);
-    border-color: var(--slot-dark) var(--gui-lit) var(--gui-lit) var(--slot-dark);
-    outline: none;
-  }
-  #join-name:focus, #join-host:focus, #join-port:focus { border-color: var(--mc-white); }
   #join-host { flex: 1; min-width: 0; }
   #join-port { width: calc(36 * var(--u)); flex: none; text-align: center; }
   /* Minecraft's world-select list: stacked rows, selection is a white outline. */
@@ -446,6 +385,13 @@
     text-shadow: var(--u) var(--u) 0 var(--shadow);
   }
   .mode-row.full .chip { color: var(--mc-red); }
+  /* The way to make this device someone else's controller instead. */
+  #join-controls { display: flex; flex-direction: column; gap: var(--u); min-width: 0; }
+  #join-controls .join-label { margin-bottom: 0; }
+  #join-controls .mode-row b { font-size: calc(var(--px) * 8px); }
+  #join-controls a.mode-row { text-decoration: none; }
+  #join-controls a.mode-row:focus-visible { outline: var(--u) solid var(--mc-white); outline-offset: var(--u); }
+  #join-controls small { font-size: calc(var(--px) * 6px); color: #7f7f7f; line-height: 1.4; margin: var(--u) 0; }
 
   /* The right column: a player figure in the skin about to be worn, then the
      name and the other faces once a solo character is being made. */
@@ -507,7 +453,7 @@
   .skin:hover { background-color: #c5c5c5; }
   .skin.selected { border-color: var(--mc-white); background-color: #fff; }
   #join-error { margin: 0; flex: 1; min-width: 0; font-size: calc(var(--px) * 7px); color: #555; }
-  #join-error.bad { color: #a83232; }
+  #join-error.bad { color: var(--ink-red); }
   /* The vanilla 200x20 widget, half width: the footer's right-hand end. */
   #join-button { margin: 0; width: calc(100 * var(--u)); flex: none; }
 
@@ -539,8 +485,11 @@
     margin: calc(20 * var(--u)) 0 calc(16 * var(--u));
     font-size: calc(var(--px) * 8px); font-weight: normal; line-height: 1;
   }
-  #pause .mc-button { margin-top: calc(4 * var(--u)); }
-  #pause .mc-button:first-of-type { margin-top: 0; }
+  /* The main page; the motion controls page is #camera-controls, in motion.css. */
+  #pause-main { display: flex; flex-direction: column; align-items: center; }
+  #pause-main[hidden] { display: none; }
+  #pause-main .mc-button { margin-top: calc(4 * var(--u)); }
+  #pause-main .mc-button:first-of-type { margin-top: 0; }
   /* Where this bot really is: the address as typed, then the IP the socket
      resolved to when they differ. */
   #pause-where {
@@ -585,24 +534,6 @@
   #death-score { margin-top: calc(6 * var(--u)); }
   #death-score b { color: var(--mc-yellow); font-weight: normal; }
   #death-countdown { margin-top: calc(6 * var(--u)); color: var(--mc-gray); }
-  /* The vanilla widget: 200x20 texture, highlighted variant on hover. */
-  .mc-button {
-    width: calc(200 * var(--u)); height: calc(20 * var(--u));
-    margin-top: calc(24 * var(--u));
-    padding: 0; border: 0; cursor: pointer;
-    background: url('/assets/gui/sprites/widget/button.png') 0 0 / 100% 100%;
-    image-rendering: pixelated;
-    color: var(--mc-white); font: inherit;
-    text-shadow: var(--u) var(--u) 0 var(--shadow);
-  }
-  .mc-button:hover, .mc-button:focus-visible {
-    background-image: url('/assets/gui/sprites/widget/button_highlighted.png');
-    color: var(--mc-yellow); outline: none;
-  }
-  .mc-button:disabled {
-    background-image: url('/assets/gui/sprites/widget/button_disabled.png');
-    color: var(--mc-gray); cursor: default;
-  }
 
   /* --- inventory ----------------------------------------------------------- */
   #inventory {
@@ -616,10 +547,6 @@
     margin: calc(2 * var(--u)) 0 0;
     font-size: calc(var(--px) * 6px); color: var(--mc-gray);
     text-shadow: var(--u) var(--u) 0 var(--shadow);
-  }
-  .section-label {
-    color: #7f7f7f; margin: 0 0 var(--u);
-    font-size: calc(var(--px) * 6px);
   }
   .grid {
     display: grid;
@@ -647,13 +574,9 @@
   /* Hidden outright until the Minecraft server grants creative: creative.js
      adds .open, so a survival session never sees a control it cannot use. */
   #creative { display: none; }
-  /* Vanilla container chrome: light bevel top-left, dark bevel bottom-right. */
   #creative.open {
     display: block; margin-bottom: calc(3 * var(--u));
-    width: calc(176 * var(--u)); box-sizing: border-box;
-    background: var(--gui);
-    border-style: solid; border-width: calc(2 * var(--u));
-    border-color: var(--gui-lit) var(--gui-dim) var(--gui-dim) var(--gui-lit);
+    width: calc(176 * var(--u));
     padding: calc(3 * var(--u));
   }
   #creative-head { display: flex; align-items: baseline; gap: calc(2 * var(--u)); }
@@ -739,7 +662,6 @@
     left: calc(35 * var(--u)); top: calc(11 * var(--u));
   }
 </style>
-<link rel="stylesheet" href="/motion.css">
 </head>
 <body>
   <canvas id="viewport"></canvas>
@@ -752,6 +674,8 @@
     <canvas id="minimap-canvas" width="64" height="64"></canvas>
     <div id="minimap-arrow"></div>
   </div>
+  <!-- The motion camera while its panel is closed; camera-controls.js moves the video in here. -->
+  <div id="motion-feed" class="overlay"></div>
 
   <div id="hud-bars" class="overlay">
     <div id="health" class="icon-row"></div>
@@ -801,8 +725,10 @@
   </div>
 
   <div id="pause" class="overlay shadowed">
+    <div id="pause-main">
     <h1>Game menu</h1>
     <button id="pause-resume" class="mc-button" type="button">Back to Game</button>
+    <button id="pause-motion" class="mc-button" type="button">Motion Controls...</button>
     <button id="pause-quit" class="mc-button" type="button">Quit to Title</button>
     <div id="pause-where">
       <div>Connected to</div>
@@ -827,12 +753,13 @@
       <div class="row creative-only"><b>double-space</b><span>toggle flight</span></div>
       <div class="row creative-only"><b>space / shift</b><span>fly up / down</span></div>
     </div>
+    </div>
   </div>
 
   <div id="players" class="overlay"></div>
 
-  <div id="join" class="overlay">
-    <form id="join-panel" action="#">
+  <div id="join" class="overlay mc-dirt">
+    <form id="join-panel" class="mc-panel" action="#">
       <header id="join-head">
         <h1>Shared Minecraft</h1>
         <p id="join-build"></p>
@@ -840,21 +767,16 @@
       <section id="join-left">
         <p class="section-label join-label">Server</p>
         <div id="join-server">
-          <input id="join-host" placeholder="server address" autocomplete="off" spellcheck="false">
-          <input id="join-port" placeholder="25565" inputmode="numeric" maxlength="5" autocomplete="off">
+          <input id="join-host" class="mc-text" placeholder="server address" autocomplete="off" spellcheck="false">
+          <input id="join-port" class="mc-text" placeholder="25565" inputmode="numeric" maxlength="5" autocomplete="off">
         </div>
         <p class="section-label join-label">How to play</p>
         <div id="join-modes"></div>
-        <fieldset id="join-controls" aria-describedby="join-control-hint">
-          <legend>Controls</legend>
-          <label><input type="radio" name="control-mode" value="standard" checked> Keyboard / mouse / touch</label>
-          <label><input type="radio" name="control-mode" value="camera"> Use camera</label>
-          <label><input type="radio" name="control-mode" value="hybrid"> Camera + phone</label>
-          <label><input type="radio" name="control-mode" value="phone"> Paired phone controller</label>
-          <small id="join-control-hint">You can change controls from the game menu.</small>
-          <a id="join-controller" href="/controller" aria-describedby="join-controller-hint">Use this device as a controller</a>
-          <small id="join-controller-hint">Pair with a game on another screen using its pairing code. No extra player needed.</small>
-        </fieldset>
+        <div id="join-controls">
+          <p class="section-label join-label">Controller</p>
+          <a id="join-controller" class="mode-row" href="/controller" aria-describedby="join-controller-hint"><span><b>Use this device as a controller</b></span></a>
+          <small id="join-controller-hint">Pair with a game on another screen using its pairing code. No extra player needed. Motion controls for this screen are in the game menu.</small>
+        </div>
       </section>
       <section id="join-right">
         <p class="section-label join-label">Your character</p>
@@ -869,7 +791,7 @@
           </div>
         </div>
         <div id="join-identity">
-          <input id="join-name" maxlength="16" placeholder="your name" autocomplete="off" spellcheck="false">
+          <input id="join-name" class="mc-text" maxlength="16" placeholder="your name" autocomplete="off" spellcheck="false">
           <div id="join-skins"></div>
         </div>
       </section>
@@ -884,7 +806,7 @@
     <div id="inventory-panel">
       <!-- Creative only. Kept above the inventory so a stack dragged up out of
            a slot and released here is destroyed, as it is in vanilla. -->
-      <div id="creative">
+      <div id="creative" class="mc-panel">
         <div id="creative-head">
           <p class="section-label">Creative</p>
           <input id="creative-search" placeholder="search items" autocomplete="off" spellcheck="false">

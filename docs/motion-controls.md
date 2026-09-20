@@ -1,17 +1,17 @@
 # Motion controls: setup, practice, and tuning
 
-## Choose controls when opening the game
+## Open the setup page from the game menu
 
-The opening screen offers **Keyboard / mouse / touch**, **Use camera**,
-**Camera + phone**, and **Paired phone controller**. Your selection
-is remembered in this browser. Join the game normally; motion selections open
-setup in **practice mode**, without requesting camera permission until you press
-**Start camera**. You can reopen setup from **Game menu → Motion controls & phone**.
+Join the game normally, then open **Game menu → Motion Controls**. It is a
+page of the game menu; **Done** or Escape returns to the menu. Setup starts
+in **practice mode**, without requesting camera permission until you press
+**Start Camera**. While the camera runs and the page is not showing, its feed
+stays in a small box beside the minimap.
 
 Practice mode displays detected actions without sending them to the player.
-Press **Enable player control** when ready. **Return to practice** releases all
-motion actions; **Stop all inputs** also stops the camera and motion sensor and
-revokes a desktop pairing. Hiding the panel keeps enabled controls running.
+Press **Enable Player Control** when ready. **Return to Practice** releases all
+motion actions; **Stop All Inputs** also stops the camera and motion sensor and
+revokes a desktop pairing. Done returns to the game menu and keeps enabled controls running.
 Keyboard/touch input remains available alongside motion controls.
 
 ## Camera-only setup
@@ -19,7 +19,7 @@ Keyboard/touch input remains available alongside motion controls.
 1. Use HTTPS (or localhost on the same computer). Place a stable camera around
    chest/face height. Fit your face, hips, hands, and feet in the picture with
    room above your head. Prefer even front lighting and a simple background.
-2. Select front/default or rear camera, then press **Start camera**. Changing
+2. Select front/default or rear camera, then press **Start Camera**. Changing
    cameras stops capture; start it again to use the new choice.
 3. Stand still in a comfortable neutral stance and look straight ahead while
    calibration completes. It takes about 30 stable tracked frames. Keep feet
@@ -56,15 +56,15 @@ expressions on some cameras.
 
 ## Pair a phone with QR code
 
-1. Open **Pair a phone** on the game screen, after joining.
+1. Open **Pair a Phone** on the game screen, after joining.
 2. Check **Site address reachable from your phone**. It must point to this same
    running application. A desktop URL such as `localhost:3000` points to the
    phone itself when opened on a phone. Use a reachable HTTPS deployment or
    an HTTPS reverse proxy/tunnel to your development server. Plain HTTP LAN
    addresses generally cannot access camera/motion sensors.
-3. Press **Generate pairing code**. Scan the QR code using the phone camera, or
+3. Press **Generate Code**. Scan the QR code using the phone camera, or
    open the displayed link on the phone. The code is already filled in when
-   opening the QR/link. Alternatively, open `/controller` and enter the code.
+   opening the QR/link. Alternatively, open `/p` and enter the code.
 4. Press **Connect to game** on the phone. Codes expire after five minutes and
    work once. Once connected, the QR/code is removed from the game screen.
 5. Choose inputs and practice on the phone, then enable player control on
@@ -75,11 +75,16 @@ expressions on some cameras.
    a socket disconnect requires a new code.
 
 Recommended hybrid setup: mount the computer camera for head/arm/body input;
-use the phone for mining: hold it upright with the screen facing you, pause briefly, then thrust forward. Camera knee lifts still control walking. On the phone,
-choose **Enable phone mining** (no camera required), allow motion permission if
-prompted. This enables phone input; enable player control on the game screen when ready. The live measurements show acceleration
-and warn if no samples arrive. Mining requires a forward thrust followed by braking; sideways shakes and isolated impacts are rejected. Repeated forward thrusts keep mining held through brief pauses between strokes. Resting for about 350 ms stops mining. There is a gravity-filter fallback for devices that only report
-acceleration including gravity.
+use the phone for mining: hold it upright with the screen facing you, pause
+briefly, then thrust forward. Camera knee lifts still control walking. On the
+phone, turn on **Phone Mining** (no camera required) and allow motion permission
+if prompted. This enables phone input; enable player control on the game screen
+when ready. The live measurements show acceleration and warn if no samples
+arrive. Mining requires a forward thrust followed by braking; sideways shakes
+and isolated impacts are rejected. Repeated forward thrusts keep mining held
+through brief pauses between strokes. Resting for about 350 ms stops mining.
+There is a gravity-filter fallback for devices that only report acceleration
+including gravity.
 
 Alternatively, mount the phone to use its camera as the sole tracker and leave
 accelerometer mining off. A phone moving with your body is a poor stationary
@@ -87,8 +92,9 @@ camera: do not expect simultaneous handheld full-body camera tracking and
 accelerometer mining to be reliable.
 
 The desktop merges camera and phone actions. Phone acceleration only mines;
-camera gestures can walk, jump, and mine. When both cameras track gestures, releasing one source does not cancel the other. Head look from
-both sources adds together, so normally use just one camera for steering.
+camera gestures can walk, jump, and mine. When both cameras track gestures,
+releasing one source does not cancel the other. Head look from both sources
+adds together, so normally use just one camera for steering.
 The receiving game browser's look-speed slider controls final turn speed.
 
 ## Tune sensitivity

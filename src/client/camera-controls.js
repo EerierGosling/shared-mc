@@ -10,7 +10,10 @@ const { FIELDS, DEFAULTS, load, save } = require('./motion-settings')
 const RUNTIME = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.22-rc.20250304'
 const MODEL_ROOT = 'https://storage.googleapis.com/mediapipe-models/'
 
-module.exports = function setupCameraControls ({ apply, canPlay, onStart, socket, companion = false, mount = document.body }) {
+// In the game the panel is a page of the game menu (mount is #pause and the
+// menu shows and hides it, so onDone hands Done back to the menu); on the
+// phone it sits in the page and Done just hides it.
+module.exports = function setupCameraControls ({ apply, canPlay, onStart, onDone, socket, companion = false, mount = document.body }) {
   let settings = load()
   const gestures = new Gestures(settings)
   const faces = new FaceGestures()
@@ -20,41 +23,60 @@ module.exports = function setupCameraControls ({ apply, canPlay, onStart, socket
   panel.id = 'camera-controls'
   panel.hidden = true
   panel.setAttribute('aria-label', 'Motion controls setup')
-  panel.innerHTML = `<h2>Motion controls</h2>
+  const pairing = companion
+    ? ''
+    : `<details data-role="pairing"><summary class="mc-button">Pair a Phone...</summary>
+      <p>Open <a href="/controller" target="_blank" rel="noopener">the phone controller</a> on your phone and enter the code, or scan it. Both devices must reach this site over HTTPS.</p>
+      <label class="motion-field">Site address reachable from your phone <input type="text" class="mc-text" data-role="pair-origin" aria-label="Phone-accessible HTTPS site address"></label>
+      <small>Use this server's HTTPS address. localhost on your phone points to the phone, not your computer.</small>
+      <div class="motion-buttons">
+        <button type="button" class="mc-button" data-action="pair">Generate Code</button>
+        <button type="button" class="mc-button" data-action="unpair">Disconnect Phone</button>
+      </div>
+      <canvas data-role="pair-qr" role="img" aria-label="Scan to open the phone controller with the pairing code" hidden></canvas>
+      <strong data-role="pair-code"></strong><a data-role="pair-link"></a>
+      <p data-role="pair-status">No phone connected. Codes expire after five minutes and work once.</p>
+      <small>A phone can send camera gestures, accelerometer mining, or both. Recommended: desktop camera + phone mining. Pairing does not create another player.</small>
+    </details>`
+  panel.innerHTML = `<h2>Motion Controls</h2>
     <small>Start in practice mode. Calibrate, test your gestures, then enable player control.</small>
     <div class="motion-preview"><video autoplay muted playsinline aria-label="Mirrored camera preview"></video><canvas data-role="landmarks" aria-hidden="true"></canvas></div>
     <small data-role="tracking">Green landmarks show confident body tracking.</small>
     <p data-role="status" role="status">Choose a camera or phone motion input.</p>
     <div class="motion-buttons">
-      <button type="button" data-action="start">Start camera</button>
-      <button type="button" data-action="calibrate">Calibrate neutral pose</button>
-      <button type="button" data-action="motion">Enable phone mining</button>
+      <button type="button" class="mc-button" data-action="start">Start Camera</button>
+      <button type="button" class="mc-button" data-action="calibrate">Calibrate</button>
+      <button type="button" class="mc-button" data-action="motion">Phone Mining: OFF</button>
+      <label class="mc-button mc-cycle">Camera:&nbsp;<select data-setting="camera"><option value="user">Front</option><option value="environment">Rear</option></select></label>
     </div>
-    <label>Camera <select data-setting="camera"><option value="user">Front / default</option><option value="environment">Rear camera</option></select></label>
-    <div class="motion-buttons motion-primary">
-      <button type="button" data-action="arm">Enable player control</button>
-      <button type="button" data-action="stop">Stop all inputs</button>
-      <button type="button" data-action="hide">Hide panel</button>
+    <div class="motion-buttons">
+      <button type="button" class="mc-button wide" data-action="arm">Enable Player Control</button>
+      <button type="button" class="mc-button wide" data-action="stop">Stop All Inputs</button>
     </div>
-    <p data-role="mode">Practice mode — gestures do not affect the player.</p>
-    <p data-role="start-hint">After camera calibration, raise both hands above your head and hold for one second to enable player control.</p>
+    <p data-role="mode">Practice mode: gestures do not affect the player.</p>
+    <small data-role="start-hint">After camera calibration, raise both hands above your head and hold for one second to enable player control.</small>
     <p data-role="detected">Detected: idle</p>
-    <details data-role="tuning"><summary>Sensitivity & tuning</summary>
-      <label>Preset <select data-setting="preset"><option value="normal">Balanced</option><option value="gentle">Small movements</option><option value="deliberate">Deliberate movements</option></select></label>
+    ${pairing}
+    <details data-role="tuning"><summary class="mc-button">Sensitivity &amp; Tuning...</summary>
+      <div class="motion-buttons">
+        <label class="mc-button mc-cycle wide">Preset:&nbsp;<select data-setting="preset"><option value="normal">Balanced</option><option value="gentle">Small movements</option><option value="deliberate">Deliberate movements</option></select></label>
+      </div>
       <div data-role="sliders"></div>
-      <label><input type="checkbox" data-setting="autojump"> Autojump while walking forward</label>
-      <label><input type="checkbox" data-setting="invertX"> Invert horizontal look</label>
-      <label><input type="checkbox" data-setting="invertY"> Invert vertical look</label>
-      <label>Mining arm <select data-setting="arm"><option value="right">Right</option><option value="left">Left</option></select></label>
-      <label><input type="checkbox" data-setting="facial"> Facial actions: smile to use/place; open mouth to jump</label>
-      <small>Hold an expression for ¼ second. Relax before repeating. Face tracking downloads an additional model.</small>
-      <button type="button" data-action="defaults">Reset sensitivity</button>
+      <div class="motion-buttons">
+        <label class="mc-button mc-toggle"><input type="checkbox" data-setting="autojump"><span>Autojump</span></label>
+        <label class="mc-button mc-toggle"><input type="checkbox" data-setting="invertX"><span>Invert X</span></label>
+        <label class="mc-button mc-toggle"><input type="checkbox" data-setting="invertY"><span>Invert Y</span></label>
+        <label class="mc-button mc-cycle">Mining arm:&nbsp;<select data-setting="arm"><option value="right">Right</option><option value="left">Left</option></select></label>
+        <label class="mc-button mc-toggle wide"><input type="checkbox" data-setting="facial"><span>Facial Actions</span></label>
+      </div>
+      <small>Smile to use or place, open your mouth to jump. Hold an expression for a quarter second and relax before repeating. Face tracking downloads an additional model.</small>
+      <div class="motion-buttons"><button type="button" class="mc-button wide" data-action="defaults">Reset Sensitivity</button></div>
       <small>Settings save on this browser. Changing them returns to practice mode.</small>
     </details>
-    <details><summary>Live measurements</summary><pre data-role="diagnostics">Start an input to see measurements.</pre></details>
-    <details><summary>How to calibrate & practice</summary>
+    <details><summary class="mc-button">Live Measurements...</summary><pre data-role="diagnostics">Start an input to see measurements.</pre></details>
+    <details class="motion-help"><summary class="mc-button">How to Calibrate...</summary>
       <ol>
-        <li>Place the camera at chest/face height with your whole body in view. Use even light and a clear background.</li>
+        <li>Place the camera at chest or face height with your whole body in view. Use even light and a clear background.</li>
         <li>Click Calibrate and stand still, looking straight ahead, until tracking is ready.</li>
         <li>Lean your head each way, swing your mining arm, alternate knee lifts, then try a small jump. Watch Detected.</li>
         <li>Lower a threshold if a gesture is missed. Raise it if ordinary movement triggers actions. Increase head dead zone for drift, smoothing for jitter, or reduce look speed for overshooting.</li>
@@ -64,18 +86,7 @@ module.exports = function setupCameraControls ({ apply, canPlay, onStart, socket
       <p>Use a mounted camera for body tracking. For phone mining, pair a separate phone, enable its motion sensor, hold it upright with the screen facing you, then thrust it forward to mine. Keep the controller page visible and awake.</p>
       <p>Calibration and sliders personalize a pretrained detector; they do not train a new AI model. No videos or landmarks are uploaded.</p>
     </details>
-    ${companion ? '' : `<details data-role="pairing"><summary>Pair a phone</summary>
-      <p>Open <a href="/controller" target="_blank" rel="noopener">the phone controller</a> on your phone, then enter a code. Both devices must reach this site over HTTPS.</p>
-      <label>Site address reachable from your phone <input type="text" data-role="pair-origin" aria-label="Phone-accessible HTTPS site address"></label>
-      <small>Use this server’s HTTPS address. localhost on your phone points to the phone, not your computer.</small>
-      <button type="button" data-action="pair">Generate pairing code</button>
-      <button type="button" data-action="unpair">Disconnect phone</button>
-      <canvas data-role="pair-qr" role="img" aria-label="Scan to open the phone controller with the pairing code" hidden></canvas>
-      <strong data-role="pair-code"></strong><a data-role="pair-link"></a>
-      <p data-role="pair-status">No phone connected. Codes expire after five minutes and work once.</p>
-      <small>A phone can send camera gestures, accelerometer mining, or both. Recommended: desktop camera + phone mining. Pairing does not create another player.</small>
-    </details>`}`
-  if (!companion) panel.insertBefore(panel.querySelector('[data-role=pairing]'), panel.querySelector('details'))
+    <div class="motion-buttons"><button type="button" class="mc-button wide" data-action="hide">Done</button></div>`
   mount.append(panel)
   const $ = selector => panel.querySelector(selector)
   const video = $('video')
@@ -83,14 +94,6 @@ module.exports = function setupCameraControls ({ apply, canPlay, onStart, socket
   const status = $('[data-role=status]')
   const mode = $('[data-role=mode]')
   const startButton = $('[data-action=start]')
-  let menuButton
-  if (!companion) {
-    menuButton = document.createElement('button')
-    menuButton.className = 'mc-button'
-    menuButton.textContent = 'Motion controls & phone'
-    document.getElementById('pause-resume').after(menuButton)
-    menuButton.addEventListener('click', () => show())
-  }
   let running = false
   let armed = false
   let generation = 0
@@ -129,8 +132,8 @@ module.exports = function setupCameraControls ({ apply, canPlay, onStart, socket
   function practice () {
     armed = false
     reset()
-    $('[data-action=arm]').textContent = 'Enable player control'
-    mode.textContent = 'Practice mode — gestures do not affect the player.'
+    $('[data-action=arm]').textContent = 'Enable Player Control'
+    mode.textContent = 'Practice mode: gestures do not affect the player.'
     mode.classList.remove('motion-live')
   }
   function stopCamera () {
@@ -148,12 +151,13 @@ module.exports = function setupCameraControls ({ apply, canPlay, onStart, socket
     faceDetector = null
     faceLoading = false
     startButton.disabled = false
+    syncFeed()
   }
   function stop () {
     practice()
     stopCamera()
     motionEnabled = false
-    $('[data-action=motion]').textContent = 'Enable phone mining'
+    $('[data-action=motion]').textContent = 'Phone Mining: OFF'
     if (!companion) socket?.emit('motion:unpair')
     paired = false
     status.textContent = 'All motion inputs stopped.'
@@ -163,13 +167,23 @@ module.exports = function setupCameraControls ({ apply, canPlay, onStart, socket
     practice()
     status.textContent = `Camera stopped: ${error.message || error}. Check permission, HTTPS and connectivity, then retry.`
   }
-  function show (withPhone = false) {
-    panel.hidden = false
-    if (withPhone && $('[data-role=pairing]')) {
-      $('[data-role=pairing]').open = true
-      if (!paired && !$('[data-role=pair-code]').textContent) $('[data-action=pair]').click()
-    }
+  // With the panel closed the same video (and its landmarks) sits in a HUD
+  // box by the minimap while the camera runs; one element, so the detector
+  // keeps reading the frames it was reading.
+  const feed = document.getElementById('motion-feed')
+  const previewBox = $('.motion-preview')
+  function syncFeed () {
+    if (!feed) return
+    const live = running && panel.hidden
+    feed.classList.toggle('live', live)
+    const home = live ? feed : panel
+    if (previewBox.parentNode === home) return
+    if (live) home.append(previewBox)
+    else $('[data-role=tracking]').before(previewBox)
+    video.play().catch(() => {})
   }
+  function show () { panel.hidden = false; syncFeed() }
+  function hide () { panel.hidden = true; syncFeed() }
   function renderSettings () {
     for (const [key] of Object.entries(FIELDS)) {
       $(`[data-setting=${key}]`).value = settings[key]
@@ -212,7 +226,8 @@ module.exports = function setupCameraControls ({ apply, canPlay, onStart, socket
   }
   for (const [key, [label, min, max, step]] of Object.entries(FIELDS)) {
     const row = document.createElement('label')
-    row.innerHTML = `${label} <output data-output="${key}"></output><input type="range" data-setting="${key}" min="${min}" max="${max}" step="${step}">`
+    row.className = 'mc-slider'
+    row.innerHTML = `<input type="range" data-setting="${key}" min="${min}" max="${max}" step="${step}"><span>${label}: <output data-output="${key}"></output></span>`
     $('[data-role=sliders]').append(row)
     row.querySelector('input').addEventListener('input', event => { settings[key] = Number(event.target.value); settingsChanged() })
   }
@@ -249,7 +264,7 @@ module.exports = function setupCameraControls ({ apply, canPlay, onStart, socket
         status.textContent = candidate.status + (faceLoading ? ' · Loading facial actions…' : '')
         const start = startGesture.update(result.landmarks[0], now, !armed && candidate.tracked && document.hasFocus())
         $('[data-role=start-hint]').textContent = armed
-          ? 'Player control is on. Use Return to practice or Stop all inputs to pause.'
+          ? 'Player control is on. Use Return to Practice or Stop All Inputs to pause.'
           : startGesture.progress > 0
             ? `Keep both hands raised… ${Math.round(startGesture.progress * 100)}%`
             : 'After camera calibration, raise both hands above your head and hold for one second to enable player control.'
@@ -286,6 +301,7 @@ module.exports = function setupCameraControls ({ apply, canPlay, onStart, socket
       gestures.calibrate()
       lastVideoTime = -1
       running = true
+      syncFeed()
       syncFace()
       tick()
     } catch (error) { if (token === generation) fail(error) }
@@ -298,16 +314,16 @@ module.exports = function setupCameraControls ({ apply, canPlay, onStart, socket
     reset()
     armed = true
     onStart()
-    $('[data-action=arm]').textContent = 'Return to practice'
+    $('[data-action=arm]').textContent = 'Return to Practice'
     mode.textContent = 'Player control enabled. Menus and lost focus suspend input.'
     mode.classList.add('motion-live')
     // Move focus away from buttons so Space can jump after setup.
     document.activeElement?.blur()
   })
   $('[data-action=stop]').addEventListener('click', stop)
-  $('[data-action=hide]').addEventListener('click', () => { panel.hidden = true })
+  $('[data-action=hide]').addEventListener('click', onDone || hide)
   $('[data-action=motion]').addEventListener('click', async () => {
-    if (motionEnabled) { motionEnabled = false; practice(); $('[data-action=motion]').textContent = 'Enable phone mining'; return }
+    if (motionEnabled) { motionEnabled = false; practice(); $('[data-action=motion]').textContent = 'Phone Mining: OFF'; return }
     const token = generation
     try {
       if (!window.isSecureContext || !window.DeviceMotionEvent) throw new Error('Phone motion needs HTTPS and a supported browser/device')
@@ -316,7 +332,7 @@ module.exports = function setupCameraControls ({ apply, canPlay, onStart, socket
       practice()
       motionEnabled = true
       motionSince = performance.now()
-      $('[data-action=motion]').textContent = 'Disable phone mining'
+      $('[data-action=motion]').textContent = 'Phone Mining: ON'
       status.textContent = 'Waiting for motion sensor data. Hold the phone upright, screen facing you. Thrust forward repeatedly to keep mining; stop moving to release.'
       if (companion) $('[data-action=arm]').click()
     } catch (error) { status.textContent = error.message }
@@ -342,8 +358,8 @@ module.exports = function setupCameraControls ({ apply, canPlay, onStart, socket
       } catch { pairStatus.textContent = 'Enter a valid HTTPS address for this game server.'; return }
       pairButton.disabled = true
       pairStatus.textContent = 'Creating phone pairing QR code…'
-      // Respect the server's request limit even when Generate is clicked
-      // immediately after automatic generation.
+      // The server rate-limits code requests; opening the section generates
+      // one, so a Generate click right after has to wait its turn.
       const wait = Math.max(0, 1100 - (performance.now() - lastPairRequest))
       if (wait) await new Promise(resolve => setTimeout(resolve, wait))
       if (!socket.connected) {
@@ -443,5 +459,5 @@ module.exports = function setupCameraControls ({ apply, canPlay, onStart, socket
   window.addEventListener('blur', reset)
   document.addEventListener('visibilitychange', () => { if (document.hidden) reset() })
   window.addEventListener('pagehide', () => { stop(); clearInterval(controlTimer) })
-  return { get active () { return armed }, reset, stop, show, practice }
+  return { get active () { return armed }, reset, stop, show, hide, practice }
 }

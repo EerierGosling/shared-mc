@@ -314,15 +314,38 @@ class Controller {
             this.bot.stopDigging()
           } catch (err) {}
         }, DIG_WATCH_MS)
+        // The server's last word on this block while the dig ran. A refused
+        // dig (spawn protection, a claim, adventure mode) is answered with a
+        // block_change reasserting the block; mineflayer's dig() ignores it,
+        // clears the block locally when its own timer ends and resolves as if
+        // it broke, which the browser would see as a vanished block with no
+        // drop. The raw packet is watched because mineflayer's local clear
+        // fires 'blockUpdate' too.
+        const bot = this.bot
+        let serverState = null
+        const onBlockChange = packet => {
+          const at = packet.location
+          if (at.x === block.position.x && at.y === block.position.y && at.z === block.position.z) serverState = packet.type
+        }
+        bot._client.on('block_change', onBlockChange)
         let broken = false
         try {
           // 'ignore' keeps the bot's head where the browser pointed it.
-          await this.bot.dig(block, 'ignore')
+          await bot.dig(block, 'ignore')
           broken = true
         } catch (err) {
           await sleep(100)
         } finally {
           clearInterval(watcher)
+          bot._client.removeListener('block_change', onBlockChange)
+          if (broken && serverState !== null && !isAirState(bot, serverState)) {
+            // Put the server's block back where mineflayer cleared it. Not
+            // aborted on the reassert itself: some servers echo the block at
+            // dig start and still break it, and those send the air afterwards.
+            broken = false
+            bot._updateBlockState(block.position, serverState)
+            this._digNotice('* the server does not allow mining here')
+          }
           // `broken` is what separates a finished dig from an interrupted
           // one: only the former gets the burst of chips.
           this.emitter.emit('dig:stop', { broken, position: block.position, name: block.name })
@@ -508,5 +531,11 @@ class Controller {
 }
 
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms))
+
+const AIR = new Set(['air', 'cave_air', 'void_air'])
+function isAirState (bot, stateId) {
+  const entry = bot.registry && bot.registry.blocksByStateId && bot.registry.blocksByStateId[stateId]
+  return !entry || AIR.has(entry.name)
+}
 
 module.exports = Controller
