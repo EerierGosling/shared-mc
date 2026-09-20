@@ -208,4 +208,4 @@ function blockState (name) {
   return (states && states[name]) || null
 }
 
-module.exports = { init, iconFor, blockState }
+module.exports = { init, iconFor, blockState, itemAssets: () => ({ kinds, atlas }) }
