@@ -699,6 +699,52 @@
   #pause-controls .row.speech-only { display: none; }
   body.speech #pause-controls .row.speech-only { display: flex; }
 
+  /* The Controls page of the game menu (settings-panel.js): a page swapped in
+     over #pause-main, same as the motion panel. Sliders reuse .mc-slider and
+     toggles .mc-toggle; only the layout and the aim graph are ours. */
+  #control-settings {
+    width: calc(280 * var(--u)); max-width: 92vw;
+    padding: 0 0 calc(12 * var(--u));
+    text-align: center;
+  }
+  #control-settings[hidden] { display: none; }
+  #control-settings h2 {
+    margin: calc(20 * var(--u)) 0 calc(8 * var(--u));
+    font-size: calc(var(--px) * 8px); font-weight: normal; line-height: 1;
+  }
+  #control-settings small {
+    display: block; color: var(--mc-gray);
+    font-size: calc(var(--px) * 6px); line-height: 1.4;
+    margin-bottom: calc(6 * var(--u));
+  }
+  #control-settings .aim-graph { margin: 0 0 calc(6 * var(--u)); }
+  #control-settings .aim-graph[hidden] { display: none; }
+  #control-settings canvas[data-role="graph"] {
+    display: block; width: 100%; height: calc(96 * var(--u));
+    background: rgba(0, 0, 0, 0.55);
+    border: var(--u) solid var(--shadow);
+    touch-action: none; cursor: crosshair;
+  }
+  #control-settings figcaption {
+    color: var(--mc-gray); font-size: calc(var(--px) * 6px);
+    margin-top: calc(2 * var(--u));
+  }
+  #control-settings [data-role="sliders"] {
+    display: flex; flex-direction: column;
+    gap: calc(4 * var(--u)); margin: calc(4 * var(--u)) 0;
+  }
+  #control-settings .cs-toggles {
+    display: grid; grid-template-columns: 1fr 1fr 1fr;
+    gap: calc(4 * var(--u)); margin: calc(4 * var(--u)) 0;
+  }
+  #control-settings .cs-buttons {
+    display: grid; grid-template-columns: 1fr 1fr;
+    gap: calc(10 * var(--u)); margin-top: calc(6 * var(--u));
+  }
+  #control-settings .cs-toggles > *, #control-settings .cs-buttons > * {
+    width: 100%; min-width: 0; height: calc(20 * var(--u)); margin: 0;
+  }
+
   /* --- advancements -------------------------------------------------------- */
   /* Vanilla's toast sprite is 160x32: icon at (8,8), headline at (30,7),
      title at (30,18); it slides in at the top right. */
@@ -990,6 +1036,7 @@
     <div id="pause-main">
     <h1>Game menu</h1>
     <button id="pause-resume" class="mc-button" type="button">Back to Game</button>
+    <button id="pause-settings" class="mc-button" type="button">Controls...</button>
     <button id="pause-motion" class="mc-button" type="button">Motion Controls...</button>
     <button id="pause-advancements" class="mc-button" type="button">Advancements</button>
     <button id="pause-quit" class="mc-button" type="button">Quit to Title</button>

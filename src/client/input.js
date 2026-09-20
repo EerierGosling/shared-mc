@@ -2,6 +2,7 @@
 
 const setupCameraControls = require('./camera-controls')
 const setupSpeech = require('./speech')
+const { BASE_MOUSE, BASE_TOUCH, lookScale } = require('./control-settings')
 
 const KEY_TO_CONTROL = {
   KeyW: 'forward',
@@ -20,14 +21,7 @@ const CONTROL_KEYS = ['forward', 'back', 'left', 'right', 'jump', 'sneak', 'spri
 // the Minecraft server sees is unchanged (mineflayer snapshots yaw/pitch once
 // per 50ms physics tick), so sending fresher samples only cuts aim latency.
 const LOOK_SEND_MS = 16
-const SENSITIVITY = 0.004
-// A finger drag is in CSS pixels on a screen a fraction of the width, so it
-// needs to turn further per pixel than the mouse does.
-const TOUCH_SENSITIVITY = 0.006
 const HALF_PI = Math.PI / 2
-const DOUBLE_TAP_MS = 300
-// Vanilla keeps placing every four ticks while right click is held.
-const USE_REPEAT_MS = 200
 const CHAT_HISTORY = 50
 
 /**
@@ -40,7 +34,7 @@ const CHAT_HISTORY = 50
  * Touch devices get the same messages from on-screen buttons (see #touch in
  * index.html) and steer by dragging the canvas.
  */
-function setupInput ({ socket, viewer, camera, hud, inventoryUI, advancementsUI, canvas, hand, join, creative, placePrediction, pause, phoneLink }) {
+function setupInput ({ socket, viewer, camera, hud, inventoryUI, advancementsUI, canvas, hand, join, creative, placePrediction, pause, phoneLink, getControls }) {
   const held = Object.create(null)
   let locked = false
   let cameraControls = null
@@ -98,10 +92,11 @@ function setupInput ({ socket, viewer, camera, hud, inventoryUI, advancementsUI,
     if (useRepeat) return
     socket.emit('action:use')
     hand.push()
+    // Vanilla keeps placing while right click is held; the rate is tunable.
     useRepeat = setInterval(() => {
       socket.emit('action:use', { repeat: true })
       hand.push()
-    }, USE_REPEAT_MS)
+    }, getControls().placeRepeat)
   }
 
   const stopUse = () => {
@@ -158,12 +153,38 @@ function setupInput ({ socket, viewer, camera, hud, inventoryUI, advancementsUI,
     emitLook()
   }
 
-  const turn = (dx, dy, sensitivity) => {
-    camera.yaw -= dx * sensitivity
-    camera.pitch -= dy * sensitivity
+  // Turn by radian deltas already computed — the one place the camera moves, so
+  // clamping, the local apply and the throttled send stay in a single spot.
+  const applyLook = (dYaw, dPitch) => {
+    camera.yaw += dYaw
+    camera.pitch += dPitch
     camera.pitch = Math.max(-HALF_PI, Math.min(HALF_PI, camera.pitch))
     viewer.setFirstPersonCamera(null, camera.yaw, camera.pitch)
     sendLook(false)
+  }
+
+  // Motion controls hand pixel-ish deltas and their own linear sensitivity; the
+  // gestures already invert per the motion settings, so this stays a plain
+  // multiply and does not touch the mouse tuning below.
+  const turn = (dx, dy, sensitivity) => applyLook(-dx * sensitivity, -dy * sensitivity)
+
+  // Mouse look runs through the tunable response curve: base sensitivity from
+  // the slider, then acceleration/curve scaling the fast flicks (see
+  // control-settings.js). Invert flips the sign of the default -=.
+  const mouseLook = (dx, dy) => {
+    const s = getControls()
+    const base = BASE_MOUSE * s.mouseSensitivity / 100
+    const scale = lookScale(Math.hypot(dx, dy), s, base)
+    applyLook(dx * scale * (s.invertX ? 1 : -1), dy * scale * (s.invertY ? 1 : -1))
+  }
+
+  // A finger drag is CSS pixels on a screen a fraction of the width, so it turns
+  // further per pixel than the mouse; it stays linear (no acceleration) but
+  // honours its own sensitivity and the same invert toggles.
+  const touchTurn = (dx, dy) => {
+    const s = getControls()
+    const base = BASE_TOUCH * s.touchSensitivity / 100
+    applyLook(dx * base * (s.invertX ? 1 : -1), dy * base * (s.invertY ? 1 : -1))
   }
 
   const selectSlot = slot => socket.emit('hotbar', { slot })
@@ -256,14 +277,15 @@ function setupInput ({ socket, viewer, camera, hud, inventoryUI, advancementsUI,
 
   document.addEventListener('mousemove', event => {
     if (!locked) return
-    turn(event.movementX, event.movementY, SENSITIVITY)
+    mouseLook(event.movementX, event.movementY)
   })
 
   // Scroll through the hotbar, wrapping at both ends as vanilla does.
   window.addEventListener('wheel', event => {
     if (!locked || uiOpen()) return
-    const step = Math.sign(event.deltaY)
-    if (!step) return
+    const dir = Math.sign(event.deltaY)
+    if (!dir) return
+    const step = dir * (getControls().invertScroll ? -1 : 1)
     const current = hud.lastState ? hud.lastState.quickBarSlot : 0
     selectSlot(((current + step) % 9 + 9) % 9)
   }, { passive: true })
@@ -283,7 +305,7 @@ function setupInput ({ socket, viewer, camera, hud, inventoryUI, advancementsUI,
     for (const touch of event.changedTouches) {
       if (touch.identifier !== lookTouch.id) continue
       event.preventDefault()
-      turn(touch.clientX - lookTouch.x, touch.clientY - lookTouch.y, TOUCH_SENSITIVITY)
+      touchTurn(touch.clientX - lookTouch.x, touch.clientY - lookTouch.y)
       lookTouch.x = touch.clientX
       lookTouch.y = touch.clientY
       touchLook = true
@@ -416,7 +438,7 @@ function setupInput ({ socket, viewer, camera, hud, inventoryUI, advancementsUI,
     if (event.code === 'Space') event.preventDefault()
     if (control === 'forward') {
       const now = Date.now()
-      if (now - lastForwardTap < DOUBLE_TAP_MS) held.autoSprint = true
+      if (now - lastForwardTap < getControls().doubleTap) held.autoSprint = true
       lastForwardTap = now
     }
     // Double-tapping space is how vanilla toggles creative flight. Asking for
@@ -424,7 +446,7 @@ function setupInput ({ socket, viewer, camera, hud, inventoryUI, advancementsUI,
     // that flies without permission, so the refusal lives on the server.
     if (control === 'jump') {
       const now = Date.now()
-      if (now - lastJumpTap < DOUBLE_TAP_MS && creative.canFly) {
+      if (now - lastJumpTap < getControls().doubleTap && creative.canFly) {
         socket.emit('creative:fly', { active: !creative.flying })
       }
       lastJumpTap = now
